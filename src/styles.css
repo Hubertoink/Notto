@@ -73,6 +73,7 @@ textarea:focus-visible {
   color: var(--nt-text);
 }
 .notebook {
+  color: var(--nt-text);
   display: flex;
   height: 100dvh;
   min-height: 500px;
@@ -975,6 +976,7 @@ textarea:focus-visible {
   height: 100dvh;
 }
 .widget-surface {
+  color: var(--nt-text);
   background: var(--nt-paper);
   border: 1px solid var(--nt-line);
   box-shadow: 0 3px 8px var(--nt-shadow);

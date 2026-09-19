@@ -70,9 +70,11 @@ export function titleOf(content: string): string {
 export function excerptOf(content: string): string {
   return content
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '[Bild]')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[#*_`>]/g, '')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .slice(0, 220);
 }
 export function newNote(scope: Scope, content: string, now = new Date().toISOString()): Note {
   const revision = crypto.randomUUID();

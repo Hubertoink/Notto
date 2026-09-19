@@ -1,7 +1,8 @@
+import { config, eligible, semanticSearch, type Evidence } from './intelligence';
 import './search.css';
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { Search, X } from 'lucide-react';
+import { Search, Sparkles, X } from 'lucide-react';
 import { matchesQuery, titleOf, excerptOf, type Note } from './domain';
 
 export function FloatingSearch({
@@ -9,18 +10,51 @@ export function FloatingSearch({
   onClose,
   onOpen,
   notes,
+  scope,
   onSelect,
 }: {
   open: boolean;
   onClose: () => void;
   onOpen: () => void;
   notes: Note[];
+  scope: string;
   onSelect: (id: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const field = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [query, setQuery] = useState('');
+  const [semantic, setSemantic] = useState<{ query: string; hits: (Evidence & { score: number })[] } | null>(
+    null,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const generation = useRef(0);
+  useEffect(() => {
+    generation.current++;
+    setBusy(false);
+    setError('');
+    setSemantic(null);
+  }, [query, open, scope]);
+  const searchMeaning = async () => {
+    if (!query.trim() || busy) return;
+    const request = ++generation.current;
+    const searched = query;
+    setBusy(true);
+    setError('');
+    try {
+      const hits = await semanticSearch(
+        scope,
+        searched,
+        notes.filter((n) => n.scope === scope && !n.deleted),
+      );
+      if (request === generation.current) setSemantic({ query: searched, hits });
+    } catch (error) {
+      if (request === generation.current) setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (request === generation.current) setBusy(false);
+    }
+  };
   const reduced = useReducedMotion();
   useEffect(() => {
     if (open) {
@@ -31,9 +65,24 @@ export function FloatingSearch({
       trigger.current?.focus();
     }
   }, [open]);
-  const results = notes
-    .filter((n) => !n.deleted && matchesQuery(n, query))
+  const direct = notes
+    .filter((n) => n.scope === scope && !n.deleted && matchesQuery(n, query))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const related: Note[] = [];
+  if (semantic?.query === query)
+    for (const hit of semantic.hits) {
+      const note = notes.find(
+        (n) =>
+          n.id === hit.noteId &&
+          n.scope === scope &&
+          n.revision === hit.revision &&
+          !n.deleted &&
+          eligible(n),
+      );
+      if (note && !direct.some((n) => n.id === note.id) && !related.some((n) => n.id === note.id))
+        related.push(note);
+    }
+  const results = [...direct, ...related];
   return (
     <>
       {!open && (
@@ -86,9 +135,25 @@ export function FloatingSearch({
                 <X size={18} />
               </button>
             </div>
-            <div className="search-results">
+            {query.trim() && (
+              <div className="search-ai-controls">
+                <button onClick={() => void searchMeaning()} disabled={busy || !config(scope).enabled}>
+                  <Sparkles size={13} /> {busy ? 'Sucht sinngemäß …' : 'Sinngemäß suchen'}
+                </button>
+                {!config(scope).enabled && <p>KI-Suche unter „Wissen & KI“ aktivieren.</p>}
+                {error && <p role="alert">{error}</p>}
+                {!busy && semantic?.query === query && (
+                  <p role="status">
+                    {related.length
+                      ? `${related.length} zusätzliche KI-Treffer`
+                      : 'Keine zusätzlichen KI-Treffer.'}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="search-results" aria-busy={busy}>
               <p className="muted">{query ? `${results.length} Treffer` : 'Zuletzt bearbeitet'}</p>
-              {results.slice(0, 50).map((n) => (
+              {[...direct.slice(0, 40), ...related].map((n) => (
                 <button
                   key={n.id}
                   onClick={() => {
@@ -98,6 +163,7 @@ export function FloatingSearch({
                 >
                   <strong>{titleOf(n.content)}</strong>
                   <span>{excerptOf(n.content)}</span>
+                  {related.some((r) => r.id === n.id) && <small>Sinngemäßer KI-Treffer</small>}
                   {n.archived && <small>Archiv</small>}
                 </button>
               ))}

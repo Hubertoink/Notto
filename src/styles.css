@@ -76,10 +76,13 @@ textarea:focus-visible {
   color: var(--nt-text);
   display: flex;
   height: 100dvh;
-  min-height: 500px;
+  min-height: 0;
+  overflow: hidden;
   background: var(--nt-paper);
 }
 .sidebar {
+  min-height: 0;
+  overflow-y: auto;
   width: 228px;
   flex-shrink: 0;
   background: var(--nt-sidebar);
@@ -88,6 +91,9 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+.sidebar > * {
+  flex-shrink: 0;
 }
 .brand {
   display: flex;
@@ -215,7 +221,8 @@ textarea:focus-visible {
 }
 .tag-navigation {
   overflow: auto;
-  min-height: 50px;
+  min-height: 0;
+  max-height: 25dvh;
 }
 .empty-tags {
   font-size: 13px;
@@ -244,6 +251,8 @@ textarea:focus-visible {
 }
 .main {
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -321,6 +330,7 @@ textarea:focus-visible {
   min-height: 0;
 }
 .note-list-panel {
+  min-height: 0;
   width: 328px;
   flex-shrink: 0;
   border-right: 1px solid var(--nt-line);
@@ -447,6 +457,7 @@ textarea:focus-visible {
   font-weight: 500;
 }
 .detail-panel {
+  min-height: 0;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -496,6 +507,7 @@ textarea:focus-visible {
   margin-top: -8px;
 }
 .detail-actions {
+  flex-shrink: 0;
   height: 58px;
   padding: 0 26px;
   display: flex;
@@ -1238,7 +1250,7 @@ textarea:focus-visible {
 }
 @media (max-width: 700px) {
   .notebook {
-    min-height: 400px;
+    min-height: 0;
   }
   .sidebar {
     position: fixed;

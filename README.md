@@ -18,6 +18,12 @@ npm test
 
 `npm run desktop` startet seinen eigenen Vite-Server; vorher einen separat gestarteten `npm run dev` beenden. Für Windows-Builds werden Rust (MSVC), die Visual Studio C++ Build Tools und WebView2 benötigt. Das Desktop-Skript ergänzt den üblichen Rust-Pfad selbst.
 
+## Kleine Fenster und gemeinsame Suche (0.8)
+
+Die Seitenleiste und Notizbereiche scrollen unabhängig innerhalb der Fensterhöhe. Suchvorschauen sind auf zwei Zeilen und 220 Zeichen begrenzt; Markdown-Linkziele werden nicht ausgeschrieben.
+
+Strg + K bietet neben direkten Wort- und Hashtagtreffern „Sinngemäß suchen“. Diese Aktion verwendet die vorhandene Embedding-Suche und benötigt eine aktivierte KI-Verbindung. Der erste Durchlauf erstellt fehlende Textvektoren; weitere Suchen verwenden den Cache. Ausgeschlossene Notizen werden nicht an die KI übergeben. Normale Treffer bleiben bei einem KI-Fehler verfügbar. Notizbuchfragen sind weiterhin unter „Wissen & KI“ erreichbar. Automatische Anzeigetitel und projektübergreifende Zuordnungen sind noch nicht implementiert.
+
 ## Themen und Anmerkungen (0.7)
 
 Die Themenansicht zeigt eigene Hashtags und ergänzende KI-Zuordnungen ohne Bestätigungsworkflow. Vorschläge, die lediglich einen bereits gesetzten Hashtag wiederholen, werden dort nicht doppelt angezeigt. Anhänge zeigen ihren Titel beziehungsweise Dateinamen.

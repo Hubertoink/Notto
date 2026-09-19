@@ -401,6 +401,7 @@ function Notebook({
           <Menu size={20} />
         </button>
         <FloatingSearch
+          scope={scope}
           key={scope}
           open={searchOpen}
           onOpen={() => setSearchOpen(true)}

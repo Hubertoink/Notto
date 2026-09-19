@@ -10,6 +10,7 @@ import { NottoProvider } from './state';
 import { db, repo } from './repository';
 import { newNote } from './domain';
 import { knowledge } from './intelligence';
+import * as intelligence from './intelligence';
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 beforeAll(() => {
   Object.defineProperty(window, 'matchMedia', {
@@ -64,6 +65,30 @@ it('opens inline AI annotations and completes a task without changing the note',
   await user.click(checkbox);
   await waitFor(() => expect((checkbox as HTMLInputElement).checked).toBe(true));
   expect(await repo.get('local', note.id)).toEqual(note);
+});
+it('refreshes outdated annotations from the saved revision and closes through the icon', async () => {
+  const note = newNote('local', 'Aktuelle Fassung');
+  await repo.put(note, null);
+  await knowledge.append({ ...note, revision: 'old-revision' }, 'analysis', { suggestions: [] });
+  const analyze = vi.spyOn(intelligence, 'analyze').mockImplementation(async (n) => {
+    await knowledge.append(n, 'analysis', { suggestions: [] });
+  });
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
+  await screen.findByText(/frühere Textversion/);
+  await user.click(screen.getByRole('button', { name: 'Aktualisieren' }));
+  await waitFor(() => expect(analyze).toHaveBeenCalledWith(note));
+  await waitFor(() => expect(screen.queryByText(/frühere Textversion/)).toBeNull());
+  expect(await repo.get('local', note.id)).toEqual(note);
+  await user.click(screen.getByRole('button', { name: 'Anmerkungen schließen' }));
+  expect(screen.getByRole('button', { name: /KI-Anmerkungen/ }).getAttribute('aria-expanded')).toBe('false');
 });
 it('recovers an unfinished draft after closing and saves its exact text', async () => {
   const user = userEvent.setup();

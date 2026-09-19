@@ -1,3 +1,5 @@
+import { AttachmentTitle } from './AttachmentTitle';
+import { Topics } from './Topics';
 import { Sources } from './components';
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -649,7 +651,7 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
                   {titleOf(note.content)}
                 </button>
                 <p>
-                  {id.endsWith('.pdf') ? 'PDF-Dokument' : 'Bild'} · {id.slice(0, 8)}
+                  <AttachmentTitle content={note.content} scope={note.scope} id={id} />
                 </p>
                 <div className="settings-actions">
                   {id.endsWith('.pdf') && (
@@ -781,32 +783,14 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
             />
           )}
         </section>
+      ) : tab === 'topic' ? (
+        <Topics
+          notes={notes.filter((n) => !n.deleted)}
+          records={records.filter((r) => included.some((n) => n.id === r.noteId))}
+          onOpen={onOpen}
+        />
       ) : (
         <section className="knowledge-section">
-          {tab === 'topic' &&
-            [
-              ...new Set(
-                entries
-                  .filter((e) => e.item.kind === 'topic')
-                  .map((e) => e.item.title.toLocaleLowerCase('de')),
-              ),
-            ].map((topic) => (
-              <div className="knowledge-card" key={topic}>
-                <h3>#{topic}</h3>
-                {entries
-                  .filter(
-                    (e) =>
-                      e.item.kind === 'topic' &&
-                      e.item.title.toLocaleLowerCase('de') === topic &&
-                      e.decision?.status !== 'dismissed',
-                  )
-                  .map(({ note }) => (
-                    <button key={note.id} className="text-button" onClick={() => onOpen(note.id)}>
-                      {titleOf(note.content)}
-                    </button>
-                  ))}
-              </div>
-            ))}
           {entries
             .filter((e) => e.item.kind === tab)
             .map(({ note, item, decision }, i) => (
@@ -870,13 +854,13 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
                       )
                     }
                   />
-                  {tab !== 'topic' && (
+                  {
                     <Action
                       label="Im Web recherchieren"
                       isDisabled={!!busy}
                       onClick={() => void run(`Recherche: ${item.title}`, () => research(note, item))}
                     />
-                  )}
+                  }
                 </div>
                 {records
                   .filter(

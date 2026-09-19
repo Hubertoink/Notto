@@ -1,6 +1,6 @@
 [package]
 name = "notto"
-version = "0.6.2"
+version = "0.7.0"
 description = "Notto — local-first notes"
 edition = "2021"
 

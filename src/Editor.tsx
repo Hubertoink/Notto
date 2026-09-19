@@ -1,3 +1,4 @@
+import { AttachmentTitle } from './AttachmentTitle';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Eye, History, ImagePlus, PenLine, Save, X } from 'lucide-react';
 import { Action, Modal, NoteMarkdown, readableDate } from './components';
@@ -219,7 +220,7 @@ export function Editor({
           {note.conflictOf && <span className="conflict-label">Konfliktkopie</span>}
         </div>
       )}
-      {note && !compact && <NoteAnnotations key={note.id} note={note} />}
+      {note && !compact && <NoteAnnotations key={note.id} note={note} hasUnsavedChanges={dirty} />}
       <div
         className={`editor-content ${preview ? 'is-preview' : ''}`}
         onDragOver={(e) => e.preventDefault()}
@@ -265,12 +266,9 @@ export function Editor({
           {attachmentIds(content)
             .filter((id) => id.endsWith('.pdf'))
             .map((id) => {
-              const label = [...content.matchAll(/\[([^\]\n]+)\]\(attachments\/([^\s)]+)\)/g)].find(
-                (match) => match[2] === id,
-              )?.[1];
               return (
                 <PdfAttachment key={id} scope={scope} id={id}>
-                  {label || 'PDF öffnen'}
+                  <AttachmentTitle content={content} scope={scope} id={id} />
                 </PdfAttachment>
               );
             })}

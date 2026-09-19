@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Sparkles } from 'lucide-react';
-import { knowledge, type Analysis, type KnowledgeRecord, type Research } from './intelligence';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useEffect, useState, useRef } from 'react';
+import { Sparkles, X } from 'lucide-react';
+import { analyze, knowledge, type Analysis, type KnowledgeRecord, type Research } from './intelligence';
 import { addTask, checkTask, newest, noteAnalysis, tasksFor, type Task } from './task-store';
 import { useNotto } from './state';
-import { Action, Sources, NoteMarkdown } from './components';
+import { Sources, NoteMarkdown } from './components';
 import type { Note } from './domain';
 import './tasks.css';
 
@@ -122,9 +123,31 @@ export function TasksPage({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
     </section>
   );
 }
-export function NoteAnnotations({ note }: { note: Note }) {
+export function NoteAnnotations({
+  note,
+  hasUnsavedChanges = false,
+}: {
+  note: Note;
+  hasUnsavedChanges?: boolean;
+}) {
   const records = useKnowledgeRecords(note.scope);
   const [open, setOpen] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState('');
+  const trigger = useRef<HTMLButtonElement>(null);
+  const reduced = useReducedMotion();
+  const refresh = async () => {
+    if (updating || hasUnsavedChanges) return;
+    setUpdating(true);
+    setUpdateError('');
+    try {
+      await analyze(note);
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setUpdating(false);
+    }
+  };
   const analysis = noteAnalysis(records, note);
   const items = (analysis?.data as Analysis | undefined)?.suggestions ?? [];
   const tasks = tasksFor([note], records, note.scope).filter((t) => t.note);
@@ -139,51 +162,96 @@ export function NoteAnnotations({ note }: { note: Note }) {
     return true;
   });
   return (
-    <div className="note-annotations">
-      <button
-        className={`annotation-toggle ${items.length || research.length ? 'has-annotations' : ''}`}
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        title="KI-Anmerkungen direkt in der Notiz anzeigen"
-      >
-        <Sparkles size={17} />
-        <span>KI-Anmerkungen</span>
-        <span>{items.length + uniqueResearch.length || ''}</span>
-      </button>
-      {open && (
-        <div className="annotation-panel">
-          <p className="muted">KI-Vorschläge · separat vom Original gespeichert.</p>
-          {analysis && analysis.revision !== note.revision && (
-            <p className="muted">Die Anmerkungen beziehen sich auf eine frühere Textversion.</p>
-          )}
-          {!items.length && !research.length && (
-            <p>
-              Noch keine Anmerkungen. Die Analyse lässt sich unter „Wissen & KI“ starten oder automatisch
-              aktivieren.
-            </p>
-          )}
-          {tasks.map((task) => (
-            <TaskRow key={task.id} task={task} />
-          ))}
-          {items
-            .filter((i) => i.kind !== 'task')
-            .map((item, index) => (
-              <article key={index}>
-                <strong>{item.title}</strong>
-                <p>{item.detail}</p>
-                <blockquote>{item.quote}</blockquote>
-              </article>
-            ))}
-          {uniqueResearch.map((r) => (
-            <article key={r.id}>
-              <strong>Recherche</strong>
-              <NoteMarkdown content={(r.data as Research).text} scope={note.scope} />
-              <Sources sources={(r.data as Research).sources ?? []} />
-            </article>
-          ))}
-          <Action label="Anmerkungen schließen" onClick={() => setOpen(false)} variant="ghost" />
-        </div>
-      )}
-    </div>
+    <motion.div
+      layout={!reduced}
+      transition={{ type: 'spring', stiffness: 360, damping: 34 }}
+      className={`note-annotations annotation-shell ${open ? 'annotation-open' : ''}`}
+      style={{ width: open ? '100%' : 'fit-content' }}
+    >
+      <div className="annotation-heading">
+        <button
+          ref={trigger}
+          className={`annotation-toggle ${items.length || research.length ? 'has-annotations' : ''}`}
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          title="KI-Anmerkungen direkt in der Notiz anzeigen"
+        >
+          <Sparkles size={17} />
+          <span>KI-Anmerkungen</span>
+          <span>{items.length + uniqueResearch.length || ''}</span>
+        </button>
+        {open && (
+          <button
+            className="annotation-close icon-button"
+            aria-label="Anmerkungen schließen"
+            onClick={() => {
+              setOpen(false);
+              trigger.current?.focus();
+            }}
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="contents"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: reduced ? 0 : 0.22 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="annotation-panel">
+              <p className="muted">KI-Vorschläge · separat vom Original gespeichert.</p>
+              <p className="muted annotation-update">
+                {analysis && analysis.revision !== note.revision
+                  ? 'Die Anmerkungen beziehen sich auf eine frühere Textversion. '
+                  : ''}
+                <button
+                  className="annotation-refresh"
+                  disabled={updating || hasUnsavedChanges}
+                  onClick={() => void refresh()}
+                >
+                  {updating ? 'Wird aktualisiert …' : 'Aktualisieren'}
+                </button>
+              </p>
+              {hasUnsavedChanges && <p className="muted">Änderungen zuerst speichern, dann aktualisieren.</p>}
+              {updateError && (
+                <p role="alert" className="inline-error">
+                  {updateError}
+                </p>
+              )}
+              {!items.length && !research.length && (
+                <p>
+                  Noch keine Anmerkungen. Die Analyse lässt sich unter „Wissen & KI“ starten oder automatisch
+                  aktivieren.
+                </p>
+              )}
+              {tasks.map((task) => (
+                <TaskRow key={task.id} task={task} />
+              ))}
+              {items
+                .filter((i) => i.kind !== 'task')
+                .map((item, index) => (
+                  <article key={index}>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                    <blockquote>{item.quote}</blockquote>
+                  </article>
+                ))}
+              {uniqueResearch.map((r) => (
+                <article key={r.id}>
+                  <strong>Recherche</strong>
+                  <NoteMarkdown content={(r.data as Research).text} scope={note.scope} />
+                  <Sources sources={(r.data as Research).sources ?? []} />
+                </article>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

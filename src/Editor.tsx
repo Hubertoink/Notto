@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Eye, History, ImagePlus, PenLine, Save, X } from 'lucide-react';
 import { Action, Modal, NoteMarkdown, readableDate } from './components';
-import { newNote, reviseNote, tagsOf, type Note, type Revision } from './domain';
+import { newNote, reviseNote, tagsOf, attachmentIds, type Note, type Revision } from './domain';
+import { PdfAttachment } from './PdfAttachment';
 import { repo } from './repository';
 import { useNotto } from './state';
 import { Dictation } from './Dictation';
@@ -259,6 +260,22 @@ export function Editor({
           />
         )}
       </div>
+      {!preview && attachmentIds(content).some((id) => id.endsWith('.pdf')) && (
+        <div className="editor-attachments" aria-label="PDF-Anhänge">
+          {attachmentIds(content)
+            .filter((id) => id.endsWith('.pdf'))
+            .map((id) => {
+              const label = [...content.matchAll(/\[([^\]\n]+)\]\(attachments\/([^\s)]+)\)/g)].find(
+                (match) => match[2] === id,
+              )?.[1];
+              return (
+                <PdfAttachment key={id} scope={scope} id={id}>
+                  {label || 'PDF öffnen'}
+                </PdfAttachment>
+              );
+            })}
+        </div>
+      )}
       {tagsOf(content).length > 0 && (
         <div className="editor-tags">
           {tagsOf(content).map((tag) => (

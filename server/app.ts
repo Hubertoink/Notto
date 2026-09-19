@@ -56,6 +56,7 @@ export async function buildApp(db: Database, env: Environment) {
   await app.register(cors, {
     origin: (origin, cb) => cb(null, !origin || origins.has(origin)),
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Notto-Client'],
   });
   app.setErrorHandler((error, _request, reply) => {
@@ -103,7 +104,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '0.6.1' };
+    return { ok: true, version: '0.6.2' };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (

@@ -23,6 +23,26 @@ const headers = (secret?: string) => ({
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
 });
+it('allows desktop attachment upload preflight including PUT', async () => {
+  for (const origin of ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost']) {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/attachments/test.pdf',
+      headers: {
+        origin,
+        'access-control-request-method': 'PUT',
+        'access-control-request-headers': 'authorization,content-type,x-notto-client',
+      },
+    });
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBe(origin);
+    expect(
+      String(response.headers['access-control-allow-methods'])
+        .split(',')
+        .map((method) => method.trim()),
+    ).toContain('PUT');
+  }
+});
 beforeAll(async () => {
   await pg.exec(await readFile(new URL('./schema.sql', import.meta.url), 'utf8'));
   dir = await mkdtemp(join(tmpdir(), 'notto-server-'));

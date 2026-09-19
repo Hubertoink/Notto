@@ -57,17 +57,38 @@ export function Topics({
         Bestätigung nötig.
       </p>
       {!groups.length && <p>Noch keine Themen. Setze Hashtags oder analysiere deine Notizen.</p>}
-      {groups.map((group) => (
-        <article className="knowledge-card" key={`${group.ai}:${group.title}`}>
-          <span className="eyebrow">{group.ai ? 'KI-ZUORDNUNG' : 'DEIN HASHTAG'}</span>
-          <h3>{group.title}</h3>
-          {[...group.notes.values()].map((note) => (
-            <button key={note.id} className="text-button" onClick={() => onOpen(note.id)}>
-              {titleOf(note.content)}
-            </button>
-          ))}
-        </article>
-      ))}
+      {groups.length > 0 && (
+        <div className="knowledge-table-wrap">
+          <table className="knowledge-table topic-table" aria-label="Themen und zugehörige Notizen">
+            <thead>
+              <tr>
+                <th scope="col">Thema</th>
+                <th scope="col">Zuordnung</th>
+                <th scope="col">Notizen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((group) => (
+                <tr key={`${group.ai}:${group.title}`}>
+                  <th scope="row">{group.title}</th>
+                  <td>
+                    <span className="knowledge-status">{group.ai ? 'KI' : 'Hashtag'}</span>
+                  </td>
+                  <td>
+                    <div className="topic-note-links">
+                      {[...group.notes.values()].map((note) => (
+                        <button key={note.id} className="text-button" onClick={() => onOpen(note.id)}>
+                          {titleOf(note.content)}
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

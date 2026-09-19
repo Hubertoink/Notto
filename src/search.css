@@ -164,3 +164,25 @@
     display: none;
   }
 }
+@media (min-width: 701px) and (pointer: fine) {
+  .floating-search-trigger {
+    top: 10px;
+    bottom: auto;
+    right: 24px;
+    padding: 10px 14px;
+  }
+  .search-dialog {
+    margin: 10px 24px auto auto;
+  }
+  .search-surface {
+    margin-left: auto;
+    transform-origin: top right;
+  }
+  .detail-actions {
+    padding-right: 160px;
+  }
+  .knowledge-heading,
+  .tasks-page > h1 {
+    padding-right: 150px;
+  }
+}

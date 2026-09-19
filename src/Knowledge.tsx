@@ -1,5 +1,6 @@
 import { AttachmentTitle } from './AttachmentTitle';
 import { Topics } from './Topics';
+import { MemorySettings } from './Memory';
 import { Sources } from './components';
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -366,13 +367,9 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
   return (
     <section className="knowledge-content" aria-label="Wissen & KI">
       <div className="knowledge-heading">
-        <span className="eyebrow">DEIN NOTIZBUCH, WEITERGEDACHT</span>
         <h1>Wissen & KI</h1>
       </div>
-      <p className="muted">
-        Deine Originale bleiben unverändert. Hier liegen abgeleitete Vorschläge, geprüfte Entscheidungen und
-        Quellen.
-      </p>
+      <p className="muted">Notizen ordnen, Zusammenhänge finden und deinen persönlichen Kontext verwalten.</p>
       <div className="knowledge-tabs segmented">
         {[
           ['overview', 'Überblick'],
@@ -381,6 +378,7 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
           ['topic', 'Themen'],
           ['search', 'Suchen & Fragen'],
           ['files', 'Anhänge'],
+          ['memory', 'Mein Kontext'],
           ['settings', 'KI einrichten'],
         ].map(([id, label]) => (
           <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
@@ -440,7 +438,9 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
           {message}
         </p>
       )}
-      {tab === 'settings' ? (
+      {tab === 'memory' ? (
+        <MemorySettings key={scope} />
+      ) : tab === 'settings' ? (
         <fieldset className="settings-section ai-settings-fields" disabled={saving || !settingsReady}>
           <h3>OpenAI verbinden</h3>
           <p className="muted">
@@ -717,7 +717,7 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
                 ))}
             </div>
           )}
-          <div className="knowledge-card">
+          <div className="knowledge-summary">
             <h3>
               {included.length} freigegebene Notizen · {entries.length} Vorschläge
             </h3>
@@ -742,39 +742,61 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
               </button>
             )}
           </div>
-          {notes
-            .filter((n) => !n.deleted)
-            .map((n) => (
-              <article className="knowledge-card" key={n.id}>
-                <button className="text-button" onClick={() => onOpen(n.id)}>
-                  {titleOf(n.content)}
-                </button>
-                <p className="muted">
-                  {!eligible(n)
-                    ? 'Ausgeschlossen'
-                    : latest(records, 'analysis', n)
-                      ? 'Aktuelle Fassung analysiert'
-                      : 'Analyse offen'}
-                </p>
-                <div className="settings-actions">
-                  <Action
-                    label="Neu analysieren"
-                    isDisabled={!!busy || !eligible(n) || !settings.enabled}
-                    onClick={() => void run('Notiz analysieren', () => analyze(n))}
-                  />
-                  <Action
-                    label={settings.excludedNotes.includes(n.id) ? 'Wieder freigeben' : 'KI ausschließen'}
-                    onClick={() =>
-                      update({
-                        excludedNotes: settings.excludedNotes.includes(n.id)
-                          ? settings.excludedNotes.filter((id) => id !== n.id)
-                          : [...settings.excludedNotes, n.id],
-                      })
-                    }
-                  />
-                </div>
-              </article>
-            ))}
+          <div className="knowledge-table-wrap">
+            <table className="knowledge-table" aria-label="Notizen und Analysestatus">
+              <thead>
+                <tr>
+                  <th scope="col">Notiz</th>
+                  <th scope="col">Analyse</th>
+                  <th scope="col">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notes
+                  .filter((n) => !n.deleted)
+                  .map((n) => (
+                    <tr key={n.id}>
+                      <td>
+                        <button className="text-button knowledge-note-title" onClick={() => onOpen(n.id)}>
+                          {titleOf(n.content)}
+                        </button>
+                      </td>
+                      <td>
+                        <span className="knowledge-status">
+                          {!eligible(n)
+                            ? 'Ausgeschlossen'
+                            : latest(records, 'analysis', n)
+                              ? 'Aktuell'
+                              : 'Analyse offen'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="knowledge-row-actions">
+                          <Action
+                            label="Neu analysieren"
+                            isDisabled={!!busy || !eligible(n) || !settings.enabled}
+                            onClick={() => void run('Notiz analysieren', () => analyze(n))}
+                          />
+                          <Action
+                            label={
+                              settings.excludedNotes.includes(n.id) ? 'Wieder freigeben' : 'KI ausschließen'
+                            }
+                            onClick={() =>
+                              update({
+                                excludedNotes: settings.excludedNotes.includes(n.id)
+                                  ? settings.excludedNotes.filter((id) => id !== n.id)
+                                  : [...settings.excludedNotes, n.id],
+                              })
+                            }
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+            {!notes.some((n) => !n.deleted) && <p className="muted">Noch keine gespeicherten Notizen.</p>}
+          </div>
           {scope !== 'local' && (
             <Action
               label="Wissen synchronisieren"
@@ -885,17 +907,6 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
           {!entries.some((e) => e.item.kind === tab) && (
             <p>Noch keine Vorschläge. Starte eine Analyse im Überblick.</p>
           )}
-          <details>
-            <summary>Gespeicherte Entscheidungen (auch aus älteren Fassungen)</summary>
-            {records
-              .filter((r) => r.kind === 'decision')
-              .sort((a, b) => b.at.localeCompare(a.at))
-              .map((r) => (
-                <p key={r.id}>
-                  {(r.data as Decision).title} · {(r.data as Decision).status} · {readableDate(r.at)}
-                </p>
-              ))}
-          </details>
         </section>
       )}
       {correction && (

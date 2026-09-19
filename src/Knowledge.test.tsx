@@ -71,4 +71,11 @@ it('renders in the page, saves only explicitly, retains failures and reloads con
   expect((screen.getByLabelText('KI für dieses Notizbuch aktivieren') as HTMLInputElement).checked).toBe(
     true,
   );
+  await user.click(screen.getByRole('button', { name: 'Mein Kontext' }));
+  expect(await screen.findByRole('textbox', { name: 'Kontexteintrag' })).toBeTruthy();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Überblick' }));
+  expect(screen.getByRole('table', { name: 'Notizen und Analysestatus' })).toBeTruthy();
+  await user.click(screen.getByRole('button', { name: 'Kontakte' }));
+  expect(screen.queryByText(/Gespeicherte Entscheidungen/)).toBeNull();
 });

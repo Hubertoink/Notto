@@ -5,7 +5,7 @@
   --nt-paper: light-dark(#fff, #20242c);
   --nt-sidebar: light-dark(#f1f3f7, #15181e);
   --nt-text: light-dark(#252b38, #e8edf6);
-  --nt-muted: light-dark(#70798a, #a5afc0);
+  --nt-muted: light-dark(#596477, #a5afc0);
   --nt-line: light-dark(#e5e8ef, #343a47);
   --nt-accent: light-dark(#4d64cb, #a5b6ff);
   --nt-tint: light-dark(#e9edf9, #2d3653);
@@ -46,7 +46,7 @@ textarea {
 a {
   color: var(--nt-accent);
 }
-button {
+button:not(.notto-action) {
   color: inherit;
 }
 svg {

@@ -316,8 +316,8 @@ export function Settings({
         </p>
       )}
       <div className="settings-footer">
-        <span>Notto 0.1 · Deine Originale bleiben deine.</span>
-        <span>KI-Funktionen folgen später.</span>
+        <span>Notto 0.2 · Deine Originale bleiben deine.</span>
+        <span>KI konfigurieren: Seitenleiste → Wissen & KI.</span>
       </div>
     </Modal>
   );

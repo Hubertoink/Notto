@@ -1,6 +1,6 @@
 # Notto
 
-Eine lokale Windows-Notizapp mit andockbarem Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. KI und Diktat sind in diesem ersten Stand bewusst noch nicht implementiert.
+Eine lokale Windows-Notizapp mit andockbarem Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 0.2 ergänzt PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
 
 ## Starten
 
@@ -26,7 +26,8 @@ npm test
 - Widget am Griff verschieben. Nach dem Loslassen dockt es links oder rechts am aktuellen Monitor an. Der Arbeitsbereich berücksichtigt Taskleiste und Skalierung.
 - Ein Klick hält die Hover-Vorschau offen. Während der Eingabe schließt sie sich nicht beim Verlassen mit der Maus.
 - Das Hauptfenster schließt in den Tray. Über das Tray-Menü lässt sich Notto vollständig beenden oder das Widget ausblenden.
-- Bilder über die Bildschaltfläche, Einfügen aus der Zwischenablage oder Drag-and-drop hinzufügen. Unterstützt: PNG, JPEG, WebP, GIF, AVIF bis 12 MB pro Bild.
+- Bilder und PDFs über die Anhangschaltfläche oder Drag-and-drop hinzufügen. Bilder können auch aus der Zwischenablage eingefügt werden. Unterstützt: PNG, JPEG, WebP, GIF, AVIF und PDF bis 12 MB je Datei. PDF-Links öffnen eine Vorschau.
+- „Wissen & KI“ enthält Aufgaben, Kontakte, Themen, Recherche, semantische Suche und Notizbuchfragen. Über das Mikrofon im Editor lässt sich diktieren. Diese Funktionen benötigen eine eigene KI-Verbindung; lokale PDF-Textextraktion funktioniert ohne API-Schlüssel.
 - Suche kombiniert Wörter, `"exakte Wortgruppen"` und `#tags`. Tags sind unabhängig von Groß-/Kleinschreibung; Überschriften und Codeblöcke erzeugen keine Tags.
 - Papierkorb und Archiv sind reversibel. Historische Textfassungen können als neuer Entwurf übernommen werden.
 

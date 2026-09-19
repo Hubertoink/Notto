@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { allAttachmentIds, attachmentIds, markdownFile, type Scope } from './domain';
 import { repo, desktop } from './repository';
 import { fetchAttachment } from './cloud';
+import { knowledge } from './intelligence';
 export async function buildExport(scope: Scope): Promise<Uint8Array> {
   const notes = await repo.list(scope);
   const drafts = await repo.drafts(scope);
@@ -25,7 +26,14 @@ export async function buildExport(scope: Scope): Promise<Uint8Array> {
   }
   files['notto-backup.json'] = strToU8(
     JSON.stringify(
-      { format: 'notto', version: 1, exportedAt: new Date().toISOString(), notes, drafts },
+      {
+        format: 'notto',
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        notes,
+        drafts,
+        knowledge: await knowledge.list(scope),
+      },
       null,
       2,
     ),

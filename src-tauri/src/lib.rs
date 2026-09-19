@@ -11,6 +11,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+mod intelligence;
 
 struct Store {
     connection: Mutex<Connection>,
@@ -315,6 +316,7 @@ fn put_attachment(attachment: Attachment, store: State<Store>) -> Result<()> {
         "image/webp",
         "image/gif",
         "image/avif",
+        "application/pdf",
     ]
     .contains(&attachment.mime.as_str())
     {
@@ -629,7 +631,12 @@ pub fn run() {
             show_widget,
             hide_widget,
             snap_widget,
-            widget_mode
+            widget_mode,
+            intelligence::ai_key_status,
+            intelligence::ai_set_key,
+            intelligence::ai_request,
+            intelligence::knowledge_list,
+            intelligence::knowledge_put
         ])
         .run(tauri::generate_context!())
         .expect("Notto konnte nicht gestartet werden");

@@ -1,6 +1,6 @@
 {
   "name": "notto",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -23,10 +23,12 @@
     "fflate": "^0.8.2",
     "lucide-react": "^0.577.0",
     "motion": "^12.36.0",
+    "pdfjs-dist": "^6.3.289",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

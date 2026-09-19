@@ -23,6 +23,9 @@ beforeAll(async () => {
   await pg.exec(
     readFileSync(new URL('../supabase/migrations/202609190001_notto.sql', import.meta.url), 'utf8'),
   );
+  await pg.exec(
+    readFileSync(new URL('../supabase/migrations/202609190002_intelligence.sql', import.meta.url), 'utf8'),
+  );
 }, 30000);
 afterAll(async () => pg.close());
 async function asUser(uid: string) {
@@ -37,6 +40,37 @@ async function push(revision: string, base: string | null, content: string) {
   ).rows[0].result;
 }
 describe.sequential('Postgres sync and access controls', () => {
+  it('isolates append-only knowledge and enforces a server-side quota', async () => {
+    await asUser(alice);
+    await pg.query('insert into public.knowledge(id,document) values($1,$2)', [
+      id,
+      JSON.stringify({ id, scope: alice, kind: 'decision' }),
+    ]);
+    await expect(
+      pg.query('update public.knowledge set document=$1 where id=$2', [
+        JSON.stringify({ id, scope: alice }),
+        id,
+      ]),
+    ).rejects.toThrow();
+    await asUser(bob);
+    expect((await pg.query('select * from public.knowledge')).rows).toHaveLength(0);
+    await expect(
+      pg.query('insert into public.knowledge(user_id,id,document) values($1,$2,$3)', [
+        alice,
+        v1,
+        JSON.stringify({ id: v1, scope: alice }),
+      ]),
+    ).rejects.toThrow();
+    await asUser(alice);
+    for (let i = 0; i < 100; i++)
+      expect(
+        (await pg.query<{ allowed: boolean }>('select public.consume_ai_request() as allowed')).rows[0]
+          .allowed,
+      ).toBe(true);
+    expect(
+      (await pg.query<{ allowed: boolean }>('select public.consume_ai_request() as allowed')).rows[0].allowed,
+    ).toBe(false);
+  });
   it('accepts a new note and idempotent retries', async () => {
     await asUser(alice);
     expect((await push(v1, null, 'A')).accepted).toBe(true);

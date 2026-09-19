@@ -30,6 +30,8 @@ import { Action } from './components';
 import { Editor } from './Editor';
 import { Settings } from './Settings';
 import { Widget } from './Widget';
+import { Knowledge, IntelligenceWorker } from './Knowledge';
+import './knowledge.css';
 import { desktop, repo } from './repository';
 import {
   excerptOf,
@@ -85,11 +87,13 @@ function Notebook({
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [sidebar, setSidebar] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setSelected(null);
+    setKnowledgeOpen(false);
     setCreating(false);
     setQuery('');
     setTag(null);
@@ -243,6 +247,10 @@ function Notebook({
           />
         </div>
         <nav aria-label="Notizbücher">
+          <button className="nav-item" onClick={() => setKnowledgeOpen(true)}>
+            <Search size={18} />
+            <span>Wissen & KI</span>
+          </button>
           {nav('all', 'Alle Notizen', <Inbox size={18} />, active.length)}
           {nav('pinned', 'Angeheftet', <Pin size={17} />, active.filter((n) => n.pinned).length)}
           {nav(
@@ -554,6 +562,17 @@ function Notebook({
         )}
       </AnimatePresence>
       {settings && <Settings mode={mode} setMode={setMode} onClose={() => setSettings(false)} />}
+      <IntelligenceWorker />
+      {knowledgeOpen && (
+        <Knowledge
+          onClose={() => setKnowledgeOpen(false)}
+          onOpen={(id) => {
+            setKnowledgeOpen(false);
+            setCreating(false);
+            setSelected(id);
+          }}
+        />
+      )}
     </div>
   );
 }

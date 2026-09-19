@@ -15,6 +15,7 @@ class NottoDatabase extends Dexie {
   notes!: Table<Note, [string, string]>;
   drafts!: Table<Draft, string>;
   attachments!: Table<Attachment, [string, string]>;
+  knowledge!: Table<import('./intelligence').KnowledgeRecord, [string, string]>;
   constructor() {
     super('notto-v1');
     this.version(1).stores({
@@ -22,6 +23,7 @@ class NottoDatabase extends Dexie {
       drafts: 'key,scope',
       attachments: '[scope+id],scope',
     });
+    this.version(2).stores({ knowledge: '[scope+id],scope' });
   }
 }
 export const db = new NottoDatabase();
@@ -95,6 +97,15 @@ export const repo = {
       bytes: new Uint8Array(await file.arrayBuffer()),
     });
     return `![${file.name.replace(/[\[\]\\\n]/g, '')}](attachments/${id})`;
+  },
+  async addPdf(scope: Scope, file: File): Promise<string> {
+    if (file.size > MAX_IMAGE_BYTES) throw new Error('Ein PDF darf höchstens 12 MB groß sein.');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-')
+      throw new Error('Die Datei ist kein gültiges PDF.');
+    const id = `${crypto.randomUUID()}.pdf`;
+    await this.putAttachment({ scope, id, name: file.name, mime: 'application/pdf', bytes });
+    return `[${file.name.replace(/[\[\]\\\n]/g, '')}](attachments/${id})`;
   },
 };
 

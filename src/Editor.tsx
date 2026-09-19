@@ -4,6 +4,7 @@ import { Action, Modal, NoteMarkdown, readableDate } from './components';
 import { newNote, reviseNote, tagsOf, type Note, type Revision } from './domain';
 import { repo } from './repository';
 import { useNotto } from './state';
+import { Dictation } from './Dictation';
 
 export function Editor({
   note,
@@ -24,6 +25,8 @@ export function Editor({
   const [addingImages, setAddingImages] = useState(0);
   const imageOperations = useRef(0);
   const [draftStatus, setDraftStatus] = useState('');
+  const statusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const editGeneration = useRef(0);
   const [error, setError] = useState('');
   const [history, setHistory] = useState(false);
   const [oldRevision, setOldRevision] = useState<Revision | null>(null);
@@ -62,6 +65,7 @@ export function Editor({
     return () => {
       cancelled = true;
       alive.current = false;
+      clearTimeout(statusTimer.current);
     };
     // The editor must not replace unsaved text when the shared store refreshes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,8 +73,10 @@ export function Editor({
   const change = useCallback(
     (value: string) => {
       setContent(value);
+      const generation = ++editGeneration.current;
       textRef.current = value;
       setDraftStatus('Entwurf wird gesichert …');
+      clearTimeout(statusTimer.current);
       const draft = {
         key: `${scope}:${draftId ?? 'new'}`,
         scope,
@@ -83,7 +89,11 @@ export function Editor({
         .catch(() => {})
         .then(() => repo.saveDraft(draft))
         .then(() => {
-          if (alive.current && textRef.current === value) setDraftStatus('Entwurf gesichert');
+          if (alive.current && editGeneration.current === generation) {
+            statusTimer.current = setTimeout(() => {
+              if (alive.current && editGeneration.current === generation) setDraftStatus('Entwurf gesichert');
+            }, 650);
+          }
         })
         .catch((e) => {
           if (alive.current) setError(`Entwurf konnte nicht gesichert werden: ${String(e)}`);
@@ -114,6 +124,8 @@ export function Editor({
       base.current = saved.revision;
       initial.current = content;
       setDraftStatus('Gespeichert');
+      ++editGeneration.current;
+      clearTimeout(statusTimer.current);
       notify('Notiz gespeichert');
       onSaved(saved);
     } catch (e) {
@@ -129,7 +141,12 @@ export function Editor({
     setError('');
     try {
       const markdown = [];
-      for (const f of files) markdown.push(await repo.addImage(scope, f));
+      for (const f of files)
+        markdown.push(
+          await (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+            ? repo.addPdf(scope, f)
+            : repo.addImage(scope, f)),
+        );
       const el = input.current;
       const position = el?.selectionStart ?? textRef.current.length;
       const current = textRef.current;
@@ -251,8 +268,15 @@ export function Editor({
       )}
       <div className="editor-footer">
         <div className="editor-tools">
+          <Dictation
+            scope={scope}
+            onInsert={(text) => {
+              const position = input.current?.selectionStart ?? textRef.current.length;
+              change(textRef.current.slice(0, position) + text + textRef.current.slice(position));
+            }}
+          />
           <Action
-            label="Bild hinzufügen"
+            label="Bild oder PDF hinzufügen"
             icon={<ImagePlus size={18} />}
             isIconOnly
             variant="ghost"
@@ -263,14 +287,25 @@ export function Editor({
             type="file"
             hidden
             multiple
-            accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf,.pdf"
             onChange={(e) => {
               void addFiles(Array.from(e.target.files ?? []));
               e.target.value = '';
             }}
           />
-          <span className="draft-state" role="status">
-            {addingImages ? 'Bild wird gespeichert …' : draftStatus || 'Markdown · nur von dir bearbeitet'}
+          <span
+            className={`draft-state save-indicator ${error ? 'save-error' : addingImages || draftStatus.includes('wird') ? 'save-writing' : draftStatus ? 'save-saved' : ''}`}
+            role="status"
+            aria-label={
+              error
+                ? 'Speicherfehler'
+                : addingImages
+                  ? 'Anhang wird gespeichert'
+                  : draftStatus || 'Noch kein Entwurf'
+            }
+            title={error || draftStatus || 'Noch kein Entwurf'}
+          >
+            <Save size={17} />
           </span>
         </div>
         <Action
@@ -284,7 +319,7 @@ export function Editor({
       </div>
       {!compact && (
         <div className="editor-hint">
-          <span>Bilder einfügen oder hereinziehen</span>
+          <span>Bilder und PDFs hereinziehen</span>
           <span>Strg + Enter zum Speichern</span>
         </div>
       )}

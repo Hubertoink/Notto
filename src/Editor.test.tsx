@@ -64,6 +64,21 @@ it('recovers an unfinished draft after closing and saves its exact text', async 
   expect((await repo.list('local'))[0].content).toBe('#medien\nSteam Families für vier PCs prüfen.');
   expect(await repo.draft('local', null)).toBeUndefined();
 });
+it('keeps one save icon while writing and turns green after a quiet interval', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  const field = await screen.findByRole('textbox', { name: 'Notiztext' });
+  await waitFor(() => expect((field as HTMLTextAreaElement).disabled).toBe(false));
+  await user.type(field, 'Ein Gedanke');
+  const status = screen.getByRole('status', { name: 'Entwurf wird gesichert …' });
+  expect(status.textContent).toBe('');
+  expect(status.classList.contains('save-writing')).toBe(true);
+  expect(status.querySelector('svg')).not.toBeNull();
+  await waitFor(() => expect(status.classList.contains('save-saved')).toBe(true), { timeout: 1800 });
+  await user.type(field, '!');
+  expect(status.classList.contains('save-writing')).toBe(true);
+  expect(screen.getByRole('button', { name: 'Festhalten' }).classList.contains('notto-action')).toBe(true);
+});
 it('waits for an image to finish persisting before allowing the note to be saved', async () => {
   const user = userEvent.setup();
   const saved = vi.fn();

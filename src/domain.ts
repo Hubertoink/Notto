@@ -122,7 +122,7 @@ export function conflictCopy(note: Note): Note {
 export function attachmentIds(content: string): string[] {
   return [
     ...new Set(
-      [...content.matchAll(/attachments\/([a-f0-9-]+\.(?:png|jpg|webp|gif|avif))/g)].map((m) => m[1]),
+      [...content.matchAll(/attachments\/([a-f0-9-]+\.(?:png|jpg|webp|gif|avif|pdf))/g)].map((m) => m[1]),
     ),
   ];
 }

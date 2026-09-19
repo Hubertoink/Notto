@@ -8,9 +8,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { fetchAttachment } from './cloud';
 import { desktop } from './repository';
 import { useNotto } from './state';
+import { PdfAttachment } from './PdfAttachment';
 
 export function Action(props: ButtonProps) {
-  return <Button size="lg" {...props} />;
+  return <Button size="lg" {...props} className={`notto-action ${props.className || ''}`} />;
 }
 export function Modal({
   title,
@@ -87,21 +88,26 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
         remarkPlugins={[remarkGfm]}
         components={{
           img: ({ src, alt }) => <NoteImage src={src} alt={alt} scope={scope} />,
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noreferrer noopener"
-              onClick={(e) => {
-                if (desktop) {
-                  e.preventDefault();
-                  void invoke('open_external', { url: href }).catch((e) => notify(String(e)));
-                }
-              }}
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) =>
+            /^attachments\/[a-f0-9-]+\.pdf$/.test(href || '') ? (
+              <PdfAttachment scope={scope} id={href!.slice(12)}>
+                {children}
+              </PdfAttachment>
+            ) : (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer noopener"
+                onClick={(e) => {
+                  if (desktop) {
+                    e.preventDefault();
+                    void invoke('open_external', { url: href }).catch((e) => notify(String(e)));
+                  }
+                }}
+              >
+                {children}
+              </a>
+            ),
         }}
       >
         {content}

@@ -1,6 +1,6 @@
 [package]
 name = "notto"
-version = "0.1.0"
+version = "0.2.0"
 description = "Notto — local-first notes"
 edition = "2021"
 
@@ -22,6 +22,9 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
+keyring = { version = "3", features = ["windows-native"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
+base64 = "0.22"
 
 [profile.release]
 codegen-units = 1

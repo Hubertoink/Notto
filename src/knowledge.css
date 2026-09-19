@@ -1,0 +1,102 @@
+.save-indicator {
+  display: inline-flex !important;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s ease;
+}
+.save-indicator.save-writing {
+  color: light-dark(#9b4a08, #ffb25b);
+}
+.save-indicator.save-saved {
+  color: light-dark(#22734a, #7bddaa);
+}
+.save-indicator.save-error {
+  color: var(--nt-error);
+}
+.knowledge-tabs {
+  margin: 24px 0;
+  flex-wrap: wrap;
+}
+.knowledge-section {
+  display: grid;
+  gap: 16px;
+}
+.knowledge-card {
+  padding: 22px;
+  border: 1px solid var(--nt-line);
+  border-radius: 16px;
+  display: grid;
+  gap: 14px;
+  background: var(--nt-paper);
+}
+.knowledge-card h3 {
+  font-size: 18px;
+}
+.knowledge-card blockquote {
+  margin: 0;
+  border-left: 2px solid var(--nt-accent);
+  padding: 8px 14px;
+  color: var(--nt-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.knowledge-card .text-button {
+  text-align: left;
+}
+.knowledge-dismissed {
+  opacity: 0.7;
+}
+.research-result {
+  border-top: 1px solid var(--nt-line);
+  padding-top: 18px;
+  display: grid;
+  gap: 12px;
+}
+.knowledge-progress {
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--nt-tint);
+  margin-bottom: 16px;
+}
+.modal-body label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.modal-body input:not([type='checkbox']),
+.modal-body textarea {
+  border: 1px solid var(--nt-line);
+  background: var(--nt-paper);
+  color: var(--nt-text);
+  border-radius: 10px;
+  padding: 12px;
+  width: 100%;
+}
+.modal-body textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+.modal-body .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.extracted-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: 1.65;
+}
+.pdf-canvas {
+  max-width: 100%;
+  height: auto;
+  background: white;
+}
+@media (prefers-reduced-motion: reduce) {
+  .save-indicator {
+    transition: none;
+  }
+}

@@ -15,6 +15,13 @@ import { knowledge } from './intelligence';
 import * as intelligence from './intelligence';
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 beforeAll(() => {
+  vi.stubGlobal('CSS', { escape: (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '\\$&') });
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute('open');
+  };
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query) => ({
@@ -86,19 +93,26 @@ it('saves, edits and forgets personal instructions in the settings surface', asy
     </Theme>,
   );
   const user = userEvent.setup();
-  const input = screen.getByRole('textbox', { name: 'Kontexteintrag' });
+  expect(screen.getByRole('region', { name: 'Über mich' })).toBeTruthy();
+  expect(screen.getByRole('region', { name: 'Das hat Noto gelernt' })).toBeTruthy();
+  await user.click(screen.getByRole('button', { name: 'Anweisung hinzufügen' }));
+  let input = screen.getByRole('textbox', { name: 'Kontexteintrag' });
   await user.type(input, 'Bitte knapp antworten.');
   await user.click(screen.getByRole('button', { name: 'Eintrag speichern' }));
   expect(await screen.findByText('Bitte knapp antworten.')).toBeTruthy();
   await user.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+  input = screen.getByRole('textbox', { name: 'Kontexteintrag' });
   await user.clear(input);
   await user.type(input, 'Bitte sachlich antworten.');
   await user.click(screen.getByRole('button', { name: 'Änderungen speichern' }));
   expect(await screen.findByText('Bitte sachlich antworten.')).toBeTruthy();
   expect(screen.queryByText('Bitte knapp antworten.')).toBeNull();
+  await user.click(screen.getByText('Details & Verwaltung'));
   await user.click(screen.getByRole('button', { name: 'Vergessen' }));
   await waitFor(() => expect(screen.queryByText('Bitte sachlich antworten.')).toBeNull());
   expect(memoryState(await knowledge.list('local'), 'local').entries).toEqual([]);
+  await user.click(screen.getByRole('button', { name: 'Pausieren' }));
+  expect(await screen.findByText('Personalisierung pausiert')).toBeTruthy();
 });
 it('opens inline AI annotations and completes a task without changing the note', async () => {
   const note = newNote('local', 'Steam einrichten');

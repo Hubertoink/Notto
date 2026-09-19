@@ -133,7 +133,7 @@ Abhängigkeiten sind über `package-lock.json` und `src-tauri/Cargo.lock` festge
 
 ## Persönlicher Kontext
 
-Unter **Wissen & KI → Mein Kontext** verwaltest du Anweisungen, gemerkte Informationen und fallbezogene Präferenzen. Einträge gehören zum jeweiligen Notizbuch und werden im angemeldeten Konto zwischen Web und Desktop synchronisiert. Lokaler Kontext bleibt im lokalen Notizbuch.
+Unter **Wissen & KI → Mein Kontext** findest du die Übersicht **Über mich**, **So soll Noto arbeiten** und **Das hat Noto gelernt**. Du kannst direkt Informationen und Anweisungen hinzufügen, vorhandene Einträge bearbeiten und Vorschläge über **Jetzt prüfen** bestätigen. Die Übersicht zeigt freigegebene Einträge und bietet eine Pause für die Personalisierung. Einträge gehören zum jeweiligen Notizbuch und werden im angemeldeten Konto zwischen Web und Desktop synchronisiert. Lokaler Kontext bleibt im lokalen Notizbuch.
 
 - Eigene Anweisungen und manuell gespeicherte Informationen gelten sofort für künftige KI-Anfragen.
 - Aus einer ausgewählten Notiz lassen sich belegte Kontextvorschläge erstellen; diese musst du bestätigen.

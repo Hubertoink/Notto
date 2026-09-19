@@ -1,24 +1,28 @@
 import { useState } from 'react';
-import { Brain, Plus } from 'lucide-react';
+import { Brain, Plus, Check, Pause, SlidersHorizontal, Sparkles, Pencil, ArrowRight } from 'lucide-react';
 import { useNotto } from './state';
 import { useKnowledgeRecords } from './Tasks';
 import { memoryState, memoryUsable, type Memory } from './memory-policy';
 import { saveMemory, suggestMemory } from './memory-client';
 import { config, eligible, knowledge } from './intelligence';
 import { titleOf } from './domain';
-import { Action } from './components';
+import { Action, Modal } from './components';
 import './memory.css';
 
 const categories = {
-  instruction: 'Anweisungen',
-  fact: 'Gemerkte Informationen',
-  preference: 'Gelernte Präferenzen',
+  fact: 'Über mich',
+  instruction: 'So soll Noto arbeiten',
+  preference: 'Das hat Noto gelernt',
 };
 export function MemorySettings() {
   const { scope, notes } = useNotto();
   const records = useKnowledgeRecords(scope);
   const state = memoryState(records, scope);
   const [tab, setTab] = useState<keyof typeof categories>('instruction');
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [extractOpen, setExtractOpen] = useState(false);
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const [reviewOnly, setReviewOnly] = useState(false);
   const [editing, setEditing] = useState<Memory | null>(null);
   const [text, setText] = useState('');
   const [selectedNote, setSelectedNote] = useState('');
@@ -66,135 +70,64 @@ export function MemorySettings() {
         quote: note?.content.includes(source.quote ?? '') ? source.quote : undefined,
       };
     });
+  const usable = (entry: Memory) => memoryUsable(entry, notes, config(scope), scope);
+  const needsReview = (entry: Memory) => entry.status === 'suggested' || !usable(entry);
+  const available = state.entries.filter((e) => e.status === 'active' && usable(e));
+  const pending = state.entries.filter(needsReview).length;
+  const openEditor = (category: keyof typeof categories, entry: Memory | null = null) => {
+    setTab(category);
+    setEditing(entry);
+    setText(entry?.text ?? '');
+    setEditorOpen(true);
+  };
   return (
-    <section className="settings-section memory-settings" aria-label="Mein Kontext">
-      <h3>
-        <Brain size={18} /> Mein Kontext
-      </h3>
-      <p className="muted">
-        Was Noto über deine Arbeitsweise berücksichtigen soll. Gilt für dieses Notizbuch; Originalnotizen
-        bleiben unverändert.
-      </p>
-      <label className="memory-option">
-        <input
-          type="checkbox"
-          checked={state.enabled}
+    <section className="memory-dashboard" aria-label="Mein Kontext">
+      <div className="memory-overview">
+        <div className="memory-overview-status">
+          <span className={`memory-symbol ${state.enabled ? 'is-active' : ''}`}>
+            {state.enabled ? <Check size={22} /> : <Pause size={22} />}
+          </span>
+          <div>
+            <h2>Personalisierung {state.enabled ? 'aktiviert' : 'pausiert'}</h2>
+            <p>Noto berücksichtigt deinen freigegebenen Kontext bei neuen KI-Antworten.</p>
+          </div>
+        </div>
+        <div className="memory-metrics" aria-label="Verfügbarer Kontext">
+          {(Object.keys(categories) as (keyof typeof categories)[]).map((category) => (
+            <div key={category}>
+              <strong>{available.filter((e) => e.category === category).length}</strong>
+              <span>
+                {category === 'fact'
+                  ? 'Informationen'
+                  : category === 'instruction'
+                    ? 'Anweisungen'
+                    : 'Präferenzen'}
+              </span>
+            </div>
+          ))}
+        </div>
+        <button
+          className="memory-toggle"
           disabled={busy}
-          onChange={(e) => void run(() => settings({ enabled: e.target.checked }))}
-        />
-        Persönlichen Kontext verwenden
-      </label>
-      <label className="memory-option">
-        <input
-          type="checkbox"
-          checked={state.autoLearn}
-          disabled={busy}
-          onChange={(e) => void run(() => settings({ autoLearn: e.target.checked }))}
-        />
-        Ausdrückliche Korrekturen automatisch berücksichtigen
-      </label>
-      <p className="muted">
-        Ohne automatische Übernahme bleiben Korrekturen Vorschläge. Aus Notizen abgeleitete Informationen
-        bestätigst du immer selbst. Geänderte, gelöschte oder ausgeschlossene Quellen werden nicht verwendet.
-      </p>
-      <div className="memory-tabs" aria-label="Kontextbereiche">
-        {Object.entries(categories).map(([key, label]) => (
-          <button
-            key={key}
-            aria-pressed={tab === key}
-            onClick={() => {
-              setTab(key as typeof tab);
-              setEditing(null);
-              setText('');
-            }}
-          >
-            {label}
-          </button>
-        ))}
+          onClick={() => void run(() => settings({ enabled: !state.enabled }))}
+        >
+          {state.enabled ? 'Pausieren' : 'Aktivieren'}
+        </button>
       </div>
-      <form
-        className="memory-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run(async () => {
-            if (!text.trim()) return;
-            await saveMemory(scope, {
-              key: editing?.key ?? crypto.randomUUID(),
-              category: tab,
-              text: text.trim(),
-              status: 'active',
-              sources: editing ? sourcesNow(editing) : [],
-            });
-            setEditing(null);
-            setText('');
-          });
-        }}
-      >
-        <label>
-          {editing ? 'Eintrag bearbeiten und bestätigen' : `${categories[tab]} ergänzen`}
-          <textarea
-            aria-label="Kontexteintrag"
-            value={text}
-            maxLength={2000}
-            rows={3}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={
-              tab === 'instruction'
-                ? 'Zum Beispiel: Antworte knapp. Leitbildtexte sind keine Aufgaben.'
-                : tab === 'fact'
-                  ? 'Zum Beispiel: Mit Medienraum meine ich die vier PCs im Jugendhaus.'
-                  : 'Zum Beispiel: Ordne Konzepttexte nach Zielgruppen und Angeboten.'
-            }
-          />
-        </label>
-        <div className="settings-actions">
-          <button className="memory-save" type="submit" disabled={busy || !text.trim()}>
-            {editing ? 'Änderungen speichern' : 'Eintrag speichern'}
-          </button>
-          {editing && (
-            <Action
-              label="Abbrechen"
-              onClick={() => {
-                setEditing(null);
-                setText('');
-              }}
-            />
-          )}
-        </div>
-      </form>
-      {tab === 'fact' && (
-        <div className="memory-extract">
-          <label>
-            Kontext aus einer Notiz vorschlagen
-            <select
-              aria-label="Quellnotiz für Kontext"
-              value={selectedNote}
-              onChange={(e) => setSelectedNote(e.target.value)}
-            >
-              <option value="">Notiz auswählen …</option>
-              {notes.filter(eligible).map((note) => (
-                <option value={note.id} key={note.id}>
-                  {titleOf(note.content)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Action
-            label="Vorschläge erstellen"
-            icon={<Plus size={16} />}
-            isDisabled={busy || !selectedNote}
-            onClick={() =>
-              void run(async () => {
-                const note = notes.find((n) => n.id === selectedNote);
-                if (!note) throw new Error('Notiz nicht mehr verfügbar.');
-                const count = await suggestMemory(note);
-                return count
-                  ? `${count} Vorschläge zur Prüfung erstellt.`
-                  : 'Keine neuen Kontextinformationen gefunden.';
-              })
-            }
-          />
-        </div>
+      {(pending > 0 || reviewOnly) && (
+        <button
+          className="memory-review-banner"
+          aria-pressed={reviewOnly}
+          onClick={() => setReviewOnly(!reviewOnly)}
+        >
+          <Sparkles size={17} />
+          <span>
+            {pending} {pending === 1 ? 'Eintrag braucht' : 'Einträge brauchen'} deine Prüfung
+          </span>
+          <span>
+            {reviewOnly ? 'Alle Einträge zeigen' : 'Jetzt prüfen'} <ArrowRight size={14} />
+          </span>
+        </button>
       )}
       {error && (
         <p role="alert" className="inline-error">
@@ -206,78 +139,302 @@ export function MemorySettings() {
           {message}
         </p>
       )}
-      <div className="memory-list">
-        {state.entries
-          .filter((entry) => entry.category === tab)
-          .map((entry) => {
-            const usable = memoryUsable(entry, notes, config(scope), scope);
-            return (
-              <article key={entry.key} className="memory-card">
-                <span className="eyebrow">
-                  {!usable
-                    ? 'QUELLE PRÜFEN · NICHT VERWENDET'
-                    : entry.status === 'suggested'
-                      ? 'VORSCHLAG · NICHT VERWENDET'
-                      : state.enabled
-                        ? 'FÜR KI FREIGEGEBEN'
-                        : 'GEDÄCHTNIS PAUSIERT'}
+      <div className="memory-columns">
+        {(Object.keys(categories) as (keyof typeof categories)[]).map((category) => {
+          const Icon =
+            category === 'fact' ? Brain : category === 'instruction' ? SlidersHorizontal : Sparkles;
+          const entries = state.entries
+            .filter((e) => e.category === category && (!reviewOnly || needsReview(e)))
+            .sort((a, b) => Number(needsReview(b)) - Number(needsReview(a)));
+          const all = expanded.includes(category);
+          return (
+            <section
+              className={`memory-column memory-${category}`}
+              key={category}
+              aria-label={categories[category]}
+            >
+              <header>
+                <span className="memory-symbol">
+                  <Icon size={22} />
                 </span>
-                <p>{entry.text}</p>
-                {entry.sources.length > 0 && (
-                  <details>
-                    <summary>Herkunft ansehen</summary>
-                    {entry.sources.map((source) => (
-                      <div key={source.noteId}>
-                        <strong>{titleOf(notes.find((n) => n.id === source.noteId)?.content ?? '')}</strong>
-                        {source.quote && <blockquote>{source.quote}</blockquote>}
-                      </div>
-                    ))}
-                  </details>
-                )}
-                <div className="settings-actions">
-                  {entry.status === 'suggested' && usable && (
-                    <Action
-                      label="Bestätigen"
-                      isDisabled={busy}
-                      onClick={() => void run(() => saveMemory(scope, { ...entry, status: 'active' }))}
-                    />
-                  )}
-                  <Action
-                    label="Bearbeiten"
-                    isDisabled={busy}
-                    onClick={() => {
-                      setEditing(entry);
-                      setText(entry.text);
-                    }}
-                  />
-                  <Action
-                    label="Vergessen"
-                    isDisabled={busy}
-                    onClick={() =>
-                      void run(async () => {
-                        await saveMemory(scope, { ...entry, text: '', sources: [], status: 'forgotten' });
-                        if (editing?.key === entry.key) {
-                          setEditing(null);
-                          setText('');
-                        }
-                        return 'Wird für künftige KI-Anfragen nicht mehr verwendet.';
-                      })
-                    }
-                  />
+                <div>
+                  <h3>{categories[category]}</h3>
+                  <p>
+                    {category === 'fact'
+                      ? 'Dein Arbeitsumfeld, Projekte und wichtige Begriffe.'
+                      : category === 'instruction'
+                        ? 'Deine Regeln für Antworten und Arbeitsweise.'
+                        : 'Präferenzen aus deinen ausdrücklichen Korrekturen.'}
+                  </p>
                 </div>
-              </article>
-            );
-          })}
+              </header>
+              {category !== 'preference' && (
+                <button className="memory-add" disabled={busy} onClick={() => openEditor(category)}>
+                  <Plus size={16} />
+                  {category === 'fact' ? 'Information hinzufügen' : 'Anweisung hinzufügen'}
+                </button>
+              )}
+              {category === 'preference' && (
+                <label className="memory-learning">
+                  <input
+                    type="checkbox"
+                    checked={state.autoLearn}
+                    disabled={busy}
+                    onChange={(e) => void run(() => settings({ autoLearn: e.target.checked }))}
+                  />
+                  <span>
+                    Korrekturen automatisch übernehmen<small>Sonst prüfst du jeden Vorschlag zuerst.</small>
+                  </span>
+                </label>
+              )}
+              <div className="memory-list">
+                {(all ? entries : entries.slice(0, 3)).map((entry) => (
+                  <article className="memory-card" key={entry.key}>
+                    <div className="memory-card-top">
+                      <span className={`memory-entry-status ${needsReview(entry) ? 'needs-review' : ''}`}>
+                        {!usable(entry)
+                          ? 'Quelle prüfen'
+                          : entry.status === 'suggested'
+                            ? 'Vorschlag'
+                            : state.enabled
+                              ? 'Aktiv'
+                              : 'Pausiert'}
+                      </span>
+                      <button
+                        className="memory-edit"
+                        aria-label="Bearbeiten"
+                        title="Bearbeiten"
+                        disabled={busy}
+                        onClick={() => openEditor(category, entry)}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    </div>
+                    <p>{entry.text}</p>
+                    {entry.status === 'suggested' && usable(entry) && (
+                      <button
+                        className="memory-add"
+                        disabled={busy}
+                        onClick={() => void run(() => saveMemory(scope, { ...entry, status: 'active' }))}
+                      >
+                        <Check size={15} />
+                        Bestätigen
+                      </button>
+                    )}
+                    {!usable(entry) && (
+                      <small className="muted">
+                        Die Quelle wurde geändert oder ist nicht freigegeben. Dieser Eintrag wird nicht
+                        verwendet.
+                      </small>
+                    )}
+                    <details>
+                      <summary>Details & Verwaltung</summary>
+                      {entry.sources.length ? (
+                        entry.sources.map((source) => (
+                          <div key={source.noteId}>
+                            <strong>
+                              {titleOf(notes.find((n) => n.id === source.noteId)?.content ?? '')}
+                            </strong>
+                            {source.quote && <blockquote>{source.quote}</blockquote>}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="muted">Von dir eingetragen.</p>
+                      )}
+                      <button
+                        className="text-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await saveMemory(scope, { ...entry, text: '', sources: [], status: 'forgotten' });
+                            return 'Wird für künftige KI-Anfragen nicht mehr verwendet.';
+                          })
+                        }
+                      >
+                        Vergessen
+                      </button>
+                    </details>
+                  </article>
+                ))}
+                {!entries.length && (
+                  <div className="memory-empty">
+                    <Icon size={24} />
+                    <p>
+                      {reviewOnly
+                        ? 'Hier ist nichts zu prüfen.'
+                        : category === 'fact'
+                          ? 'Was sollte Noto über deinen Alltag wissen?'
+                          : category === 'instruction'
+                            ? 'Wie sollen deine Antworten aussehen?'
+                            : 'Wenn du einen KI-Vorschlag korrigierst, erscheint die gelernte Präferenz hier.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <footer>
+                {entries.length > 3 && (
+                  <button
+                    className="text-button"
+                    onClick={() =>
+                      setExpanded(all ? expanded.filter((c) => c !== category) : [...expanded, category])
+                    }
+                  >
+                    {all ? 'Weniger anzeigen' : `Alle anzeigen (${entries.length})`} <ArrowRight size={14} />
+                  </button>
+                )}
+                {category === 'fact' && (
+                  <button className="text-button" disabled={busy} onClick={() => setExtractOpen(true)}>
+                    Aus einer Notiz vorschlagen <ArrowRight size={14} />
+                  </button>
+                )}
+              </footer>
+            </section>
+          );
+        })}
       </div>
-      {!state.entries.some((e) => e.category === tab) && (
-        <p className="muted">
-          Hier sind noch keine Einträge. Korrigierte KI-Vorschläge erscheinen unter „Gelernte Präferenzen“.
+      <details className="memory-explanation">
+        <summary>Du behältst die Kontrolle</summary>
+        <p>
+          Vorschläge aus Notizen bestätigst du immer selbst. Geänderte, gelöschte oder ausgeschlossene Quellen
+          werden nicht verwendet. Dein Kontext gehört zu diesem Notizbuch; deine Originalnotizen bleiben
+          unverändert.
         </p>
+        <p>
+          „Vergessen“ entfernt einen Eintrag aus künftigen KI-Anfragen. Frühere Speicherereignisse bleiben im
+          Datenverlauf; bereits erzeugte Antworten werden nicht gelöscht.
+        </p>
+      </details>
+      {editorOpen && (
+        <Modal
+          title={
+            editing
+              ? 'Eintrag bearbeiten'
+              : tab === 'fact'
+                ? 'Information hinzufügen'
+                : 'Anweisung hinzufügen'
+          }
+          onClose={() => {
+            if (!busy) setEditorOpen(false);
+          }}
+        >
+          <form
+            className="memory-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run(async () => {
+                if (!text.trim()) return;
+                await saveMemory(scope, {
+                  key: editing?.key ?? crypto.randomUUID(),
+                  category: tab,
+                  text: text.trim(),
+                  status: 'active',
+                  sources: editing ? sourcesNow(editing) : [],
+                });
+                setEditing(null);
+                setText('');
+                setEditorOpen(false);
+              });
+            }}
+          >
+            <label>
+              {editing ? 'Eintrag bearbeiten und bestätigen' : `${categories[tab]} ergänzen`}
+              <textarea
+                aria-label="Kontexteintrag"
+                autoFocus
+                value={text}
+                maxLength={2000}
+                rows={3}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={
+                  tab === 'instruction'
+                    ? 'Zum Beispiel: Antworte knapp. Leitbildtexte sind keine Aufgaben.'
+                    : tab === 'fact'
+                      ? 'Zum Beispiel: Mit Medienraum meine ich die vier PCs im Jugendhaus.'
+                      : 'Zum Beispiel: Ordne Konzepttexte nach Zielgruppen und Angeboten.'
+                }
+              />
+            </label>
+            <div className="settings-actions">
+              <button className="memory-save" type="submit" disabled={busy || !text.trim()}>
+                {editing ? 'Änderungen speichern' : 'Eintrag speichern'}
+              </button>
+              {
+                <Action
+                  label="Abbrechen"
+                  onClick={() => {
+                    setEditing(null);
+                    setText('');
+                    setEditorOpen(false);
+                  }}
+                />
+              }
+            </div>
+          </form>
+          {error && (
+            <p role="alert" className="inline-error">
+              {error}
+            </p>
+          )}
+        </Modal>
       )}
-      <p className="muted">
-        „Vergessen“ entfernt den Eintrag aus künftigen KI-Anfragen. Frühere Speicherereignisse bleiben im
-        Datenverlauf; Originalnotizen und bereits erzeugte Antworten werden nicht gelöscht.
-      </p>
+      {extractOpen && (
+        <Modal
+          title="Kontext aus einer Notiz"
+          onClose={() => {
+            if (!busy) setExtractOpen(false);
+          }}
+        >
+          <p className="muted">
+            Noto schlägt belegte Informationen vor. Erst nach deiner Bestätigung werden sie verwendet.
+          </p>
+          <div className="memory-extract">
+            <label>
+              Kontext aus einer Notiz vorschlagen
+              <select
+                aria-label="Quellnotiz für Kontext"
+                value={selectedNote}
+                onChange={(e) => setSelectedNote(e.target.value)}
+              >
+                <option value="">Notiz auswählen …</option>
+                {notes.filter(eligible).map((note) => (
+                  <option value={note.id} key={note.id}>
+                    {titleOf(note.content)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Action
+              label="Vorschläge erstellen"
+              icon={<Plus size={16} />}
+              isDisabled={busy || !selectedNote}
+              onClick={() =>
+                void run(async () => {
+                  const note = notes.find((n) => n.id === selectedNote);
+                  if (!note) throw new Error('Notiz nicht mehr verfügbar.');
+                  const count = await suggestMemory(note);
+                  if (count) {
+                    setExtractOpen(false);
+                    setReviewOnly(true);
+                  }
+                  return count
+                    ? `${count} Vorschläge zur Prüfung erstellt.`
+                    : 'Keine neuen Kontextinformationen gefunden.';
+                })
+              }
+            />
+          </div>
+          {error && (
+            <p role="alert" className="inline-error">
+              {error}
+            </p>
+          )}
+          {message && (
+            <p role="status" className="muted">
+              {message}
+            </p>
+          )}
+        </Modal>
+      )}
     </section>
   );
 }

@@ -72,7 +72,7 @@ it('renders in the page, saves only explicitly, retains failures and reloads con
     true,
   );
   await user.click(screen.getByRole('button', { name: 'Mein Kontext' }));
-  expect(await screen.findByRole('textbox', { name: 'Kontexteintrag' })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: 'Information hinzufügen' })).toBeTruthy();
   expect(screen.queryByRole('dialog')).toBeNull();
   await user.click(screen.getByRole('button', { name: 'Überblick' }));
   expect(screen.getByRole('table', { name: 'Notizen und Analysestatus' })).toBeTruthy();

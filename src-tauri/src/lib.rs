@@ -373,15 +373,52 @@ fn open_vault(store: State<Store>) -> Result<()> {
 }
 #[tauri::command]
 fn open_external(url: String) -> Result<()> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err("Nur Weblinks können geöffnet werden".into());
+    let parsed = reqwest::Url::parse(&url).map_err(err)?;
+    if !matches!(parsed.scheme(), "https" | "http")
+        || parsed.host_str().is_none()
+        || url.contains('\0')
+    {
+        return Err("Nur gültige Weblinks können geöffnet werden".into());
     }
-    // Explorer delegates URLs to the user's default browser without shell interpolation.
-    std::process::Command::new("explorer.exe")
-        .arg(url)
-        .spawn()
-        .map_err(err)?;
-    Ok(())
+    #[cfg(target_os = "windows")]
+    {
+        #[link(name = "shell32")]
+        extern "system" {
+            fn ShellExecuteW(
+                hwnd: *mut std::ffi::c_void,
+                operation: *const u16,
+                file: *const u16,
+                parameters: *const u16,
+                directory: *const u16,
+                show: i32,
+            ) -> isize;
+        }
+        let operation: Vec<u16> = "open\0".encode_utf16().collect();
+        let target: Vec<u16> = parsed
+            .as_str()
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        // Both strings are NUL-terminated and stay alive throughout the synchronous call.
+        let result = unsafe {
+            ShellExecuteW(
+                std::ptr::null_mut(),
+                operation.as_ptr(),
+                target.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                1,
+            )
+        };
+        if result <= 32 {
+            return Err(format!(
+                "Standardbrowser konnte nicht geöffnet werden (Windows {result})"
+            ));
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    Err("Weblinks werden auf diesem System noch nicht unterstützt".into())
 }
 fn show_main(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
@@ -629,6 +666,12 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn external_links_reject_files_and_invalid_urls() {
+        for url in ["file:///C:/Windows", "javascript:alert(1)", "C:\\Windows", "https://example.com\0bad"] {
+            assert!(super::open_external(url.to_string()).is_err());
+        }
+    }
     use super::*;
     #[test]
     fn optimistic_save_and_recovery() {

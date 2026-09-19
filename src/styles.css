@@ -1,18 +1,18 @@
 :root {
   font-family: Inter, 'Segoe UI', sans-serif;
   font-size: 16px;
-  --nt-bg: light-dark(#f8f9fb, #181b21);
-  --nt-paper: light-dark(#fff, #20242c);
-  --nt-sidebar: light-dark(#f1f3f7, #15181e);
-  --nt-text: light-dark(#252b38, #e8edf6);
-  --nt-muted: light-dark(#596477, #a5afc0);
-  --nt-line: light-dark(#e5e8ef, #343a47);
-  --nt-accent: light-dark(#4d64cb, #a5b6ff);
-  --nt-tint: light-dark(#e9edf9, #2d3653);
-  --nt-hover: light-dark(#f0f2f7, #2c323e);
+  --nt-bg: light-dark(#f8f9fb, #1f1f28);
+  --nt-paper: light-dark(#fff, #24242e);
+  --nt-sidebar: light-dark(#f1f3f7, #16161d);
+  --nt-text: light-dark(#252b38, #dcd7ba);
+  --nt-muted: light-dark(#596477, #c8c093);
+  --nt-line: light-dark(#e5e8ef, #363646);
+  --nt-accent: light-dark(#4d64cb, #7e9cd8);
+  --nt-tint: light-dark(#e9edf9, #2d4f67);
+  --nt-hover: light-dark(#f0f2f7, #2a2a37);
   --nt-shadow: light-dark(#18234316, #00000050);
-  --nt-error: light-dark(#a6363e, #ffadb2);
-  --nt-success: light-dark(#36785e, #91d9b6);
+  --nt-error: light-dark(#a6363e, #e46876);
+  --nt-success: light-dark(#36785e, #98bb6c);
   color: var(--nt-text);
   background: var(--nt-bg);
   font-synthesis: none;
@@ -376,7 +376,7 @@ textarea:focus-visible {
   background: var(--nt-hover);
 }
 .note-card.selected {
-  border-color: light-dark(#bcc8ee, #596a9c);
+  border-color: light-dark(#bcc8ee, #7e9cd8);
   background: var(--nt-paper);
   box-shadow: 0 2px 5px var(--nt-shadow);
 }
@@ -520,7 +520,7 @@ textarea:focus-visible {
 .editor-top {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
 }
 .editor-top h1 {

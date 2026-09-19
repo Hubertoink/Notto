@@ -3,7 +3,7 @@ import { Sparkles } from 'lucide-react';
 import { knowledge, type Analysis, type KnowledgeRecord, type Research } from './intelligence';
 import { addTask, checkTask, newest, noteAnalysis, tasksFor, type Task } from './task-store';
 import { useNotto } from './state';
-import { Action } from './components';
+import { Action, Sources, NoteMarkdown } from './components';
 import type { Note } from './domain';
 import './tasks.css';
 
@@ -177,14 +177,8 @@ export function NoteAnnotations({ note }: { note: Note }) {
           {uniqueResearch.map((r) => (
             <article key={r.id}>
               <strong>Recherche</strong>
-              <p className="research-text">{(r.data as Research).text}</p>
-              {(r.data as Research).sources
-                ?.filter((s) => /^https?:\/\//i.test(s.url))
-                .map((s, i) => (
-                  <a key={i} href={s.url} target="_blank" rel="noreferrer">
-                    {s.title}
-                  </a>
-                ))}
+              <NoteMarkdown content={(r.data as Research).text} scope={note.scope} />
+              <Sources sources={(r.data as Research).sources ?? []} />
             </article>
           ))}
           <Action label="Anmerkungen schließen" onClick={() => setOpen(false)} variant="ghost" />

@@ -1,0 +1,114 @@
+.floating-search-trigger {
+  position: fixed;
+  right: 28px;
+  bottom: 24px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 17px;
+  border-radius: 28px;
+  color: var(--nt-text);
+  background: var(--nt-paper);
+  border: 1px solid var(--nt-line);
+  box-shadow: 0 6px 25px var(--nt-shadow);
+}
+.search-dialog {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--nt-text);
+  width: min(660px, calc(100vw - 32px));
+  max-height: 80dvh;
+  overflow: visible;
+  margin: 12dvh auto auto;
+}
+.search-dialog::backdrop {
+  background: #09061880;
+  backdrop-filter: blur(7px);
+}
+.search-surface {
+  background: var(--nt-paper);
+  border: 1px solid var(--nt-line);
+  overflow: hidden;
+  box-shadow: 0 24px 90px #0006;
+}
+.search-field {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--nt-line);
+}
+.search-field input {
+  min-width: 0;
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--nt-text);
+}
+.search-field button {
+  color: var(--nt-muted);
+  background: transparent;
+}
+.search-results {
+  max-height: 52dvh;
+  overflow: auto;
+  padding: 12px;
+}
+.search-results > p {
+  padding: 0 12px;
+  font-size: 13px;
+}
+.search-results > button {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  width: 100%;
+  border-radius: 10px;
+  text-align: left;
+  color: var(--nt-text);
+  background: transparent;
+}
+.search-results > button:hover,
+.search-results > button:focus-visible {
+  background: var(--nt-tint);
+}
+.search-results span,
+.search-results small {
+  color: var(--nt-muted);
+  font-size: 13px;
+}
+.search-footer {
+  padding: 12px 24px;
+  font-size: 12px;
+  color: var(--nt-muted);
+  border-top: 1px solid var(--nt-line);
+}
+.floating-menu {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 30;
+  color: var(--nt-text);
+  background: var(--nt-paper);
+  border-radius: 10px;
+}
+.research-sources {
+  padding-left: 20px;
+}
+.research-sources a {
+  color: var(--nt-accent);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .list-heading {
+    padding-top: 54px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-dialog::backdrop {
+    backdrop-filter: none;
+  }
+}

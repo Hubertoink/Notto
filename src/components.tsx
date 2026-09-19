@@ -9,6 +9,38 @@ import { fetchAttachment } from './cloud';
 import { desktop } from './repository';
 import { useNotto } from './state';
 import { PdfAttachment } from './PdfAttachment';
+import { uniqueSources } from './knowledge-policy';
+
+export function WebLink({ href, children }: { href?: string; children: ReactNode }) {
+  const { notify } = useNotto();
+  if (!href || !uniqueSources([{ url: href, title: '' }]).length) return <span>{children}</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      onClick={(e) => {
+        if (desktop) {
+          e.preventDefault();
+          void invoke('open_external', { url: href }).catch((error) => notify(String(error)));
+        }
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+export function Sources({ sources }: { sources: { title: string; url: string }[] }) {
+  return (
+    <ul className="research-sources">
+      {uniqueSources(sources).map((source) => (
+        <li key={source.url}>
+          <WebLink href={source.url}>{source.title}</WebLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function Action(props: ButtonProps) {
   return <Button size="lg" {...props} className={`notto-action ${props.className || ''}`} />;
@@ -81,7 +113,6 @@ function NoteImage({ src, alt, scope }: { src?: string; alt?: string; scope: str
   );
 }
 export function NoteMarkdown({ content, scope }: { content: string; scope: string }) {
-  const { notify } = useNotto();
   return (
     <div className="markdown">
       <Markdown
@@ -94,19 +125,7 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
                 {children}
               </PdfAttachment>
             ) : (
-              <a
-                href={href}
-                target="_blank"
-                rel="noreferrer noopener"
-                onClick={(e) => {
-                  if (desktop) {
-                    e.preventDefault();
-                    void invoke('open_external', { url: href }).catch((e) => notify(String(e)));
-                  }
-                }}
-              >
-                {children}
-              </a>
+              <WebLink href={href}>{children}</WebLink>
             ),
         }}
       >

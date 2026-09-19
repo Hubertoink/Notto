@@ -1,3 +1,4 @@
+import { Sources } from './components';
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Action, Modal, NoteMarkdown, readableDate } from './components';
@@ -892,16 +893,7 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
                         Recherche · {readableDate(r.at)} · bitte Identität und Angaben prüfen
                       </span>
                       <NoteMarkdown content={(r.data as Research).text} scope={scope} />
-                      <ul>
-                        {(r.data as Research).sources.map((s) => (
-                          <li key={s.url}>
-                            <NoteMarkdown
-                              content={`[${s.title.replace(/[\[\]]/g, '')}](${s.url})`}
-                              scope={scope}
-                            />
-                          </li>
-                        ))}
-                      </ul>
+                      <Sources sources={(r.data as Research).sources} />
                     </div>
                   ))}
               </article>

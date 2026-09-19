@@ -1,3 +1,4 @@
+import { FloatingSearch } from './FloatingSearch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -14,13 +15,11 @@ import {
   PanelRight,
   Pin,
   Plus,
-  Search,
   Settings2,
   Sparkles,
   Trash2,
   Upload,
   WifiOff,
-  X,
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
@@ -38,16 +37,7 @@ import { TasksPage, TaskRow, useKnowledgeRecords } from './Tasks';
 import { tasksFor } from './task-store';
 import { desktop, repo } from './repository';
 import { noteShortcut, newNoteLabel } from './shortcuts';
-import {
-  excerptOf,
-  importedMarkdown,
-  matchesQuery,
-  newNote,
-  reviseNote,
-  tagsOf,
-  titleOf,
-  type Note,
-} from './domain';
+import { excerptOf, importedMarkdown, newNote, reviseNote, tagsOf, titleOf, type Note } from './domain';
 
 type View = 'all' | 'pinned' | 'archive' | 'trash';
 export default function App() {
@@ -88,7 +78,7 @@ function Notebook({
   const { notes, scope, user, loading, notify, notice, sync, syncState, syncError } = useNotto();
   const [view, setView] = useState<View>('all');
   const [tag, setTag] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -104,14 +94,13 @@ function Notebook({
     setSidebar(false);
   };
   const [sidebar, setSidebar] = useState(false);
-  const search = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setSelected(null);
     setKnowledgeOpen(false);
     setTasksOpen(false);
     setCreating(false);
-    setQuery('');
+    setSearchOpen(false);
     setTag(null);
     setView('all');
   }, [scope]);
@@ -129,11 +118,10 @@ function Notebook({
             (view === 'trash' ? n.deleted : !n.deleted) &&
             (view === 'archive' ? n.archived : view === 'trash' ? true : !n.archived) &&
             (view === 'pinned' ? n.pinned : true) &&
-            (!tag || tagsOf(n.content).includes(tag)) &&
-            matchesQuery(n, query),
+            (!tag || tagsOf(n.content).includes(tag)),
         )
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt)),
-    [notes, view, tag, query],
+    [notes, view, tag],
   );
   const selectedNote = notes.find((n) => n.id === selected);
   const title = tasksOpen
@@ -158,13 +146,16 @@ function Notebook({
   };
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat || e.isComposing || document.querySelector('[role="dialog"]'))
+      if (
+        e.defaultPrevented ||
+        e.repeat ||
+        e.isComposing ||
+        document.querySelector('[role="dialog"], dialog[open]')
+      )
         return;
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setKnowledgeOpen(false);
-        setTasksOpen(false);
-        search.current?.focus();
+        setSearchOpen(true);
       }
       if (noteShortcut(e, desktop)) {
         e.preventDefault();
@@ -180,6 +171,8 @@ function Notebook({
     let closed = false;
     listen<string | null>('open-note', (e) => {
       if (e.payload) {
+        setKnowledgeOpen(false);
+        setTasksOpen(false);
         setCreating(false);
         setSelected(e.payload);
       } else openNew();
@@ -350,6 +343,15 @@ function Notebook({
           )}
         </nav>
         <div className="sidebar-bottom">
+          {desktop && (
+            <button
+              className="nav-item"
+              onClick={() => void invoke('show_widget').catch((e) => notify(String(e)))}
+            >
+              <PanelRight size={17} />
+              <span>Randwidget anzeigen</span>
+            </button>
+          )}
           {nav('trash', 'Papierkorb', <Trash2 size={17} />, notes.filter((n) => n.deleted).length)}
           <button className="nav-item" onClick={() => importInput.current?.click()}>
             <Upload size={17} />
@@ -399,48 +401,26 @@ function Notebook({
         </div>
       </aside>
       <main className="main">
-        <header className="topbar">
-          <button
-            className="mobile-menu icon-button"
-            aria-label="Navigation öffnen"
-            onClick={() => setSidebar(true)}
-          >
-            <Menu size={20} />
-          </button>
-          <div className="breadcrumb">
-            Mein Notizbuch <span>/</span> <strong>{title}</strong>
-          </div>
-          <div className="search">
-            <Search size={17} />
-            <input
-              ref={search}
-              aria-label="Notizen durchsuchen"
-              placeholder="Notizen durchsuchen …"
-              value={query}
-              onChange={(e) => {
-                setKnowledgeOpen(false);
-                setTasksOpen(false);
-                setQuery(e.target.value);
-              }}
-            />
-            {query ? (
-              <button aria-label="Suche leeren" onClick={() => setQuery('')}>
-                <X size={15} />
-              </button>
-            ) : (
-              <kbd>Strg K</kbd>
-            )}
-          </div>
-          {desktop && (
-            <Action
-              label="Randwidget anzeigen"
-              isIconOnly
-              icon={<PanelRight size={18} />}
-              variant="ghost"
-              onClick={() => void invoke('show_widget').catch((e) => notify(String(e)))}
-            />
-          )}
-        </header>
+        <button
+          className="mobile-menu icon-button floating-menu"
+          aria-label="Navigation öffnen"
+          onClick={() => setSidebar(true)}
+        >
+          <Menu size={20} />
+        </button>
+        <FloatingSearch
+          key={scope}
+          open={searchOpen}
+          onOpen={() => setSearchOpen(true)}
+          onClose={() => setSearchOpen(false)}
+          notes={notes}
+          onSelect={(id) => {
+            openTaskNote(id);
+            setView('all');
+            setTag(null);
+          }}
+        />
+
         <div className="knowledge-page" hidden={!knowledgeOpen}>
           <Knowledge
             key={scope}
@@ -466,7 +446,6 @@ function Notebook({
                 <h1>{title}</h1>
                 <p>
                   {filtered.length} {filtered.length === 1 ? 'Notiz' : 'Notizen'}
-                  {query ? ' gefunden' : ''}
                 </p>
               </div>
               <Action
@@ -485,20 +464,14 @@ function Notebook({
                 <div className="list-empty">
                   <FileText size={28} strokeWidth={1.3} />
                   <strong>
-                    {query
-                      ? 'Keine passenden Notizen'
-                      : view === 'trash'
-                        ? 'Dein Papierkorb ist leer'
-                        : view === 'archive'
-                          ? 'Noch nichts archiviert'
-                          : 'Hier beginnt dein Notizbuch'}
+                    {view === 'trash'
+                      ? 'Dein Papierkorb ist leer'
+                      : view === 'archive'
+                        ? 'Noch nichts archiviert'
+                        : 'Hier beginnt dein Notizbuch'}
                   </strong>
-                  <p>
-                    {query
-                      ? 'Probiere einen anderen Begriff oder #Tag.'
-                      : 'Halte einen Gedanken fest. Die Ordnung kann später kommen.'}
-                  </p>
-                  {!query && view === 'all' && (
+                  <p>Halte einen Gedanken fest. Die Ordnung kann später kommen.</p>
+                  {view === 'all' && (
                     <Action label="Erste Notiz schreiben" icon={<Plus size={16} />} onClick={openNew} />
                   )}
                 </div>
@@ -547,9 +520,7 @@ function Notebook({
                 >
                   <ArrowLeft size={16} /> Zurück
                 </button>
-                <span>
-                  {creating ? 'Ein neuer Gedanke' : selectedNote?.deleted ? 'Im Papierkorb' : 'Original'}
-                </span>
+                <span>{selectedNote?.deleted ? 'Im Papierkorb' : ''}</span>
                 <div className="toolbar">
                   {selectedNote && !selectedNote.deleted && (
                     <>

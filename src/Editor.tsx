@@ -183,10 +183,6 @@ export function Editor({
       aria-label={note ? 'Notiz bearbeiten' : 'Neue Notiz'}
     >
       <div className="editor-top">
-        <div>
-          <span className="eyebrow">{note ? 'ORIGINALNOTIZ' : 'NEUE NOTIZ'}</span>
-          {!compact && <h1>{note ? 'Dein Gedanke.' : 'Was möchtest du festhalten?'}</h1>}
-        </div>
         <div className="toolbar">
           <Action
             label={preview ? 'Bearbeiten' : 'Vorschau'}

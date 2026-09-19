@@ -18,6 +18,12 @@ npm test
 
 `npm run desktop` startet seinen eigenen Vite-Server; vorher einen separat gestarteten `npm run dev` beenden. Für Windows-Builds werden Rust (MSVC), die Visual Studio C++ Build Tools und WebView2 benötigt. Das Desktop-Skript ergänzt den üblichen Rust-Pfad selbst.
 
+## Suche, Quellen und Darstellung (0.6)
+
+Strg + K öffnet die schwebende Notizsuche mit einer Morph-Animation. Sie durchsucht aktive und archivierte Notizen; der Papierkorb bleibt ausgeschlossen. Enter öffnet den ersten Treffer, Esc schließt die Suche. Die obere Navigationsleiste und dekorative Notizüberschriften entfallen. Die dunkle Palette orientiert sich an [Omarchy Kanagawa](https://github.com/basecamp/omarchy/blob/master/themes/kanagawa/colors.toml); das helle Farbschema bleibt erhalten.
+
+Quellenlinks werden dedupliziert und unter Windows über den Standardbrowser geöffnet. Noto recherchiert, fasst zusammen, verknüpft Wissen und schlägt Aufgaben für den Nutzer vor. Die KI führt keine Kontoaktionen, Käufe oder Installationen aus und fragt nicht nach Zugangsdaten dafür. Die Rollenbeschreibung gilt für neue Analysen und Recherchen; bestehende Texte können unter „Wissen & KI“ neu recherchiert werden.
+
 ## Aufgaben und Anmerkungen (0.5)
 
 „KI-Anmerkungen“ unter dem Notiztitel klappt Vorschläge und Recherchen direkt in der Notiz auf. Die Originaldatei wird dabei nicht verändert; ältere Analysen sind als solche gekennzeichnet.

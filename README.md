@@ -18,6 +18,12 @@ npm test
 
 `npm run desktop` startet seinen eigenen Vite-Server; vorher einen separat gestarteten `npm run dev` beenden. Für Windows-Builds werden Rust (MSVC), die Visual Studio C++ Build Tools und WebView2 benötigt. Das Desktop-Skript ergänzt den üblichen Rust-Pfad selbst.
 
+## Aufgaben und Anmerkungen (0.5)
+
+„KI-Anmerkungen“ unter dem Notiztitel klappt Vorschläge und Recherchen direkt in der Notiz auf. Die Originaldatei wird dabei nicht verändert; ältere Analysen sind als solche gekennzeichnet.
+
+„Aufgaben“ in der Seitenleiste zeigt offene Aufgaben mit Checkboxen. Ein Klick auf den Bereich öffnet die vollständige Liste einschließlich erledigter Aufgaben und das Eingabefeld für eigene Aufgaben. Das Funkeln-Icon kennzeichnet KI-Vorschläge. Abhaken und Wiederöffnen werden lokal gespeichert und im angemeldeten Konto über die Wissens-Synchronisation zwischen Geräten übertragen. Bestätigte und erledigte KI-Aufgaben bleiben auch bei einer erneuten Analyse erhalten. Aufgaben aus gelöschten Notizen erscheinen erst nach deren Wiederherstellung wieder.
+
 ## Bedienung
 
 - **Strg + Alt + Umschalt + N:** globale Schnellnotiz über das Randwidget (Standard ab 0.4.2, solange Noto läuft). Unter Einstellungen → Tastenkürzel & Randwidget änderbar; der Button zeigt die aktive Kombination.

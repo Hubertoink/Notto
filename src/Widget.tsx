@@ -9,8 +9,10 @@ import { useNotto } from './state';
 import { titleOf } from './domain';
 import { Action } from './components';
 import { Editor } from './Editor';
+import { useCaptureShortcut, shortcutLabel } from './shortcuts';
 
 export function Widget() {
+  const shortcut = useCaptureShortcut();
   const { notes, scope, notify, notice } = useNotto();
   const [mode, setMode] = useState<'idle' | 'peek' | 'edit'>('idle');
   const [side, setSide] = useState<'left' | 'right'>('right');
@@ -49,6 +51,8 @@ export function Widget() {
     void listen('quick-capture', () => {
       pinned.current = true;
       change('edit');
+      window.dispatchEvent(new Event('noto-focus-capture'));
+      setTimeout(() => document.querySelector<HTMLTextAreaElement>('textarea')?.focus(), 100);
     }).then(keep);
     void listen<'left' | 'right'>('dock-side', (e) => setSide(e.payload)).then(keep);
     void getCurrentWindow()
@@ -195,6 +199,22 @@ export function Widget() {
             </div>
             <Action
               label="Neue Notiz"
+              endContent={
+                desktop && (
+                  <kbd className="note-shortcut">
+                    {shortcut?.active
+                      ? shortcutLabel(shortcut.shortcut, true)
+                      : shortcut
+                        ? 'Kürzel prüfen'
+                        : '…'}
+                  </kbd>
+                )
+              }
+              tooltip={
+                shortcut?.active
+                  ? `Überall unter Windows: ${shortcutLabel(shortcut.shortcut)}`
+                  : shortcut?.error || undefined
+              }
               icon={<Plus size={17} />}
               variant="primary"
               width="100%"
@@ -203,6 +223,11 @@ export function Widget() {
                 change('edit');
               }}
             />
+            {desktop && shortcut && !shortcut.active && (
+              <p className="shortcut-warning">
+                Tastenkürzel nicht aktiv. Unter Einstellungen → Tastenkürzel prüfen.
+              </p>
+            )}
           </motion.div>
         ) : (
           <Editor

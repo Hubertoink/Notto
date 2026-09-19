@@ -35,6 +35,7 @@ import { Widget } from './Widget';
 import { Knowledge, IntelligenceWorker } from './Knowledge';
 import './knowledge.css';
 import { desktop, repo } from './repository';
+import { noteShortcut, newNoteLabel } from './shortcuts';
 import {
   excerptOf,
   importedMarkdown,
@@ -141,12 +142,14 @@ function Notebook({
   };
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if (e.defaultPrevented || e.repeat || e.isComposing || document.querySelector('[role="dialog"]'))
+        return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setKnowledgeOpen(false);
         search.current?.focus();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      if (noteShortcut(e, desktop)) {
         e.preventDefault();
         openNew();
       }
@@ -245,6 +248,12 @@ function Notebook({
         <div className="sidebar-new">
           <Action
             label="Neue Notiz"
+            endContent={
+              <kbd className="note-shortcut" aria-label={newNoteLabel}>
+                {desktop ? newNoteLabel : 'Strg ⇧ ␣'}
+              </kbd>
+            }
+            tooltip={`Neue Notiz · ${newNoteLabel}`}
             icon={<Plus size={18} />}
             variant="primary"
             width="100%"
@@ -417,6 +426,7 @@ function Notebook({
               </div>
               <Action
                 label="Neue Notiz"
+                tooltip={`Neue Notiz · ${newNoteLabel}`}
                 icon={<Plus size={19} />}
                 isIconOnly
                 variant="ghost"
@@ -566,7 +576,7 @@ function Notebook({
                   variant="primary"
                   onClick={openNew}
                 />
-                <span className="welcome-shortcut">Strg + N für eine neue Notiz</span>
+                <span className="welcome-shortcut">{newNoteLabel} für eine neue Notiz</span>
               </div>
             )}
           </section>

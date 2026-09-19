@@ -10,8 +10,8 @@ use std::{
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 mod intelligence;
+mod shortcuts;
 
 struct Store {
     connection: Mutex<Connection>,
@@ -487,14 +487,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        if let Some(w) = app.get_webview_window("widget") {
-                            let _ = w.show();
-                            let _ = w.emit("quick-capture", ());
-                        }
-                    }
-                })
+                .with_handler(|app, _, event| shortcuts::handle(app, event.state()))
                 .build(),
         )
         .setup(|app| {
@@ -542,13 +535,7 @@ pub fn run() {
             }
             let _ = position_widget(app.handle(), None, true);
             let open = MenuItem::with_id(app, "open", "Noto öffnen", true, None::<&str>)?;
-            let capture = MenuItem::with_id(
-                app,
-                "capture",
-                "Neue Notiz · Strg+Umschalt+Leertaste",
-                true,
-                None::<&str>,
-            )?;
+            let capture = MenuItem::with_id(app, "capture", "Neue Notiz", true, None::<&str>)?;
             let toggle = MenuItem::with_id(
                 app,
                 "toggle",
@@ -572,12 +559,7 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => show_main(app),
-                    "capture" => {
-                        if let Some(w) = app.get_webview_window("widget") {
-                            let _ = w.show();
-                            let _ = w.emit("quick-capture", ());
-                        }
-                    }
+                    "capture" => shortcuts::capture(app),
                     "toggle" => {
                         if let Some(w) = app.get_webview_window("widget") {
                             if w.is_visible().unwrap_or(false) {
@@ -601,9 +583,7 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
-            if let Err(e) = app.global_shortcut().register("Control+Shift+Space") {
-                eprintln!("Tastenkürzel konnte nicht registriert werden: {e}");
-            }
+            shortcuts::setup(app.handle()).map_err(std::io::Error::other)?;
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -632,6 +612,8 @@ pub fn run() {
             hide_widget,
             snap_widget,
             widget_mode,
+            shortcuts::shortcut_status,
+            shortcuts::shortcut_set,
             intelligence::ai_key_status,
             intelligence::ai_models,
             intelligence::ai_set_key,

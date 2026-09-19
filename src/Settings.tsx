@@ -7,6 +7,7 @@ import { desktop, repo } from './repository';
 import { allAttachmentIds, newNote } from './domain';
 import { exportNotebook } from './export';
 import { useNotto } from './state';
+import { useCaptureShortcut, shortcutOptions, shortcutLabel } from './shortcuts';
 
 export function Settings({
   onClose,
@@ -18,6 +19,11 @@ export function Settings({
   setMode: (mode: 'system' | 'light' | 'dark') => void;
 }) {
   const { scope, user, notify, sync, syncState, syncError, lastSync } = useNotto();
+  const shortcut = useCaptureShortcut();
+  const [selectedShortcut, setSelectedShortcut] = useState(shortcutOptions[0].value);
+  useEffect(() => {
+    if (shortcut?.shortcut) setSelectedShortcut(shortcut.shortcut);
+  }, [shortcut?.shortcut]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [invite, setInvite] = useState('');
@@ -285,10 +291,47 @@ export function Settings({
       </section>
       {desktop && (
         <section className="settings-section">
-          <h3>Randwidget</h3>
+          <h3>Tastenkürzel & Randwidget</h3>
           <p className="muted">
-            Am Griff verschieben und am linken oder rechten Rand andocken. Strg + Umschalt + Leertaste öffnet
-            die Eingabe.
+            Das globale Kürzel öffnet die Schnellnotiz auch aus anderen Programmen, bei geschlossenem
+            Hauptfenster oder ausgeblendetem Widget. Noto muss dafür im Infobereich laufen. Im Hauptfenster
+            funktioniert zusätzlich Strg + N.
+          </p>
+          <label>
+            Globale Schnellnotiz
+            <select
+              value={selectedShortcut}
+              onChange={(e) => setSelectedShortcut(e.target.value)}
+              disabled={busy}
+            >
+              {shortcutOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className={shortcut?.active ? 'muted small' : 'inline-error'} role="status">
+            {shortcut
+              ? shortcut.active
+                ? `Aktiv: ${shortcutLabel(shortcut.shortcut)}`
+                : shortcut.error
+              : 'Tastenkürzel wird geprüft …'}
+          </p>
+          <Action
+            label="Kürzel prüfen & übernehmen"
+            isLoading={busy}
+            isDisabled={busy}
+            onClick={() =>
+              void run(async () => {
+                await invoke('shortcut_set', { shortcut: selectedShortcut });
+                setMessage('Tastenkürzel registriert und für den nächsten Start gespeichert.');
+              })
+            }
+          />
+          <p className="muted small">
+            Windows prüft beim Registrieren, ob die Kombination bereits belegt ist. Bei einem Konflikt bleibt
+            dein bisheriges Kürzel aktiv. Am Griff kannst du das Widget an den Bildschirmrand verschieben.
           </p>
           <div className="settings-actions">
             <Action

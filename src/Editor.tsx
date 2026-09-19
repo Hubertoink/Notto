@@ -31,6 +31,20 @@ export function Editor({
   const [history, setHistory] = useState(false);
   const [oldRevision, setOldRevision] = useState<Revision | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!compact) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const focus = () => {
+      setPreview(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => input.current?.focus(), 100);
+    };
+    window.addEventListener('noto-focus-capture', focus);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('noto-focus-capture', focus);
+    };
+  }, [compact]);
   const file = useRef<HTMLInputElement>(null);
   const base = useRef(note?.revision ?? null);
   const queue = useRef(Promise.resolve());

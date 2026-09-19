@@ -1,4 +1,12 @@
-# Noto auf Mittwald (0.4.1)
+# Noto auf Mittwald (0.4.2)
+
+## Tastenkürzel
+
+Im Randwidget zeigt **Neue Notiz** das tatsächlich registrierte globale Kürzel an. Standard: **Strg + Umschalt + Leertaste**. Es funktioniert auch aus anderen Programmen und bei ausgeblendetem Widget, solange Noto im Windows-Infobereich läuft. Vollständiges Beenden oder Abmelden bei Windows beendet auch die Tastenkürzelregistrierung.
+
+Unter **Einstellungen → Tastenkürzel & Randwidget** sind zwei Alternativen wählbar. Noto registriert zuerst die neue Kombination und gibt erst danach die bisherige frei. Ein Konflikt wird angezeigt, ohne das bisherige Kürzel zu verlieren. Die erfolgreiche Auswahl wird lokal gespeichert und beim nächsten Start erneut registriert. Andere Programme können Tastendrücke zusätzlich über eigene Hooks behandeln; eine universelle Konfliktfreiheit kann Windows nicht garantieren. Grundlage ist die [globale Tastenkürzelregistrierung von Tauri](https://v2.tauri.app/plugin/global-shortcut/).
+
+Im Windows-Hauptfenster gilt zusätzlich **Strg + N**; im aktiven Website-Tab **Strg + Umschalt + Leertaste** (␣ im Button). Browserkürzel wie Strg + N und Strg + Umschalt + N bleiben frei. Wiederholte Tastendrücke, Texteingabe-Komposition und zusätzliche Modifikatortasten lösen keine lokale neue Notiz aus. Bei geöffneten Dialogen werden die lokalen Navigationskürzel nicht abgefangen.
 
 **Wissen & KI** ist ein eigener Bereich in der Hauptnavigation unter **Angeheftet**. Unter **KI einrichten** werden Änderungen zunächst als Entwurf gehalten. **Einstellungen speichern** wartet auf die Serverbestätigung; erst dann werden Änderungen im Konto und lokal aktiv. Bei einem Fehler bleiben die Eingaben für einen erneuten Versuch erhalten. Beim Wechsel zwischen Notizen und KI-Bereich bleiben ungespeicherte Einstellungen in der geöffneten App erhalten.
 

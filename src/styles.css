@@ -1357,3 +1357,25 @@ textarea:focus-visible {
     animation-duration: 0s !important;
   }
 }
+
+.note-shortcut {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 2px 4px;
+  line-height: 1.2;
+}
+.shortcut-warning {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--nt-error);
+  margin-top: 8px;
+}
+.widget-peek .notto-action {
+  gap: 7px;
+  padding-left: 12px;
+  padding-right: 12px;
+}

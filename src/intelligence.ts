@@ -65,13 +65,10 @@ export function config(scope: string): AIConfig {
     return { ...defaults };
   }
 }
-export function saveConfig(scope: string, value: AIConfig) {
+export async function saveConfig(scope: string, value: AIConfig) {
+  if (scope !== 'local' && ownBackend()) await serverRequest(readCloudConfig().url, '/ai/settings', value);
   localStorage.setItem(`notto-ai:${scope}`, JSON.stringify(value));
   window.dispatchEvent(new Event('notto-ai-config'));
-  if (scope !== 'local' && ownBackend())
-    void serverRequest(readCloudConfig().url, '/ai/settings', value).catch((e) =>
-      window.dispatchEvent(new CustomEvent('notto-ai-error', { detail: String(e) })),
-    );
 }
 export function eligible(note: Note) {
   const c = config(note.scope);

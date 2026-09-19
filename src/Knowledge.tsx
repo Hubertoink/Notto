@@ -11,6 +11,7 @@ import {
   analyze,
   ask,
   config,
+  defaults,
   decisionKey,
   eligible,
   extract,
@@ -37,15 +38,6 @@ export function IntelligenceWorker() {
   useEffect(() => {
     const error = (e: Event) => notify((e as CustomEvent<string>).detail);
     window.addEventListener('notto-ai-error', error);
-    if (scope !== 'local' && ownBackend())
-      void serverRequest(readCloudConfig().url, '/ai/settings')
-        .then(({ config: remote }) => {
-          if (remote) {
-            localStorage.setItem(`notto-ai:${scope}`, JSON.stringify(remote));
-            window.dispatchEvent(new Event('notto-ai-config'));
-          }
-        })
-        .catch((e) => notify(String(e)));
     return () => window.removeEventListener('notto-ai-error', error);
   }, [scope, notify]);
   useEffect(() => {
@@ -164,20 +156,20 @@ export function IntelligenceWorker() {
   return null;
 }
 
-export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (id: string) => void }) {
+export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen: (id: string) => void }) {
   const { scope, notes } = useNotto();
   const [serverJobs, setServerJobs] = useState<{ id: string; status: string; error: string | null }[]>([]);
   const [serverKeyReady, setServerKeyReady] = useState<boolean | null>(null);
   useEffect(() => {
-    if (scope === 'local' || !ownBackend()) return;
-    let active = true;
+    if (!active || scope === 'local' || !ownBackend()) return;
+    let current = true;
     const refresh = async () => {
       try {
         const [status, jobs] = await Promise.all([
           serverRequest(readCloudConfig().url, '/ai/settings'),
           serverRequest(readCloudConfig().url, '/ai/jobs'),
         ]);
-        if (active) {
+        if (current) {
           setServerKeyReady(status.configured);
           setServerJobs(jobs.jobs);
         }
@@ -186,13 +178,54 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
     void refresh();
     const timer = setInterval(() => void refresh(), 10000);
     return () => {
-      active = false;
+      current = false;
       clearInterval(timer);
     };
-  }, [scope]);
+  }, [scope, active]);
   const [records, setRecords] = useState<KnowledgeRecord[]>([]),
     [tab, setTab] = useState('overview');
   const [settings, setSettings] = useState<AIConfig>(() => config(scope));
+  const [dirty, setDirty] = useState(false);
+  const dirtyRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [savedMessage, setSavedMessage] = useState('');
+  const [settingsReady, setSettingsReady] = useState(scope === 'local' || !ownBackend());
+  const [settingsReload, setSettingsReload] = useState(0);
+  useEffect(() => {
+    if (scope === 'local' || !ownBackend()) return;
+    let cancelled = false;
+    void serverRequest(readCloudConfig().url, '/ai/settings')
+      .then(({ config: remote }) => {
+        if (cancelled) return;
+        const current = { ...defaults, ...remote };
+        localStorage.setItem(`notto-ai:${scope}`, JSON.stringify(current));
+        if (!dirtyRef.current) setSettings(current);
+        setSettingsReady(true);
+        setSaveError('');
+        window.dispatchEvent(new Event('notto-ai-config'));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSaveError(
+            'Server-Einstellungen konnten nicht geladen werden. Prüfe die Verbindung, bevor du speicherst.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scope, settingsReload]);
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, []);
   const [key, setKey] = useState(''),
     [hasKey, setHasKey] = useState(false);
   const [models, setModels] = useState<string[]>([]);
@@ -229,7 +262,9 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
     };
   }, [tab, scope, hasKey, modelsRefresh]);
   useEffect(() => {
-    const refresh = () => setSettings(config(scope));
+    const refresh = () => {
+      if (!dirtyRef.current) setSettings(config(scope));
+    };
     window.addEventListener('notto-ai-config', refresh);
     return () => window.removeEventListener('notto-ai-config', refresh);
   }, [scope]);
@@ -266,9 +301,32 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
     };
   }, [scope]);
   const update = (patch: Partial<AIConfig>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    saveConfig(scope, next);
+    if (saving || !settingsReady) return;
+    setSettings((current) => ({ ...current, ...patch }));
+    dirtyRef.current = true;
+    setDirty(true);
+    setSavedMessage('');
+    setSaveError('');
+  };
+  const persist = async () => {
+    if (saving || !settingsReady) return;
+    setSaving(true);
+    setSaveError('');
+    setSavedMessage('');
+    try {
+      await saveConfig(scope, settings);
+      dirtyRef.current = false;
+      setDirty(false);
+      setSavedMessage(
+        scope !== 'local' && ownBackend()
+          ? 'KI-Einstellungen im Konto gespeichert.'
+          : 'KI-Einstellungen auf diesem Gerät gespeichert.',
+      );
+    } catch (e) {
+      setSaveError(`Nicht gespeichert: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
   };
   const run = async (label: string, fn: () => Promise<void>) => {
     if (busy) return;
@@ -303,7 +361,11 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
     await knowledge.append(note, 'decision', { key: decisionKey(note.id, item), status, title, detail });
   };
   return (
-    <Modal title="Wissen & KI" onClose={onClose} width={1000}>
+    <section className="knowledge-content" aria-label="Wissen & KI">
+      <div className="knowledge-heading">
+        <span className="eyebrow">DEIN NOTIZBUCH, WEITERGEDACHT</span>
+        <h1>Wissen & KI</h1>
+      </div>
       <p className="muted">
         Deine Originale bleiben unverändert. Hier liegen abgeleitete Vorschläge, geprüfte Entscheidungen und
         Quellen.
@@ -323,6 +385,43 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
           </button>
         ))}
       </div>
+      {(tab === 'settings' || dirty || savedMessage || saveError) && (
+        <div className="ai-save-bar">
+          <div aria-live="polite">
+            <strong>
+              {saving
+                ? 'Wird gespeichert …'
+                : dirty
+                  ? 'Ungespeicherte Änderungen'
+                  : savedMessage || 'KI-Einstellungen'}
+            </strong>
+            <p className="muted small">
+              {dirty
+                ? 'Erst nach dem Speichern werden die Änderungen aktiv.'
+                : scope !== 'local' && ownBackend()
+                  ? 'Diese Einstellungen gelten für dein Konto auf allen Geräten.'
+                  : 'Diese Einstellungen gelten für das lokale Notizbuch.'}
+            </p>
+            {saveError && (
+              <p role="alert" className="inline-error">
+                {saveError}
+              </p>
+            )}
+            {!settingsReady && saveError && (
+              <button className="text-button" onClick={() => setSettingsReload((v) => v + 1)}>
+                Einstellungen erneut laden
+              </button>
+            )}
+          </div>
+          <Action
+            label="Einstellungen speichern"
+            variant="primary"
+            isLoading={saving}
+            isDisabled={saving || !settingsReady || !!busy}
+            onClick={() => void persist()}
+          />
+        </div>
+      )}
       {busy && (
         <p role="status" className="knowledge-progress">
           {busy} … Du kannst weiter in deinen Notizen arbeiten.
@@ -339,7 +438,7 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
         </p>
       )}
       {tab === 'settings' ? (
-        <section className="settings-section">
+        <fieldset className="settings-section ai-settings-fields" disabled={saving || !settingsReady}>
           <h3>OpenAI verbinden</h3>
           <p className="muted">
             Aktivierte KI-Funktionen senden freigegebene Texte an OpenAI. OCR sendet ausgewählte Bilder oder
@@ -482,7 +581,7 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
             Hintergrundanalysen werden erst nach manueller Wiederholung oder einer neuen Fassung erneut
             versucht. Recherche und OCR startest du ausdrücklich.
           </p>
-        </section>
+        </fieldset>
       ) : tab === 'search' ? (
         <section className="knowledge-section">
           <label>
@@ -863,6 +962,6 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
           <pre className="extracted-text">{source.text}</pre>
         </Modal>
       )}
-    </Modal>
+    </section>
   );
 }

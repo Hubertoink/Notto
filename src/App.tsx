@@ -16,6 +16,7 @@ import {
   Plus,
   Search,
   Settings2,
+  Sparkles,
   Trash2,
   Upload,
   WifiOff,
@@ -121,16 +122,19 @@ function Notebook({
     [notes, view, tag, query],
   );
   const selectedNote = notes.find((n) => n.id === selected);
-  const title = tag
-    ? `#${tag}`
-    : view === 'pinned'
-      ? 'Angeheftet'
-      : view === 'archive'
-        ? 'Archiv'
-        : view === 'trash'
-          ? 'Papierkorb'
-          : 'Alle Notizen';
+  const title = knowledgeOpen
+    ? 'Wissen & KI'
+    : tag
+      ? `#${tag}`
+      : view === 'pinned'
+        ? 'Angeheftet'
+        : view === 'archive'
+          ? 'Archiv'
+          : view === 'trash'
+            ? 'Papierkorb'
+            : 'Alle Notizen';
   const openNew = () => {
+    setKnowledgeOpen(false);
     setSelected(null);
     setCreating(true);
     setSidebar(false);
@@ -139,6 +143,7 @@ function Notebook({
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
+        setKnowledgeOpen(false);
         search.current?.focus();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
@@ -194,8 +199,9 @@ function Notebook({
   }
   const nav = (id: View, label: string, icon: React.ReactNode, count: number) => (
     <button
-      className={`nav-item ${view === id && !tag ? 'active' : ''}`}
+      className={`nav-item ${view === id && !tag && !knowledgeOpen ? 'active' : ''}`}
       onClick={() => {
+        setKnowledgeOpen(false);
         setView(id);
         setTag(null);
         setSidebar(false);
@@ -246,12 +252,19 @@ function Notebook({
           />
         </div>
         <nav aria-label="Notizbücher">
-          <button className="nav-item" onClick={() => setKnowledgeOpen(true)}>
-            <Search size={18} />
-            <span>Wissen & KI</span>
-          </button>
           {nav('all', 'Alle Notizen', <Inbox size={18} />, active.length)}
           {nav('pinned', 'Angeheftet', <Pin size={17} />, active.filter((n) => n.pinned).length)}
+          <button
+            className={`nav-item ${knowledgeOpen ? 'active' : ''}`}
+            aria-current={knowledgeOpen ? 'page' : undefined}
+            onClick={() => {
+              setKnowledgeOpen(true);
+              setSidebar(false);
+            }}
+          >
+            <Sparkles size={18} />
+            <span>Wissen & KI</span>
+          </button>
           {nav(
             'archive',
             'Archiv',
@@ -272,6 +285,7 @@ function Notebook({
                 key={t}
                 className={`nav-item ${tag === t ? 'active' : ''}`}
                 onClick={() => {
+                  setKnowledgeOpen(false);
                   setTag(t);
                   setView('all');
                   setCreating(false);
@@ -354,7 +368,10 @@ function Notebook({
               aria-label="Notizen durchsuchen"
               placeholder="Notizen durchsuchen …"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setKnowledgeOpen(false);
+                setQuery(e.target.value);
+              }}
             />
             {query ? (
               <button aria-label="Suche leeren" onClick={() => setQuery('')}>
@@ -374,7 +391,20 @@ function Notebook({
             />
           )}
         </header>
-        <div className="work-area">
+        <div className="knowledge-page" hidden={!knowledgeOpen}>
+          <Knowledge
+            key={scope}
+            active={knowledgeOpen}
+            onOpen={(id) => {
+              setKnowledgeOpen(false);
+              setCreating(false);
+              setSelected(id);
+              setView('all');
+              setTag(null);
+            }}
+          />
+        </div>
+        <div className="work-area" hidden={knowledgeOpen}>
           <section className="note-list-panel">
             <div className="list-heading">
               <div>
@@ -448,10 +478,6 @@ function Notebook({
                   </button>
                 ))
               )}
-            </div>
-            <div className="list-footer">
-              <span>{user ? 'Privates Notizbuch' : 'Deine Notizen bleiben bei dir.'}</span>
-              <span>n.</span>
             </div>
           </section>
           <section className="detail-panel">
@@ -562,16 +588,6 @@ function Notebook({
       </AnimatePresence>
       {settings && <Settings mode={mode} setMode={setMode} onClose={() => setSettings(false)} />}
       <IntelligenceWorker />
-      {knowledgeOpen && (
-        <Knowledge
-          onClose={() => setKnowledgeOpen(false)}
-          onOpen={(id) => {
-            setKnowledgeOpen(false);
-            setCreating(false);
-            setSelected(id);
-          }}
-        />
-      )}
     </div>
   );
 }

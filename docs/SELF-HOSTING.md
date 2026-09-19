@@ -1,4 +1,6 @@
-# Noto auf Mittwald (0.4)
+# Noto auf Mittwald (0.4.1)
+
+**Wissen & KI** ist ein eigener Bereich in der Hauptnavigation unter **Angeheftet**. Unter **KI einrichten** werden Änderungen zunächst als Entwurf gehalten. **Einstellungen speichern** wartet auf die Serverbestätigung; erst dann werden Änderungen im Konto und lokal aktiv. Bei einem Fehler bleiben die Eingaben für einen erneuten Versuch erhalten. Beim Wechsel zwischen Notizen und KI-Bereich bleiben ungespeicherte Einstellungen in der geöffneten App erhalten.
 
 Ziel: **https://noto-app.de** (ein t), Projekt `p-wqa66m` / `77a026ee-99bd-4c29-ab09-47a261d1f3dc`.
 

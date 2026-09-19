@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS users(id uuid PRIMARY KEY,email text NOT NULL UNIQUE,password_hash text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS sessions(hash text PRIMARY KEY,user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires_at timestamptz NOT NULL);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE TABLE IF NOT EXISTS invitations(hash text PRIMARY KEY,email text NOT NULL,used_at timestamptz);
+CREATE TABLE IF NOT EXISTS notes(user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,id uuid NOT NULL,revision uuid NOT NULL,document jsonb NOT NULL,updated_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(user_id,id));
+CREATE TABLE IF NOT EXISTS attachments(user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,id text NOT NULL,name text NOT NULL,mime text NOT NULL,sha256 text NOT NULL,size integer NOT NULL,PRIMARY KEY(user_id,id));
+CREATE TABLE IF NOT EXISTS knowledge(user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,id uuid NOT NULL,document jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(user_id,id));
+CREATE TABLE IF NOT EXISTS ai_settings(user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,document jsonb NOT NULL);
+CREATE TABLE IF NOT EXISTS rate_limits(key text NOT NULL,bucket bigint NOT NULL,count integer NOT NULL,expires_at timestamptz NOT NULL DEFAULT now()+interval '2 days',PRIMARY KEY(key,bucket));
+CREATE TABLE IF NOT EXISTS jobs(id uuid PRIMARY KEY,user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,note_id uuid NOT NULL,revision uuid NOT NULL,kind text NOT NULL DEFAULT 'analysis',status text NOT NULL DEFAULT 'pending',attempts integer NOT NULL DEFAULT 0,available_at timestamptz NOT NULL DEFAULT now(),lease_until timestamptz,error text,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(user_id,note_id,revision,kind));
+CREATE INDEX IF NOT EXISTS pending_jobs ON jobs(status,available_at);

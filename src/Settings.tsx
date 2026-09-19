@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Cloud, Download, FolderOpen, LogOut, Monitor, Moon, Sun } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Action, Modal, readableDate } from './components';
-import { cloud, configured, readCloudConfig, saveCloudConfig } from './cloud';
+import { cloud, configured, readCloudConfig, saveCloudConfig, ownBackend } from './cloud';
 import { desktop, repo } from './repository';
 import { allAttachmentIds, newNote } from './domain';
 import { exportNotebook } from './export';
@@ -20,6 +20,7 @@ export function Settings({
   const { scope, user, notify, sync, syncState, syncError, lastSync } = useNotto();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [invite, setInvite] = useState('');
   const [signup, setSignup] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -49,10 +50,12 @@ export function Settings({
     const c = cloud();
     if (!c) throw new Error('Zuerst eine Cloud-Verbindung konfigurieren.');
     if (signup) {
-      const { error } = await c.auth.signUp({ email, password });
+      const { error } = await c.auth.signUp({ email, password, options: { data: { invite } } });
       if (error) throw error;
       setMessage(
-        'Konto angelegt. Falls eine Bestätigung erforderlich ist, öffne bitte den Link in deiner E-Mail.',
+        ownBackend()
+          ? 'Konto angelegt. Du bist angemeldet.'
+          : 'Konto angelegt. Bitte gegebenenfalls die Bestätigungs-E-Mail öffnen.',
       );
     } else {
       const { error } = await c.auth.signInWithPassword({ email, password });
@@ -175,11 +178,23 @@ export function Settings({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete={signup ? 'new-password' : 'current-password'}
-                    minLength={8}
+                    minLength={ownBackend() ? 12 : 8}
                     required
-                    placeholder="Mindestens 8 Zeichen"
+                    placeholder="Mindestens 12 Zeichen"
                   />
                 </label>
+                {signup && ownBackend() && (
+                  <label>
+                    Einrichtungscode
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      required
+                      value={invite}
+                      onChange={(e) => setInvite(e.target.value)}
+                    />
+                  </label>
+                )}
                 <div className="settings-actions">
                   <Action
                     type="submit"
@@ -210,34 +225,24 @@ export function Settings({
             onSubmit={(e) => {
               e.preventDefault();
               void run(async () => {
-                saveCloudConfig(configuration);
+                saveCloudConfig({ ...configuration, key: '' });
                 location.reload();
               });
             }}
           >
             <label>
-              Supabase-Projekt-URL
+              Notto-Serveradresse
               <input
                 type="url"
                 required
-                placeholder="https://….supabase.co"
+                placeholder="https://noto-app.de"
                 value={configuration.url}
                 onChange={(e) => setConfiguration({ ...configuration, url: e.target.value.trim() })}
               />
             </label>
-            <label>
-              Öffentlicher Publishable-/Anon-Key
-              <input
-                required
-                value={configuration.key}
-                onChange={(e) => setConfiguration({ ...configuration, key: e.target.value.trim() })}
-                autoComplete="off"
-                placeholder="sb_publishable_…"
-              />
-            </label>
             <p className="muted small">
-              Das Projektschema muss eingerichtet sein. Hier niemals einen Secret- oder Service-Role-Key
-              eintragen.
+              Anmeldung und Synchronisation laufen über deinen Notto-Server. Der OpenAI-Schlüssel bleibt auf
+              dem Server.
             </p>
             <Action type="submit" label="Verbindung speichern" isDisabled={Boolean(user)} isLoading={busy} />
             {user && <p className="muted small">Melde dich ab, bevor du die Verbindung wechselst.</p>}
@@ -316,7 +321,7 @@ export function Settings({
         </p>
       )}
       <div className="settings-footer">
-        <span>Notto 0.2 · Deine Originale bleiben deine.</span>
+        <span>Notto 0.3 · Deine Originale bleiben deine.</span>
         <span>KI konfigurieren: Seitenleiste → Wissen & KI.</span>
       </div>
     </Modal>

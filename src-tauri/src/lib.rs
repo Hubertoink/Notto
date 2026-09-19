@@ -636,7 +636,9 @@ pub fn run() {
             intelligence::ai_set_key,
             intelligence::ai_request,
             intelligence::knowledge_list,
-            intelligence::knowledge_put
+            intelligence::knowledge_put,
+            intelligence::server_session_get,
+            intelligence::server_session_set
         ])
         .run(tauri::generate_context!())
         .expect("Notto konnte nicht gestartet werden");

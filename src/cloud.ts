@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { repo, mutateStored } from './repository';
 import { allAttachmentIds, conflictCopy, validNote, type Note, type Scope } from './domain';
+import { createNottoClient } from './backend';
 
 export interface CloudConfig {
   url: string;
@@ -10,7 +11,9 @@ export function readCloudConfig(): CloudConfig {
   try {
     return (
       JSON.parse(localStorage.getItem('notto-cloud') || 'null') || {
-        url: import.meta.env.VITE_SUPABASE_URL || '',
+        url:
+          import.meta.env.VITE_NOTTO_SERVER_URL ||
+          (import.meta.env.MODE === 'test' ? '' : 'https://noto-app.de'),
         key: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
       }
     );
@@ -20,14 +23,22 @@ export function readCloudConfig(): CloudConfig {
 }
 export function configured(): boolean {
   const c = readCloudConfig();
-  return Boolean(c.url && c.key);
+  return Boolean(c.url);
+}
+export function ownBackend() {
+  const c = readCloudConfig();
+  return Boolean(c.url && !c.key);
 }
 let client: SupabaseClient | null = null;
 export function cloud(): SupabaseClient | null {
   if (client) return client;
   const c = readCloudConfig();
-  if (!c.url || !c.key) return null;
+  if (!c.url) return null;
   try {
+    if (!c.key) {
+      client = createNottoClient(c.url);
+      return client;
+    }
     client = createClient(c.url, c.key, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });

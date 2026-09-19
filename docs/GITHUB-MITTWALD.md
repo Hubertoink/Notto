@@ -17,8 +17,8 @@ Repository: https://github.com/Hubertoink/Notto
 
 Diese Einrichtung bindet einen Runner an; sie stellt noch keinen Notto-Server bereit.
 
-## Noch umzusetzen: eigenes Backend
+## Eigenes Backend und Container
 
-Der hochgeladene Stand 0.2 enthält weiterhin die bisherige Supabase-Anbindung. Für den vereinbarten Mittwald-Betrieb folgen ein eigenes Backend für Login und konfliktbewusste Synchronisation, PostgreSQL, persistenter Anhangspeicher, serverseitige KI-Jobs sowie Container- und Deployment-Konfiguration. Die normale App-Oberfläche soll anschließend nur Serveradresse und Login benötigen.
+Version 0.3 enthält das eigene Backend für Login, Synchronisation, Anhänge und serverseitige KI-Jobs. Der Workflow `Notto container` baut ein privates Image. Zielprojekt ist `p-wqa66m`, Domain `noto-app.de`. Betrieb und Deployment stehen in [SELF-HOSTING.md](SELF-HOSTING.md). Die App benötigt Serveradresse und Login.
 
-Für das Deployment werden das konkrete Mittwald-Projekt und eine Ziel-Domain benötigt. API- und Deployment-Schlüssel gehören in Server-Secrets bzw. GitHub Actions Secrets. Den OpenAI-Schlüssel benötigt später ausschließlich der laufende Notto-Server. Ob der Mittwald-Runner selbst Images bauen kann, muss am installierten Runner geprüft werden; alternativ übernimmt ein GitHub-Runner den Image-Build.
+Die Registry-Zugangsdaten sind als GitHub Actions Secrets eingerichtet. Der Image-Build läuft zunächst auf GitHub, da noch kein Mittwald-Runner an dieses Repository angebunden ist. Der manuelle Mittwald-Prüfworkflow bleibt für dessen Registrierung vorbereitet. Der laufende Notto-Server benötigt seinen eigenen OpenAI-Schlüssel; Build-Jobs benötigen diesen Schlüssel nicht.

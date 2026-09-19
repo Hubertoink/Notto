@@ -1,5 +1,7 @@
 # Notto 0.2: Wissen, Dateien und KI
 
+**Für den aktuellen Mittwald-Betrieb ab Version 0.3 gilt [SELF-HOSTING.md](SELF-HOSTING.md).** Die folgende Supabase-Anleitung dokumentiert ausschließlich den früheren Stand. Im neuen Betrieb werden keine Supabase-Schlüssel benötigt.
+
 ## Windows
 
 In der Seitenleiste **Wissen & KI → KI einrichten** öffnen. Den eigenen OpenAI-API-Schlüssel hinterlegen und KI aktivieren. Der Schlüssel liegt im Windows-Anmeldedatenspeicher; er wird weder in Markdown noch in Browser-Speicher, Backups oder der Cloud gespeichert. Standardmodell: `gpt-4.1-mini`, Embeddings: `text-embedding-3-small`, Audio: `gpt-transcribe`. Zugriff auf die Modelle hängt vom API-Konto ab.

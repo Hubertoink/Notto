@@ -1,0 +1,12 @@
+node_modules
+dist
+build-server
+.git
+.env*
+.notto-deploy
+.tools
+output
+Astryx Library
+src-tauri/target
+src-tauri/gen
+test-results

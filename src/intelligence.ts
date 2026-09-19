@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
 import { db, desktop, repo } from './repository';
-import { cloud, fetchAttachment } from './cloud';
+import { cloud, fetchAttachment, ownBackend, readCloudConfig } from './cloud';
+import { serverRequest } from './backend';
 import { attachmentIds, tagsOf, type Note } from './domain';
 
 export interface Evidence {
@@ -67,6 +68,10 @@ export function config(scope: string): AIConfig {
 export function saveConfig(scope: string, value: AIConfig) {
   localStorage.setItem(`notto-ai:${scope}`, JSON.stringify(value));
   window.dispatchEvent(new Event('notto-ai-config'));
+  if (scope !== 'local' && ownBackend())
+    void serverRequest(readCloudConfig().url, '/ai/settings', value).catch((e) =>
+      window.dispatchEvent(new CustomEvent('notto-ai-error', { detail: String(e) })),
+    );
 }
 export function eligible(note: Note) {
   const c = config(note.scope);
@@ -156,10 +161,9 @@ export async function request(scope: string, endpoint: string, body: Record<stri
   const count = Number(localStorage.getItem(key) || 0);
   if (count >= c.dailyLimit) throw new Error('Dein tägliches Anfragelimit ist erreicht.');
   localStorage.setItem(key, String(count + 1));
-  if (desktop) return invoke('ai_request', { endpoint, body });
+  if (desktop && (scope === 'local' || !ownBackend())) return invoke('ai_request', { endpoint, body });
   const client = cloud();
-  if (!client)
-    throw new Error('Für die Web-KI ist eine Cloud-Verbindung mit der Funktion notto-ai erforderlich.');
+  if (!client) throw new Error('Für die KI bitte deinen Notto-Server verbinden und anmelden.');
   const { data, error } = await client.functions.invoke('notto-ai', { body: { endpoint, body } });
   if (error) throw new Error(`KI-Server nicht erreichbar: ${error.message}`);
   return data;

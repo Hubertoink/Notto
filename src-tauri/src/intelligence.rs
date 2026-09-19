@@ -3,6 +3,32 @@ use base64::Engine;
 use rusqlite::params;
 use serde_json::Value;
 use tauri::State;
+fn server_credential(server: &str) -> Result<keyring::Entry> {
+    if !server.starts_with("https://") && !server.starts_with("http://127.0.0.1:") {
+        return Err("Ungültiger Server".into());
+    }
+    keyring::Entry::new("Notto.ServerSession", server).map_err(err)
+}
+#[tauri::command]
+pub fn server_session_get(server: String) -> Result<Option<String>> {
+    match server_credential(&server)?.get_password() {
+        Ok(s) => Ok(Some(s)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(err(e)),
+    }
+}
+#[tauri::command]
+pub fn server_session_set(server: String, secret: String) -> Result<()> {
+    let entry = server_credential(&server)?;
+    if secret.is_empty() {
+        match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(err(e)),
+        }
+    } else {
+        entry.set_password(&secret).map_err(err)
+    }
+}
 
 fn credential() -> Result<keyring::Entry> {
     keyring::Entry::new("Notto.OpenAI", "api-key").map_err(err)

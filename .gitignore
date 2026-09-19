@@ -1,5 +1,7 @@
 node_modules/
 dist/
+build-server/
+.notto-deploy/
 src-tauri/target/
 .env
 .env.*

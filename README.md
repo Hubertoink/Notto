@@ -1,5 +1,7 @@
 # Notto
 
+**Aktueller Betrieb (0.3): [noto-app.de](https://noto-app.de), eigenes Docker-Backend auf Mittwald.** Anmeldung, Synchronisation und KI laufen über den eigenen Server. Supabase wird dafür nicht benötigt. Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
+
 Eine lokale Windows-Notizapp mit andockbarem Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 0.2 ergänzt PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
 
 ## Starten
@@ -54,7 +56,7 @@ Der Browser verwendet IndexedDB. Windows und Browser haben **getrennte lokale Sp
 
 Der Export enthält Markdown, alle referenzierten Bilder (auch aus früheren Versionen), Papierkorb, Entwürfe und `notto-backup.json` mit kompletter Historie und Zuständen. Markdown kann wieder importiert werden; der automatische Import der vollständigen JSON-Historie ist noch nicht implementiert.
 
-## Cloud einrichten
+## Frühere Supabase-Anbindung (0.2, optional)
 
 Die App funktioniert ohne Backend. Für Login und Synchronisation muss ein eigenes Supabase-Projekt verbunden werden:
 

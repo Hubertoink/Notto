@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { Action, Modal, NoteMarkdown, readableDate } from './components';
 import { useNotto } from './state';
 import { desktop } from './repository';
+import { ownBackend, readCloudConfig } from './cloud';
+import { serverRequest } from './backend';
 import { attachmentIds, titleOf, type Note } from './domain';
 import {
   analyze,
@@ -32,6 +34,20 @@ export function IntelligenceWorker() {
   const running = useRef(false),
     failed = useRef(new Set<string>());
   const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const error = (e: Event) => notify((e as CustomEvent<string>).detail);
+    window.addEventListener('notto-ai-error', error);
+    if (scope !== 'local' && ownBackend())
+      void serverRequest(readCloudConfig().url, '/ai/settings')
+        .then(({ config: remote }) => {
+          if (remote) {
+            localStorage.setItem(`notto-ai:${scope}`, JSON.stringify(remote));
+            window.dispatchEvent(new Event('notto-ai-config'));
+          }
+        })
+        .catch((e) => notify(String(e)));
+    return () => window.removeEventListener('notto-ai-error', error);
+  }, [scope, notify]);
   useEffect(() => {
     if (scope === 'local') return;
     let syncing = false,
@@ -84,7 +100,7 @@ export function IntelligenceWorker() {
   }, []);
   useEffect(() => {
     const c = config(scope);
-    if (!c.enabled || !c.auto || running.current) return;
+    if (!c.enabled || !c.auto || running.current || (scope !== 'local' && ownBackend())) return;
     let cancelled = false;
     const run = async () => {
       running.current = true;
@@ -150,6 +166,30 @@ export function IntelligenceWorker() {
 
 export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (id: string) => void }) {
   const { scope, notes } = useNotto();
+  const [serverJobs, setServerJobs] = useState<{ id: string; status: string; error: string | null }[]>([]);
+  const [serverKeyReady, setServerKeyReady] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (scope === 'local' || !ownBackend()) return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const [status, jobs] = await Promise.all([
+          serverRequest(readCloudConfig().url, '/ai/settings'),
+          serverRequest(readCloudConfig().url, '/ai/jobs'),
+        ]);
+        if (active) {
+          setServerKeyReady(status.configured);
+          setServerJobs(jobs.jobs);
+        }
+      } catch {}
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 10000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [scope]);
   const [records, setRecords] = useState<KnowledgeRecord[]>([]),
     [tab, setTab] = useState('overview');
   const [settings, setSettings] = useState<AIConfig>(() => config(scope));
@@ -268,7 +308,7 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
             PDF-Seiten; Diktat sendet die Aufnahme. Recherche übermittelt den sichtbaren Suchbegriff an die
             Websuche.
           </p>
-          {desktop ? (
+          {desktop && scope === 'local' ? (
             <>
               <label>
                 API-Schlüssel {hasKey ? '· sicher hinterlegt' : ''}
@@ -307,8 +347,12 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
             </>
           ) : (
             <p>
-              Die Webversion verwendet die authentifizierte Supabase-Funktion <code>notto-ai</code>. Der
-              API-Schlüssel wird dort als Server-Secret eingerichtet. Anleitung: docs/AI-SETUP.md im Projekt.
+              Dein Notto-Server führt die KI-Anfragen aus. Den OpenAI-Schlüssel hinterlegst du einmalig in den
+              Server-Einstellungen bei Mittwald. Er wird nicht auf deine Geräte übertragen.
+              {serverKeyReady !== null &&
+                (serverKeyReady
+                  ? ' OpenAI ist verbunden.'
+                  : ' Der OpenAI-Schlüssel fehlt noch auf dem Server.')}
             </p>
           )}
           <label>
@@ -333,7 +377,10 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
               checked={settings.auto}
               onChange={(e) => update({ auto: e.target.checked })}
             />{' '}
-            Gespeicherte Notizen im Hintergrund analysieren, solange Notto geöffnet ist
+            Gespeicherte Notizen im Hintergrund analysieren{' '}
+            {scope !== 'local' && ownBackend()
+              ? '– auch bei geschlossener App'
+              : '– solange Notto geöffnet ist'}
           </label>
           <label className="checkbox-row">
             <input
@@ -477,6 +524,26 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
         </section>
       ) : tab === 'overview' ? (
         <section className="knowledge-section">
+          {serverJobs.some(
+            (j) => j.status === 'pending' || j.status === 'running' || j.status === 'failed',
+          ) && (
+            <div className="knowledge-card">
+              <h3>Hintergrundaufträge auf deinem Server</h3>
+              {serverJobs
+                .filter((j) => ['pending', 'running', 'failed'].includes(j.status))
+                .slice(0, 5)
+                .map((j) => (
+                  <p key={j.id}>
+                    {j.status === 'running'
+                      ? 'Analyse läuft'
+                      : j.status === 'pending'
+                        ? 'Wartet auf Verarbeitung'
+                        : 'Analyse fehlgeschlagen'}
+                    {j.error ? ` · ${j.error}` : ''}
+                  </p>
+                ))}
+            </div>
+          )}
           <div className="knowledge-card">
             <h3>
               {included.length} freigegebene Notizen · {entries.length} Vorschläge

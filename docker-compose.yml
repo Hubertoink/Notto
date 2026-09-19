@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: notto
+      POSTGRES_USER: notto
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U notto -d notto']
+      interval: 10s
+      retries: 10
+    restart: unless-stopped
+  app:
+    image: ${NOTTO_IMAGE}
+    environment: &app-environment
+      NODE_ENV: production
+      APP_ORIGIN: https://noto-app.de
+      DATABASE_URL: postgresql://notto:${POSTGRES_PASSWORD}@db:5432/notto
+      SETUP_EMAIL: ${SETUP_EMAIL}
+      SETUP_INVITE_TOKEN: ${SETUP_INVITE_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DATA_DIR: /data/attachments
+    ports:
+      - '3000:3000'
+    volumes:
+      - attachments:/data/attachments
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  worker:
+    image: ${NOTTO_IMAGE}
+    environment:
+      <<: *app-environment
+      NOTTO_ROLE: worker
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  database:
+  attachments:

@@ -8,8 +8,8 @@ use std::sync::{
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
-pub const DEFAULT: &str = "Control+Shift+Space";
-pub const OPTIONS: [&str; 3] = [DEFAULT, "Control+Alt+Shift+KeyN", "Control+Alt+Shift+Space"];
+pub const DEFAULT: &str = "Control+Alt+Shift+KeyN";
+pub const OPTIONS: [&str; 3] = [DEFAULT, "Control+Alt+Shift+Space", "Control+Shift+Space"];
 #[derive(Clone, Serialize)]
 pub struct Status {
     pub shortcut: String,

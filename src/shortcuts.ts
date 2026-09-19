@@ -8,13 +8,13 @@ export interface ShortcutStatus {
   error: string | null;
 }
 export const shortcutOptions = [
-  { value: 'Control+Shift+Space', label: 'Strg + Umschalt + Leertaste', compact: 'Strg ⇧ Leertaste' },
   { value: 'Control+Alt+Shift+KeyN', label: 'Strg + Alt + Umschalt + N', compact: 'Strg Alt ⇧ N' },
   {
     value: 'Control+Alt+Shift+Space',
     label: 'Strg + Alt + Umschalt + Leertaste',
     compact: 'Strg Alt ⇧ Leertaste',
   },
+  { value: 'Control+Shift+Space', label: 'Strg + Umschalt + Leertaste', compact: 'Strg ⇧ Leertaste' },
 ];
 export function shortcutLabel(value: string, compact = false) {
   const option = shortcutOptions.find((o) => o.value === value);

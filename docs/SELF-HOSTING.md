@@ -2,7 +2,7 @@
 
 ## Tastenkürzel
 
-Im Randwidget zeigt **Neue Notiz** das tatsächlich registrierte globale Kürzel an. Standard: **Strg + Umschalt + Leertaste**. Es funktioniert auch aus anderen Programmen und bei ausgeblendetem Widget, solange Noto im Windows-Infobereich läuft. Vollständiges Beenden oder Abmelden bei Windows beendet auch die Tastenkürzelregistrierung.
+Im Randwidget zeigt **Neue Notiz** das tatsächlich registrierte globale Kürzel an. Standard ab 0.4.2: **Strg + Alt + Umschalt + N**. Die zusätzliche Modifikatortaste reduziert Überschneidungen mit üblichen lokalen Editor-Kürzeln. Es funktioniert auch aus anderen Programmen und bei ausgeblendetem Widget, solange Noto im Windows-Infobereich läuft. Vollständiges Beenden oder Abmelden bei Windows beendet auch die Tastenkürzelregistrierung.
 
 Unter **Einstellungen → Tastenkürzel & Randwidget** sind zwei Alternativen wählbar. Noto registriert zuerst die neue Kombination und gibt erst danach die bisherige frei. Ein Konflikt wird angezeigt, ohne das bisherige Kürzel zu verlieren. Die erfolgreiche Auswahl wird lokal gespeichert und beim nächsten Start erneut registriert. Andere Programme können Tastendrücke zusätzlich über eigene Hooks behandeln; eine universelle Konfliktfreiheit kann Windows nicht garantieren. Grundlage ist die [globale Tastenkürzelregistrierung von Tauri](https://v2.tauri.app/plugin/global-shortcut/).
 

@@ -20,8 +20,8 @@ npm test
 
 ## Bedienung
 
-- **Strg + Umschalt + Leertaste:** Schnellnotiz über das Randwidget (Windows, solange Notto läuft).
-- **Strg + N:** neue Notiz im Hauptfenster.
+- **Strg + Alt + Umschalt + N:** globale Schnellnotiz über das Randwidget (Standard ab 0.4.2, solange Noto läuft). Unter Einstellungen → Tastenkürzel & Randwidget änderbar; der Button zeigt die aktive Kombination.
+- **Strg + N:** neue Notiz im Windows-Hauptfenster. Im aktiven Website-Tab: **Strg + Umschalt + Leertaste**.
 - **Strg + K:** Suche fokussieren.
 - **Strg + Enter:** Notiz speichern.
 - **Escape:** Randwidget einklappen; der Entwurf bleibt erhalten.

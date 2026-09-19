@@ -130,3 +130,16 @@ Noch separat mit echten Geräten zu prüfen: Monitorwechsel, verschiedene DPI-Sk
 - `supabase/migrations/`: Backend-Schema, Zugriffsregeln und atomare Sync-Funktion.
 
 Abhängigkeiten sind über `package-lock.json` und `src-tauri/Cargo.lock` festgeschrieben. Astryx ist als Version 0.6.2 eingebunden.
+
+## Persönlicher Kontext
+
+Unter **Einstellungen → Mein Kontext** verwaltest du Anweisungen, gemerkte Informationen und fallbezogene Präferenzen. Einträge gehören zum jeweiligen Notizbuch und werden im angemeldeten Konto zwischen Web und Desktop synchronisiert. Lokaler Kontext bleibt im lokalen Notizbuch.
+
+- Eigene Anweisungen und manuell gespeicherte Informationen gelten sofort für künftige KI-Anfragen.
+- Aus einer ausgewählten Notiz lassen sich belegte Kontextvorschläge erstellen; diese musst du bestätigen.
+- Ausdrückliche Korrekturen an KI-Vorschlägen erscheinen als Präferenzvorschläge. Automatische Berücksichtigung ist optional und standardmäßig aus. Bloßes Annehmen oder Erledigen einer Aufgabe ist kein Lernsignal.
+- Einträge mit geänderten, gelöschten oder ausgeschlossenen Quellnotizen werden nicht verwendet. Spätere Entscheidungen ersetzen frühere Korrekturen.
+- Du kannst Einträge bearbeiten, vergessen oder den gesamten persönlichen Kontext pausieren. „Vergessen“ sperrt den Eintrag für künftige Anfragen; frühere Ereignisse bleiben im Datenverlauf und Export, bereits erzeugte Antworten bleiben erhalten.
+- Kontext wird bei Textanfragen einschließlich Hintergrundanalysen berücksichtigt, nicht beim Erstellen von Suchvektoren oder Transkriptionen. Je Anfrage werden höchstens 30 aktive Einträge mit insgesamt 10.000 Textzeichen ausgewählt; Anweisungen zuerst, sonst nach Wortüberschneidung.
+
+Das Gedächtnis ergänzt die Anfrage; es trainiert kein eigenes Modell und führt keine externen Aktionen aus. Originalnotizen bleiben unverändert. Die Antwortqualität mit echten Modellen sowie die Darstellung auf unterschiedlichen Geräten müssen weiterhin praktisch beurteilt werden.

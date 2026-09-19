@@ -1,3 +1,5 @@
+import { memoryContext } from '../src/memory-policy.js';
+import { knowledgeRole } from '../src/knowledge-policy.js';
 import { z } from 'zod';
 import { limit, type Database } from './database.js';
 import { availableModels } from './models.js';
@@ -45,10 +47,26 @@ export async function openai(
       throw Object.assign(new Error('Modell auf dem Server nicht freigeschaltet.'), { statusCode: 400 });
     if (!body.input) throw Object.assign(new Error('KI-Eingabe fehlt'), { statusCode: 400 });
     const clean: Record<string, unknown> = { model, input: body.input };
-    if (endpoint === 'responses')
+    if (endpoint === 'responses') {
+      const [memories, notes, preferences] = await Promise.all([
+        db.query(
+          "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'kind' IN ('memory','decision','analysis')",
+          [userId],
+        ),
+        db.query('SELECT document FROM notes WHERE user_id=$1', [userId]),
+        db.query('SELECT document FROM ai_settings WHERE user_id=$1', [userId]),
+      ]);
+      const settings = preferences.rows[0]?.document ?? { excludedNotes: [], excludedTags: '' };
+      const context = memoryContext(
+        memories.rows.map((r) => r.document),
+        notes.rows.map((r) => ({ ...r.document, scope: userId })),
+        settings,
+        userId,
+        body.input,
+      );
       Object.assign(clean, {
         store: false,
-        instructions: body.instructions,
+        instructions: `${knowledgeRole}\n${body.instructions ?? ''}${context}`,
         text: body.text,
         max_output_tokens: 4000,
         max_tool_calls: 2,
@@ -56,7 +74,7 @@ export async function openai(
           ? { tools: [{ type: 'web_search' }], include: ['web_search_call.action.sources'] }
           : {}),
       });
-    else clean.encoding_format = 'float';
+    } else clean.encoding_format = 'float';
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(clean);
   }

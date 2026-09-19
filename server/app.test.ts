@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, expect, it, vi } from 'vitest';
 import { workOnce } from './worker';
+import { openai } from './openai';
 import { PGlite } from '@electric-sql/pglite';
 import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -93,6 +94,25 @@ it('runs consented server jobs with quoted evidence without rewriting originals'
     payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
   });
   const environment = { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 10 };
+  const memory = {
+    id: crypto.randomUUID(),
+    scope: alice,
+    noteId: crypto.randomUUID(),
+    revision: crypto.randomUUID(),
+    at: new Date().toISOString(),
+    kind: 'memory',
+    data: {
+      key: 'work-style',
+      category: 'instruction',
+      text: 'Berücksichtige vorhandene Geräte.',
+      status: 'active',
+      sources: [],
+    },
+  };
+  expect(
+    (await app.inject({ method: 'POST', url: '/api/knowledge', headers: headers(aToken), payload: [memory] }))
+      .statusCode,
+  ).toBe(200);
   const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
     new Response(
       JSON.stringify({
@@ -134,6 +154,7 @@ it('runs consented server jobs with quoted evidence without rewriting originals'
     });
     await workOnce(adapter, environment);
     expect(fetch).toHaveBeenCalledOnce();
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body)).instructions).toContain(memory.data.text);
     const knowledge = (await app.inject({ url: '/api/knowledge', headers: headers(aToken) })).json().data;
     expect(knowledge.some((r: any) => r.document.noteId === note.id && r.document.kind === 'analysis')).toBe(
       true,
@@ -142,6 +163,41 @@ it('runs consented server jobs with quoted evidence without rewriting originals'
       .json()
       .data.find((r: any) => r.document.id === note.id).document;
     expect(original).toEqual(note);
+    fetch.mockImplementation(async () => new Response(JSON.stringify({ output: [] })));
+    await openai(adapter, bob, 'responses', { model: 'gpt-4.1-mini', input: 'Hallo' }, environment);
+    expect(JSON.parse(String(fetch.mock.calls.at(-1)?.[1]?.body)).instructions).not.toContain(
+      memory.data.text,
+    );
+    const forgotten = {
+      ...memory,
+      id: crypto.randomUUID(),
+      at: new Date(Date.now() + 1000).toISOString(),
+      data: { ...memory.data, status: 'forgotten', text: '' },
+    };
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/knowledge',
+          headers: headers(aToken),
+          payload: [forgotten],
+        })
+      ).statusCode,
+    ).toBe(200);
+    await openai(adapter, alice, 'responses', { model: 'gpt-4.1-mini', input: 'Hallo' }, environment);
+    expect(JSON.parse(String(fetch.mock.calls.at(-1)?.[1]?.body)).instructions).not.toContain(
+      memory.data.text,
+    );
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/api/knowledge',
+          headers: headers(aToken),
+          payload: [{ ...memory, id: crypto.randomUUID(), data: { ...memory.data, category: 'invalid' } }],
+        })
+      ).statusCode,
+    ).toBe(400);
   } finally {
     fetch.mockRestore();
   }

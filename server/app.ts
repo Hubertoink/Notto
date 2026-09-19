@@ -1,3 +1,4 @@
+import { memorySchema } from '../src/memory-policy.js';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
@@ -104,7 +105,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '0.8.0' };
+    return { ok: true, version: '0.9.0' };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (
@@ -290,7 +291,15 @@ export async function buildApp(db: Database, env: Environment) {
         z.object({
           id: uuid,
           scope: uuid,
-          kind: z.enum(['analysis', 'decision', 'extraction', 'research', 'embedding', 'manual-task']),
+          kind: z.enum([
+            'analysis',
+            'decision',
+            'extraction',
+            'research',
+            'embedding',
+            'manual-task',
+            'memory',
+          ]),
           noteId: uuid,
           revision: uuid,
           at: z.string().datetime(),
@@ -301,6 +310,7 @@ export async function buildApp(db: Database, env: Environment) {
       .parse(req.body);
     for (const r of records) {
       if (r.scope !== req.nottoUser!.id) fail('Falsches Notizbuch.', 403);
+      if (r.kind === 'memory') memorySchema.parse(r.data);
       await db.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [
         req.nottoUser!.id,
         r.id,

@@ -1,3 +1,4 @@
+import { memoryContext } from './memory-policy';
 import { knowledgeRole, uniqueSources } from './knowledge-policy';
 import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
@@ -23,7 +24,7 @@ export interface KnowledgeRecord {
   id: string;
   scope: string;
   at: string;
-  kind: 'analysis' | 'decision' | 'extraction' | 'research' | 'embedding' | 'manual-task';
+  kind: 'analysis' | 'decision' | 'extraction' | 'research' | 'embedding' | 'manual-task' | 'memory';
   noteId: string;
   revision: string;
   data: unknown;
@@ -159,6 +160,19 @@ export async function request(scope: string, endpoint: string, body: Record<stri
   const count = Number(localStorage.getItem(key) || 0);
   if (count >= c.dailyLimit) throw new Error('Dein tägliches Anfragelimit ist erreicht.');
   localStorage.setItem(key, String(count + 1));
+  if (endpoint === 'responses') {
+    if (scope !== 'local' && ownBackend()) await knowledge.sync(scope);
+    else {
+      const context = memoryContext(
+        await knowledge.list(scope),
+        await repo.list(scope),
+        c,
+        scope,
+        body.input,
+      );
+      body = { ...body, instructions: `${body.instructions ?? ''}${context}` };
+    }
+  }
   if (desktop && (scope === 'local' || !ownBackend())) return invoke('ai_request', { endpoint, body });
   const client = cloud();
   if (!client) throw new Error('Für die KI bitte deinen Noto-Server verbinden und anmelden.');

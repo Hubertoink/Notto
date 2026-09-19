@@ -40,7 +40,11 @@ it('accepts newly discovered supported models and rejects unavailable or wrong-m
     .mockResolvedValue(new Response(JSON.stringify({ output: [] })));
   const env = { openaiKey: 'test-only', models: [], dailyLimit: 100 };
   const db = {
-    query: vi.fn().mockResolvedValue({ rows: [{ count: 1 }], rowCount: 1 }),
+    query: vi
+      .fn()
+      .mockImplementation(async (sql: string) =>
+        sql.startsWith('SELECT document') ? { rows: [], rowCount: 0 } : { rows: [{ count: 1 }], rowCount: 1 },
+      ),
   } as unknown as Database;
   await openai(db, 'test', 'responses', { model: 'gpt-5-mini', input: 'Test' }, env);
   expect(fetch).toHaveBeenCalledTimes(2);

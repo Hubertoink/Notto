@@ -6,6 +6,8 @@ import userEvent from '@testing-library/user-event';
 import { Theme } from '@astryxdesign/core/theme';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
 import { Editor } from './Editor';
+import { MemorySettings } from './Memory';
+import { memoryState } from './memory-policy';
 import { NottoProvider } from './state';
 import { db, repo } from './repository';
 import { newNote } from './domain';
@@ -46,6 +48,29 @@ function renderEditor(saved = vi.fn()) {
     </Theme>,
   );
 }
+it('saves, edits and forgets personal instructions in the settings surface', async () => {
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <MemorySettings />
+      </NottoProvider>
+    </Theme>,
+  );
+  const user = userEvent.setup();
+  const input = screen.getByRole('textbox', { name: 'Kontexteintrag' });
+  await user.type(input, 'Bitte knapp antworten.');
+  await user.click(screen.getByRole('button', { name: 'Eintrag speichern' }));
+  expect(await screen.findByText('Bitte knapp antworten.')).toBeTruthy();
+  await user.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+  await user.clear(input);
+  await user.type(input, 'Bitte sachlich antworten.');
+  await user.click(screen.getByRole('button', { name: 'Änderungen speichern' }));
+  expect(await screen.findByText('Bitte sachlich antworten.')).toBeTruthy();
+  expect(screen.queryByText('Bitte knapp antworten.')).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Vergessen' }));
+  await waitFor(() => expect(screen.queryByText('Bitte sachlich antworten.')).toBeNull());
+  expect(memoryState(await knowledge.list('local'), 'local').entries).toEqual([]);
+});
 it('opens inline AI annotations and completes a task without changing the note', async () => {
   const note = newNote('local', 'Steam einrichten');
   await repo.put(note, null);

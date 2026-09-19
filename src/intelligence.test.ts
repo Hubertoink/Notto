@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { db, repo } from './repository';
 import { newNote, reviseNote, attachmentIds } from './domain';
+import { saveMemory, suggestMemory } from './memory-client';
 import {
   analyze,
   config,
@@ -37,6 +38,54 @@ const response = (suggestions: unknown[]) => ({
     output: [{ content: [{ type: 'output_text', text: JSON.stringify({ suggestions }) }] }],
   },
   error: null,
+});
+it('includes saved personal instructions and forgets them without changing a note', async () => {
+  const note = newNote('local', item.quote);
+  await repo.put(note, null);
+  const memory = {
+    key: 'instruction',
+    category: 'instruction' as const,
+    text: 'Antworte knapp und sachlich.',
+    status: 'active' as const,
+    sources: [],
+  };
+  await saveMemory('local', memory);
+  api.mockResolvedValue(response([item]));
+  await analyze(note);
+  expect(api.mock.calls[0][1].body.body.instructions).toContain(memory.text);
+  await saveMemory('local', { ...memory, status: 'forgotten', text: '' });
+  await analyze(note);
+  expect(api.mock.calls[1][1].body.body.instructions).not.toContain(memory.text);
+  expect(await repo.get('local', note.id)).toEqual(note);
+});
+it('requires exact evidence for memory proposals and never accepts them automatically', async () => {
+  const note = newNote('local', item.quote);
+  await repo.put(note, null);
+  const factsResponse = (quote: string) => ({
+    data: {
+      output: [
+        {
+          content: [
+            {
+              type: 'output_text',
+              text: JSON.stringify({ facts: [{ text: 'Vier PCs im Projekt', quote }] }),
+            },
+          ],
+        },
+      ],
+    },
+    error: null,
+  });
+  api.mockResolvedValue(factsResponse('Erfundener Beleg'));
+  await expect(suggestMemory(note)).rejects.toThrow('Quellenbeleg');
+  expect(await knowledge.list('local')).toHaveLength(0);
+  api.mockResolvedValue(factsResponse(item.quote));
+  expect(await suggestMemory(note)).toBe(1);
+  const saved = (await knowledge.list('local'))[0].data as import('./memory-policy').Memory;
+  expect(saved.status).toBe('suggested');
+  await saveMemory('local', { ...saved, status: 'forgotten', text: '' });
+  expect(await suggestMemory(note)).toBe(0);
+  expect(await repo.get('local', note.id)).toEqual(note);
 });
 it('stores analysis separately without changing original text, revision, or history', async () => {
   const note = newNote('local', `#medien\n${item.quote}`);

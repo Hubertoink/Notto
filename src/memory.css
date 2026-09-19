@@ -1,0 +1,72 @@
+.memory-settings {
+  display: grid;
+  gap: 14px;
+}
+.memory-settings .muted {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.memory-option {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 10px;
+}
+.memory-option input {
+  width: auto !important;
+  margin: 3px 0;
+  flex: 0 0 auto;
+}
+.memory-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.memory-tabs button {
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--nt-hover);
+}
+.memory-tabs button[aria-pressed='true'] {
+  background: var(--nt-tint);
+}
+.memory-form,
+.memory-extract,
+.memory-list {
+  display: grid;
+  gap: 12px;
+}
+.memory-settings textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+.memory-save {
+  background: var(--nt-tint);
+  color: var(--nt-text);
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+.memory-save:disabled {
+  opacity: 0.5;
+}
+.memory-card {
+  border: 1px solid var(--nt-line);
+  padding: 16px;
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.memory-card p {
+  white-space: pre-wrap;
+}
+.memory-card summary {
+  cursor: pointer;
+  color: var(--nt-muted);
+  font-size: 13px;
+}
+.memory-card blockquote {
+  margin: 10px 0;
+  border-left: 2px solid var(--nt-accent);
+  padding-left: 10px;
+}

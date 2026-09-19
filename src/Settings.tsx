@@ -8,6 +8,7 @@ import { allAttachmentIds, newNote } from './domain';
 import { exportNotebook } from './export';
 import { useNotto } from './state';
 import { useCaptureShortcut, shortcutOptions, shortcutLabel } from './shortcuts';
+import { MemorySettings } from './Memory';
 
 export function Settings({
   onClose,
@@ -94,6 +95,7 @@ export function Settings({
   }
   return (
     <Modal title="Einstellungen" onClose={onClose} width={640}>
+      <MemorySettings key={scope} />
       <section className="settings-section">
         <h3>Darstellung</h3>
         <div className="segmented" aria-label="Farbschema">

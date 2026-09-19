@@ -48,6 +48,35 @@ function renderEditor(saved = vi.fn()) {
     </Theme>,
   );
 }
+it('opens and saves a widget draft in the main editor without consuming the other draft', async () => {
+  const draft = {
+    key: 'local:widget',
+    scope: 'local',
+    noteId: 'widget',
+    content: 'Gedanke aus dem Widget',
+    baseRevision: null,
+    updatedAt: new Date().toISOString(),
+  };
+  await repo.saveDraft(draft);
+  await repo.saveDraft({ ...draft, key: 'local:new', noteId: null, content: 'Anderer Entwurf' });
+  const saved = vi.fn();
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor draftSource="widget" onSaved={saved} />
+      </NottoProvider>
+    </Theme>,
+  );
+  await waitFor(() =>
+    expect((screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement).value).toBe(
+      draft.content,
+    ),
+  );
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Festhalten' }));
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  expect(await repo.draft('local', 'widget')).toBeUndefined();
+  expect((await repo.draft('local', null))?.content).toBe('Anderer Entwurf');
+});
 it('saves, edits and forgets personal instructions in the settings surface', async () => {
   render(
     <Theme theme={neutralTheme}>

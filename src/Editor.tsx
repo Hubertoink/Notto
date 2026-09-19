@@ -12,11 +12,13 @@ import { NoteAnnotations } from './Tasks';
 export function Editor({
   note,
   compact = false,
+  draftSource,
   onSaved,
   onClose,
 }: {
   note?: Note;
   compact?: boolean;
+  draftSource?: 'widget';
   onSaved: (note: Note) => void;
   onClose?: () => void;
 }) {
@@ -54,7 +56,7 @@ export function Editor({
   const alive = useRef(true);
   const textRef = useRef(content);
   const initial = useRef(note?.content ?? '');
-  const draftId = note?.id ?? (compact ? 'widget' : null);
+  const draftId = note?.id ?? draftSource ?? (compact ? 'widget' : null);
   useEffect(() => {
     alive.current = true;
     let cancelled = false;

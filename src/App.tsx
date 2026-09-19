@@ -31,7 +31,8 @@ import { WebAccess } from './Login';
 import { Widget } from './Widget';
 import { Knowledge, IntelligenceWorker } from './Knowledge';
 import './knowledge.css';
-import { TasksPage, TaskRow, useKnowledgeRecords } from './Tasks';
+import { TasksPage, useKnowledgeRecords } from './Tasks';
+import { useNewDrafts } from './drafts';
 import { tasksFor } from './task-store';
 import { desktop, repo } from './repository';
 import { noteShortcut, newNoteLabel } from './shortcuts';
@@ -79,6 +80,9 @@ function Notebook({
   const [searchOpen, setSearchOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [draftSource, setDraftSource] = useState<'widget' | undefined>();
+  const drafts = useNewDrafts(scope);
+  const visibleDrafts = view === 'all' ? drafts.filter((d) => !tag || tagsOf(d.content).includes(tag)) : [];
   const [settings, setSettings] = useState(false);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
@@ -136,6 +140,7 @@ function Notebook({
               ? 'Papierkorb'
               : 'Alle Notizen';
   const openNew = () => {
+    setDraftSource(undefined);
     setKnowledgeOpen(false);
     setTasksOpen(false);
     setSelected(null);
@@ -300,13 +305,6 @@ function Notebook({
             <span>Aufgaben</span>
             <span className="nav-count">{tasks.filter((t) => !t.done).length || ''}</span>
           </button>
-          <div className="sidebar-tasks" aria-label="Offene Aufgaben">
-            {tasks
-              .filter((t) => !t.done)
-              .map((task) => (
-                <TaskRow key={task.id} task={task} small />
-              ))}
-          </div>
           {nav(
             'archive',
             'Archiv',
@@ -435,10 +433,11 @@ function Notebook({
           <section className="note-list-panel">
             <div className="list-heading">
               <div>
-                <span className="eyebrow">DEIN NOTIZBUCH</span>
                 <h1>{title}</h1>
                 <p>
                   {filtered.length} {filtered.length === 1 ? 'Notiz' : 'Notizen'}
+                  {visibleDrafts.length > 0 &&
+                    ` · ${visibleDrafts.length} ${visibleDrafts.length === 1 ? 'Entwurf' : 'Entwürfe'}`}
                 </p>
               </div>
               <Action
@@ -451,9 +450,26 @@ function Notebook({
               />
             </div>
             <div className="note-list">
+              {visibleDrafts.map((draft) => (
+                <button
+                  key={draft.key}
+                  className={`note-card ${creating && (draftSource ?? null) === draft.noteId ? 'selected' : ''}`}
+                  onClick={() => {
+                    setDraftSource(draft.noteId === 'widget' ? 'widget' : undefined);
+                    setSelected(null);
+                    setCreating(true);
+                  }}
+                >
+                  <div className="note-card-meta">
+                    <span className="draft-label">Entwurf · lokal</span>
+                  </div>
+                  <h2>{titleOf(draft.content)}</h2>
+                  <p>{excerptOf(draft.content).slice(0, 155)}</p>
+                </button>
+              ))}
               {loading ? (
                 <div className="list-empty">Notizen werden geladen …</div>
-              ) : filtered.length === 0 ? (
+              ) : filtered.length === 0 && visibleDrafts.length === 0 ? (
                 <div className="list-empty">
                   <FileText size={28} strokeWidth={1.3} />
                   <strong>
@@ -556,7 +572,8 @@ function Notebook({
               </div>
             ) : creating || selectedNote ? (
               <Editor
-                key={`${scope}:${creating ? 'new' : selectedNote!.id}`}
+                key={`${scope}:${creating ? (draftSource ?? 'new') : selectedNote!.id}`}
+                draftSource={creating ? draftSource : undefined}
                 note={creating ? undefined : selectedNote}
                 onSaved={(n) => {
                   setSelected(n.id);

@@ -213,7 +213,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 27px 11px 8px;
+  margin: 18px 11px 5px;
   color: var(--nt-muted);
   font-size: 12px;
   font-weight: 600;
@@ -223,6 +223,20 @@ textarea:focus-visible {
   overflow: auto;
   min-height: 0;
   max-height: 25dvh;
+}
+.tag-navigation .nav-item {
+  padding: 5px 11px;
+  margin: 0;
+  font-size: 13px;
+  min-height: 30px;
+}
+@media (pointer: coarse) {
+  .tag-navigation .nav-item {
+    min-height: 40px;
+  }
+}
+.draft-label {
+  color: var(--nt-muted);
 }
 .empty-tags {
   font-size: 13px;

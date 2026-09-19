@@ -28,12 +28,14 @@ class NottoDatabase extends Dexie {
 }
 export const db = new NottoDatabase();
 const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('notto-changes') : null;
-export function announce() {
-  window.dispatchEvent(new Event('notto-change'));
-  channel?.postMessage('change');
-  if (desktop) void emit('notto-change').catch(console.error);
+export function announce(event = 'notto-change') {
+  window.dispatchEvent(new Event(event));
+  channel?.postMessage(event);
+  if (desktop) void emit(event).catch(console.error);
 }
-channel?.addEventListener('message', () => window.dispatchEvent(new Event('notto-change')));
+channel?.addEventListener('message', (e) =>
+  window.dispatchEvent(new Event(e.data === 'notto-drafts' ? 'notto-drafts' : 'notto-change')),
+);
 export const repo = {
   async list(scope: Scope): Promise<Note[]> {
     return desktop ? invoke('list_notes', { scope }) : db.notes.where('scope').equals(scope).toArray();
@@ -66,11 +68,13 @@ export const repo = {
   async saveDraft(draft: Draft): Promise<void> {
     if (desktop) await invoke('save_draft', { draft });
     else await db.drafts.put(draft);
+    announce('notto-drafts');
   },
   async removeDraft(scope: Scope, noteId: string | null): Promise<void> {
     const key = `${scope}:${noteId ?? 'new'}`;
     if (desktop) await invoke('remove_draft', { key });
     else await db.drafts.delete(key);
+    announce('notto-drafts');
   },
   async attachment(scope: Scope, id: string): Promise<Attachment | undefined> {
     if (!desktop) return db.attachments.get([scope, id]);

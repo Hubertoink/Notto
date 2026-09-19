@@ -18,6 +18,12 @@ npm test
 
 `npm run desktop` startet seinen eigenen Vite-Server; vorher einen separat gestarteten `npm run dev` beenden. Für Windows-Builds werden Rust (MSVC), die Visual Studio C++ Build Tools und WebView2 benötigt. Das Desktop-Skript ergänzt den üblichen Rust-Pfad selbst.
 
+## Themen und Anmerkungen (0.7)
+
+Die Themenansicht zeigt eigene Hashtags und ergänzende KI-Zuordnungen ohne Bestätigungsworkflow. Vorschläge, die lediglich einen bereits gesetzten Hashtag wiederholen, werden dort nicht doppelt angezeigt. Anhänge zeigen ihren Titel beziehungsweise Dateinamen.
+
+Das Anmerkungsfeld erweitert den KI-Button mit einer Morph-Animation und schließt über das X. „Aktualisieren“ analysiert die gespeicherte Fassung erneut; noch offene Textänderungen müssen zuerst gespeichert werden. Bei einem Fehler bleiben die bisherigen Anmerkungen erhalten.
+
 ## Suche, Quellen und Darstellung (0.6)
 
 Strg + K öffnet die schwebende Notizsuche mit einer Morph-Animation. Sie durchsucht aktive und archivierte Notizen; der Papierkorb bleibt ausgeschlossen. Enter öffnet den ersten Treffer, Esc schließt die Suche. Die obere Navigationsleiste und dekorative Notizüberschriften entfallen. Die dunkle Palette orientiert sich an [Omarchy Kanagawa](https://github.com/basecamp/omarchy/blob/master/themes/kanagawa/colors.toml); das helle Farbschema bleibt erhalten.

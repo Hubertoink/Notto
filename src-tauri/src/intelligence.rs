@@ -56,6 +56,33 @@ pub fn ai_set_key(key: String) -> Result<()> {
     }
 }
 #[tauri::command]
+pub async fn ai_models() -> Result<Vec<String>> {
+    let key = credential()?
+        .get_password()
+        .map_err(|_| "Bitte zuerst einen OpenAI-Schlüssel hinterlegen.".to_string())?;
+    let response = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(err)?
+        .get("https://api.openai.com/v1/models")
+        .bearer_auth(key)
+        .send()
+        .await
+        .map_err(err)?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "Die OpenAI-Modellliste konnte nicht geladen werden ({}).",
+            response.status()
+        ));
+    }
+    let value: Value = response.json().await.map_err(err)?;
+    let data = value["data"].as_array().ok_or("Ungültige Modellliste")?;
+    Ok(data
+        .iter()
+        .filter_map(|m| m["id"].as_str().map(String::from))
+        .collect())
+}
+#[tauri::command]
 pub async fn ai_request(endpoint: String, mut body: Value) -> Result<Value> {
     if !["responses", "embeddings", "audio/transcriptions"].contains(&endpoint.as_str()) {
         return Err("Unzulässiger API-Aufruf".into());

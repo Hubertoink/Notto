@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { limit, type Database } from './database.js';
+import { availableModels } from './models.js';
+import { analysisModel } from '../src/ai-models.js';
 export interface AIEnvironment {
   openaiKey?: string;
   models: string[];
@@ -37,7 +39,9 @@ export async function openai(
     payload = form;
   } else {
     const model = z.string().parse(body.model);
-    if (!env.models.includes(model))
+    const supported = endpoint === 'responses' ? analysisModel(model) : model === 'text-embedding-3-small';
+    const allowed = env.models.length ? env.models : await availableModels(env);
+    if (!supported || !allowed.includes(model))
       throw Object.assign(new Error('Modell auf dem Server nicht freigeschaltet.'), { statusCode: 400 });
     if (!body.input) throw Object.assign(new Error('KI-Eingabe fehlt'), { statusCode: 400 });
     const clean: Record<string, unknown> = { model, input: body.input };

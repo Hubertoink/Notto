@@ -134,6 +134,7 @@ function useStore() {
   }, [dirty, scope, sync]);
   return {
     user,
+    authReady,
     scope,
     notes,
     loading: loading || !authReady,
@@ -153,6 +154,6 @@ export function NottoProvider({ children }: { children: ReactNode }) {
 }
 export function useNotto() {
   const state = useContext(Context);
-  if (!state) throw new Error('Notto provider missing');
+  if (!state) throw new Error('Noto provider missing');
   return state;
 }

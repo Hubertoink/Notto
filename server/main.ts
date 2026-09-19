@@ -11,7 +11,10 @@ const env: Environment = {
   staticDir: process.env.STATIC_DIR || 'dist',
   secureCookies: process.env.NODE_ENV === 'production',
   openaiKey: process.env.OPENAI_API_KEY,
-  models: (process.env.OPENAI_MODELS || 'gpt-4.1-mini,text-embedding-3-small').split(','),
+  models: (process.env.OPENAI_MODELS || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean),
   dailyLimit: Number(process.env.AI_DAILY_LIMIT || 100),
 };
 await migrate(

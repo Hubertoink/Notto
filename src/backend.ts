@@ -34,7 +34,7 @@ export function createNottoClient(url: string): SupabaseClient {
       ...options,
       headers,
       credentials: 'include',
-      signal: AbortSignal.timeout(130000),
+      signal: AbortSignal.timeout(path.startsWith('/auth/') ? 15000 : 130000),
     });
     if (!response.ok) {
       let message = `Server nicht erreichbar (${response.status}).`;

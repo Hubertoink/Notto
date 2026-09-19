@@ -16,7 +16,7 @@ class Boundary extends Component<{ children: ReactNode }, { error: string }> {
   render() {
     return this.state.error ? (
       <div className="fatal">
-        <h1>Notto konnte nicht geöffnet werden.</h1>
+        <h1>Noto konnte nicht geöffnet werden.</h1>
         <p>{this.state.error}</p>
         <button onClick={() => location.reload()}>Erneut versuchen</button>
         <p>Deine gespeicherten Notizen bleiben erhalten.</p>

@@ -163,7 +163,7 @@ export async function request(scope: string, endpoint: string, body: Record<stri
   localStorage.setItem(key, String(count + 1));
   if (desktop && (scope === 'local' || !ownBackend())) return invoke('ai_request', { endpoint, body });
   const client = cloud();
-  if (!client) throw new Error('Für die KI bitte deinen Notto-Server verbinden und anmelden.');
+  if (!client) throw new Error('Für die KI bitte deinen Noto-Server verbinden und anmelden.');
   const { data, error } = await client.functions.invoke('notto-ai', { body: { endpoint, body } });
   if (error) throw new Error(`KI-Server nicht erreichbar: ${error.message}`);
   return data;

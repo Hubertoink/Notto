@@ -29,6 +29,7 @@ import { useNotto } from './state';
 import { Action } from './components';
 import { Editor } from './Editor';
 import { Settings } from './Settings';
+import { WebAccess } from './Login';
 import { Widget } from './Widget';
 import { Knowledge, IntelligenceWorker } from './Knowledge';
 import './knowledge.css';
@@ -68,7 +69,7 @@ export default function App() {
   }, [widget]);
   return (
     <Theme theme={neutralTheme} mode={mode}>
-      {widget ? <Widget /> : <Notebook mode={mode} setMode={setMode} />}
+      <WebAccess>{widget ? <Widget /> : <Notebook mode={mode} setMode={setMode} />}</WebAccess>
     </Theme>
   );
 }
@@ -218,10 +219,8 @@ function Notebook({
       )}
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">
-            n<span>.</span>
-          </span>
-          <span>notto</span>
+          <img className="brand-logo" src="/noto.png" alt="" />
+          <span>noto</span>
           <button
             className="workspace-button"
             aria-label="Kontoeinstellungen"

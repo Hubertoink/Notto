@@ -5,13 +5,13 @@ import { useNotto } from './state';
 import { desktop } from './repository';
 import { ownBackend, readCloudConfig } from './cloud';
 import { serverRequest } from './backend';
+import { analysisModels } from './ai-models';
 import { attachmentIds, titleOf, type Note } from './domain';
 import {
   analyze,
   ask,
   config,
   decisionKey,
-  defaults,
   eligible,
   extract,
   knowledge,
@@ -195,6 +195,44 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
   const [settings, setSettings] = useState<AIConfig>(() => config(scope));
   const [key, setKey] = useState(''),
     [hasKey, setHasKey] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState('');
+  const [modelsRefresh, setModelsRefresh] = useState(0);
+  useEffect(() => {
+    if (tab !== 'settings') return;
+    let active = true;
+    setModelsLoading(true);
+    setModelsError('');
+    setModels([]);
+    const load = async () => {
+      if (desktop && (scope === 'local' || !ownBackend())) {
+        if (!hasKey) throw new Error('Hinterlege zuerst deinen OpenAI-Schlüssel.');
+        return analysisModels(await invoke<string[]>('ai_models'));
+      }
+      if (scope === 'local') throw new Error('Melde dich an, um die serverseitige KI zu nutzen.');
+      if (!ownBackend())
+        throw new Error('Verbinde dich mit dem Noto-Server, um Modelle automatisch zu laden.');
+      return (await serverRequest(readCloudConfig().url, '/ai/models')).models as string[];
+    };
+    void load()
+      .then((ids) => {
+        if (!active) return;
+        setModels(ids);
+        if (!ids.length)
+          setModelsError('Für diesen Schlüssel wurden keine unterstützten Analysemodelle gefunden.');
+      })
+      .catch((e) => active && setModelsError(e instanceof Error ? e.message : String(e)))
+      .finally(() => active && setModelsLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [tab, scope, hasKey, modelsRefresh]);
+  useEffect(() => {
+    const refresh = () => setSettings(config(scope));
+    window.addEventListener('notto-ai-config', refresh);
+    return () => window.removeEventListener('notto-ai-config', refresh);
+  }, [scope]);
   const [busy, setBusy] = useState(''),
     [error, setError] = useState(''),
     [message, setMessage] = useState('');
@@ -347,7 +385,7 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
             </>
           ) : (
             <p>
-              Dein Notto-Server führt die KI-Anfragen aus. Den OpenAI-Schlüssel hinterlegst du einmalig in den
+              Dein Noto-Server führt die KI-Anfragen aus. Den OpenAI-Schlüssel hinterlegst du einmalig in den
               Server-Einstellungen bei Mittwald. Er wird nicht auf deine Geräte übertragen.
               {serverKeyReady !== null &&
                 (serverKeyReady
@@ -357,19 +395,52 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
           )}
           <label>
             Analysemodell
-            <input
+            <select
               value={settings.model}
               onChange={(e) => update({ model: e.target.value })}
-              placeholder={defaults.model}
-            />
+              disabled={modelsLoading || !models.length}
+              aria-describedby="model-description"
+            >
+              {!models.includes(settings.model) && (
+                <option value={settings.model} disabled>
+                  {settings.model} · {modelsLoading ? 'wird geprüft …' : 'nicht bestätigt'}
+                </option>
+              )}
+              {models.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+            </select>
           </label>
+          <p id="model-description" className="muted small">
+            Automatisch von OpenAI geladen. Angezeigt werden verfügbare Modelle der unterstützten
+            Analysefamilien. Die Auswahl gilt auch für Hintergrundanalysen.
+          </p>
+          {modelsLoading && (
+            <p role="status" className="muted small">
+              Modelle werden geladen …
+            </p>
+          )}
+          {modelsError && (
+            <p role="alert" className="inline-error">
+              {modelsError}
+            </p>
+          )}
+          <button
+            className="text-button small"
+            disabled={modelsLoading}
+            onClick={() => setModelsRefresh((v) => v + 1)}
+          >
+            Modellliste neu laden
+          </button>
           <label className="checkbox-row">
             <input
               type="checkbox"
               checked={settings.enabled}
               onChange={(e) => update({ enabled: e.target.checked })}
             />{' '}
-            KI für dieses Notizbuch auf diesem Gerät aktivieren
+            KI für dieses Notizbuch aktivieren
           </label>
           <label className="checkbox-row">
             <input
@@ -380,7 +451,7 @@ export function Knowledge({ onClose, onOpen }: { onClose: () => void; onOpen: (i
             Gespeicherte Notizen im Hintergrund analysieren{' '}
             {scope !== 'local' && ownBackend()
               ? '– auch bei geschlossener App'
-              : '– solange Notto geöffnet ist'}
+              : '– solange Noto geöffnet ist'}
           </label>
           <label className="checkbox-row">
             <input

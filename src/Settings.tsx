@@ -231,7 +231,7 @@ export function Settings({
             }}
           >
             <label>
-              Notto-Serveradresse
+              Noto-Serveradresse
               <input
                 type="url"
                 required
@@ -241,7 +241,7 @@ export function Settings({
               />
             </label>
             <p className="muted small">
-              Anmeldung und Synchronisation laufen über deinen Notto-Server. Der OpenAI-Schlüssel bleibt auf
+              Anmeldung und Synchronisation laufen über deinen Noto-Server. Der OpenAI-Schlüssel bleibt auf
               dem Server.
             </p>
             <Action type="submit" label="Verbindung speichern" isDisabled={Boolean(user)} isLoading={busy} />
@@ -321,7 +321,7 @@ export function Settings({
         </p>
       )}
       <div className="settings-footer">
-        <span>Notto 0.3 · Deine Originale bleiben deine.</span>
+        <span>Noto 0.4 · Deine Originale bleiben deine.</span>
         <span>KI konfigurieren: Seitenleiste → Wissen & KI.</span>
       </div>
     </Modal>

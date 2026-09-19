@@ -10,6 +10,7 @@ import type { Database } from './database.js';
 import { limit } from './database.js';
 import { digest, hashPassword, verifyPassword, token } from './security.js';
 import { openai, type AIEnvironment } from './openai.js';
+import { selectableModels } from './models.js';
 import { validNote } from '../src/domain.js';
 declare module 'fastify' {
   interface FastifyRequest {
@@ -102,7 +103,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '0.3.0' };
+    return { ok: true, version: '0.4.0' };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (
@@ -306,6 +307,10 @@ export async function buildApp(db: Database, env: Environment) {
       ]);
     }
     return { ok: true };
+  });
+  app.get('/api/ai/models', async (req) => {
+    await limit(db, `models:${req.nottoUser!.id}`, 60, 3600);
+    return { models: await selectableModels(env) };
   });
   app.get('/api/ai/settings', async (req) => ({
     config:

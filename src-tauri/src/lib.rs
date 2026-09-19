@@ -506,7 +506,7 @@ pub fn run() {
                 "widget",
                 WebviewUrl::App("index.html?window=widget".into()),
             )
-            .title("Notto · Schnellnotiz")
+            .title("Noto · Schnellnotiz")
             .inner_size(64., 118.)
             .decorations(false)
             .transparent(true)
@@ -541,7 +541,7 @@ pub fn run() {
                 ))?;
             }
             let _ = position_widget(app.handle(), None, true);
-            let open = MenuItem::with_id(app, "open", "Notto öffnen", true, None::<&str>)?;
+            let open = MenuItem::with_id(app, "open", "Noto öffnen", true, None::<&str>)?;
             let capture = MenuItem::with_id(
                 app,
                 "capture",
@@ -556,7 +556,7 @@ pub fn run() {
                 true,
                 None::<&str>,
             )?;
-            let quit = MenuItem::with_id(app, "quit", "Notto beenden", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Noto beenden", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &capture, &toggle, &quit])?;
             let icon = app.default_window_icon().cloned().unwrap_or_else(|| {
                 let mut pixels = vec![0u8; 32 * 32 * 4];
@@ -567,7 +567,7 @@ pub fn run() {
             });
             TrayIconBuilder::new()
                 .icon(icon)
-                .tooltip("Notto")
+                .tooltip("Noto")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -633,6 +633,7 @@ pub fn run() {
             snap_widget,
             widget_mode,
             intelligence::ai_key_status,
+            intelligence::ai_models,
             intelligence::ai_set_key,
             intelligence::ai_request,
             intelligence::knowledge_list,
@@ -641,7 +642,7 @@ pub fn run() {
             intelligence::server_session_set
         ])
         .run(tauri::generate_context!())
-        .expect("Notto konnte nicht gestartet werden");
+        .expect("Noto konnte nicht gestartet werden");
 }
 
 #[cfg(test)]

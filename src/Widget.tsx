@@ -96,7 +96,7 @@ export function Widget() {
         }
       }}
     >
-      {!desktop && <p className="widget-preview-label">Notto · Randwidget-Vorschau</p>}
+      {!desktop && <p className="widget-preview-label">Noto · Randwidget-Vorschau</p>}
       <motion.div
         className={`widget-surface widget-${mode}`}
         initial={false}
@@ -118,7 +118,7 @@ export function Widget() {
           <div className="widget-anchor">
             <button
               className="widget-logo"
-              aria-label="Notto öffnen"
+              aria-label="Noto öffnen"
               onPointerEnter={(e) => {
                 if (e.pointerType !== 'touch') hover.current = setTimeout(() => change('peek'), 240);
               }}
@@ -127,7 +127,7 @@ export function Widget() {
                 change('peek');
               }}
             >
-              n<span>.</span>
+              <img src="/noto.png" alt="" />
             </button>
             <button
               className="widget-grip"
@@ -153,7 +153,8 @@ export function Widget() {
           >
             <div className="widget-heading">
               <strong>
-                notto<span>.</span>
+                <img className="widget-heading-logo" src="/noto.png" alt="" />
+                noto<span>.</span>
               </strong>
               <div className="toolbar">
                 <Action

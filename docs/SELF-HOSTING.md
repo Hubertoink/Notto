@@ -1,4 +1,4 @@
-# Notto auf Mittwald (0.3)
+# Noto auf Mittwald (0.4)
 
 Ziel: **https://noto-app.de** (ein t), Projekt `p-wqa66m` / `77a026ee-99bd-4c29-ab09-47a261d1f3dc`.
 
@@ -11,7 +11,7 @@ Ziel: **https://noto-app.de** (ein t), Projekt `p-wqa66m` / `77a026ee-99bd-4c29-
 
 ## Erster Zugang
 
-Die Registrierung benötigt einen zufälligen, einmal verwendbaren Einrichtungscode und die dafür freigegebene E-Mail-Adresse. Die lokale Datei `.notto-deploy/ERSTER-ZUGANG.txt` enthält die Ersteinrichtung. Sie ist von Git und Docker ausgeschlossen. Passwort selbst über **Einstellungen → Neues Konto erstellen** festlegen (mindestens zwölf Zeichen). Ein verbrauchter Code funktioniert auch nach einem Neustart nicht erneut.
+Die Website zeigt ohne Anmeldung den Login. Über **Konto einrichten** lassen sich E-Mail, Passwort (mindestens zwölf Zeichen), Passwortbestätigung und Einladung eingeben. Die Registrierung benötigt einen zufälligen, einmal verwendbaren Einrichtungscode und die dafür freigegebene E-Mail-Adresse. Die lokale Datei `.notto-deploy/ERSTER-ZUGANG.txt` enthält die Ersteinrichtung. Sie ist von Git und Docker ausgeschlossen. Ein verbrauchter Code funktioniert auch nach einem Neustart nicht erneut. In Windows bleibt lokales Arbeiten möglich; die Anmeldung befindet sich unter **Einstellungen → Konto & Synchronisation**. Vorhandene lokale Notizen werden über **Lokale Notizen ins Konto kopieren** übernommen. Neue Konto-Notizen synchronisieren sich automatisch.
 
 Web-Sitzungen liegen in HttpOnly-/Secure-/SameSite-Cookies. Windows legt sein Sitzungstoken im Windows-Anmeldedatenspeicher ab. Sitzungen laufen nach 30 Tagen ab; Abmelden widerruft die jeweilige Sitzung. Das letzte Benutzerprofil wird lokal für Offline-Zugriff auf bereits gespeicherte Notizen vorgehalten. Bereits synchronisierte Notizen bleiben auf dem Gerät; eine App-Sperre ist nicht enthalten.
 
@@ -24,6 +24,15 @@ In Notto anschließend **Wissen & KI → KI einrichten → KI aktivieren**. Die 
 PDF-Text und OCR werden über die bestehenden Anhangfunktionen erzeugt und als separate Erkenntnisse synchronisiert. Der Hintergrundworker verwendet die bereits synchronisierten Extraktionen; nach einer späteren Extraktion eine Analyse bei Bedarf manuell wiederholen. Diktat und interaktive Suche verwenden ebenfalls den serverseitigen OpenAI-Schlüssel bei angemeldetem Konto. Das lokale Offline-Notizbuch kann weiterhin optional einen eigenen Windows-Schlüssel verwenden.
 
 ## Aktualisieren
+
+Wenn Zugangsdaten in mStudio geändert wurden, für reine Code-Updates **nur die Images aktualisieren**, damit die aktuelle Serverkonfiguration erhalten bleibt:
+
+```sh
+mw container update 9fc73c6f-9cda-4547-8f05-eb47ece01dbb -p p-wqa66m --image p-wqa66m.project.space/notto:<commit> --recreate -q
+mw container update 815c2e94-2fdf-431c-ae7c-6feb74988d79 -p p-wqa66m --image p-wqa66m.project.space/notto:<commit> --recreate -q
+```
+
+Ein vollständiges Compose-Deployment erfordert eine aktuelle lokale Secret-Datei; ein dort leerer OpenAI-Wert würde einen im Container gesetzten Schlüssel überschreiben.
 
 1. Codeänderungen prüfen und nach GitHub pushen. `Notto checks` führt Tests, Web- und Server-Build aus.
 2. `Notto container` unter GitHub Actions manuell auf main starten. Er baut ein Image und legt es mit der vollständigen Commit-ID in der privaten Registry ab. Registry-Zugangsdaten sind als Actions-Secrets hinterlegt.
@@ -40,6 +49,10 @@ Vor größeren Änderungen einen konsistenten PostgreSQL-Dump (`pg_dump -Fc`) so
 Passwortzurücksetzung per E-Mail und eine Verwaltung weiterer Einladungen in der Oberfläche sind noch nicht enthalten. Weitere Konten erfordern einen serverseitig angelegten Einladungsdatensatz. SMTP ist nicht eingerichtet. Die bestehende Versions- und Konfliktlogik bleibt erhalten; eine automatische Übernahme eines früheren Supabase-Kontos ist nicht enthalten. Lokale Notizen können nach Anmeldung explizit ins neue Konto kopiert werden.
 
 ## Lokal prüfen
+
+Seit 0.4 lädt die Modellauswahl die [OpenAI-Modellliste](https://developers.openai.com/api/reference/resources/models/methods/list) nach Anmeldung serverseitig. Die Liste wird fünf Minuten gecacht. Da die API keine Funktionsmerkmale liefert, filtert Noto auf unterstützte allgemeine GPT-Analysefamilien; Audio-, Realtime-, Bild-, Codex- und reine Suchmodelle werden ausgeblendet. Modellverfügbarkeit garantiert keine Berechtigung für jedes einzelne Tool. `OPENAI_MODELS` kann als optionale kommaseparierte Einschränkung gesetzt werden (dann auch `text-embedding-3-small` für die Suche aufnehmen). Ohne diese Einstellung werden die verfügbaren Modelle automatisch geprüft. Lokale Windows-Notizbücher können die Liste mit ihrem eigenen Schlüssel aus dem Anmeldedatenspeicher laden.
+
+Der sichtbare Produktname und die Icons heißen Noto. Speicher-, Sitzungs- und Exportformatkennungen bleiben für bestehende Daten kompatibel.
 
 `npm test`, `npm run build`, `npm run build:server`, `docker build -t notto:test .`.
 

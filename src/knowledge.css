@@ -67,6 +67,7 @@
   margin: 16px 0;
 }
 .modal-body input:not([type='checkbox']),
+.modal-body select,
 .modal-body textarea {
   border: 1px solid var(--nt-line);
   background: var(--nt-paper);

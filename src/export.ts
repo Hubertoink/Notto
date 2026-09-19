@@ -39,7 +39,7 @@ export async function buildExport(scope: Scope): Promise<Uint8Array> {
     ),
   );
   files['README.txt'] = strToU8(
-    'Notto-Export\nDie Markdown-Dateien enthalten deine Originalnotizen.\nnotto-backup.json enthält zusätzlich die Versionshistorie, Zustände und Entwürfe.\nGelöschte Notizen liegen im Ordner trash.\n',
+    'Noto-Export\nDie Markdown-Dateien enthalten deine Originalnotizen.\nnotto-backup.json enthält zusätzlich die Versionshistorie, Zustände und Entwürfe.\nGelöschte Notizen liegen im Ordner trash.\n',
   );
   return zipSync(files);
 }
@@ -49,7 +49,7 @@ export async function exportNotebook(scope: Scope) {
   if (desktop) {
     const path = await save({
       defaultPath: filename,
-      filters: [{ name: 'Notto-Backup', extensions: ['zip'] }],
+      filters: [{ name: 'Noto-Backup', extensions: ['zip'] }],
     });
     if (path) await invoke('write_export', { path, bytes: Array.from(bytes) });
     return Boolean(path);

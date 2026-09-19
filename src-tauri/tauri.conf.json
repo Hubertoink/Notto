@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Notto",
-  "version": "0.3.0",
+  "productName": "Noto",
+  "version": "0.4.0",
   "identifier": "app.notto.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Notto",
+        "title": "Noto",
         "width": 1240,
         "height": 820,
         "minWidth": 720,
@@ -31,7 +31,11 @@
     "targets": ["nsis"],
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.ico"],
     "windows": {
-      "nsis": { "displayLanguageSelector": false, "languages": ["German"], "installMode": "currentUser" }
+      "nsis": {
+        "displayLanguageSelector": false,
+        "languages": ["German"],
+        "installMode": "currentUser"
+      }
     }
   }
 }

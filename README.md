@@ -74,14 +74,14 @@ Ein Secret- oder Service-Role-Key gehört niemals in die Oberfläche, `.env` mit
 - Bilder werden vor den referenzierenden Notizen hochgeladen und beim Herunterladen für Offline-Zugriff gecacht.
 - Atomare Versionsprüfungen verhindern verlorene Änderungen. Bei konkurrierenden Änderungen bleibt die lokale Fassung als Konfliktkopie erhalten, die Cloud-Fassung behält ihre ursprüngliche ID.
 - Abgebrochene Uploads können ohne doppelte Notizen wiederholt werden.
-- Aufgaben oder externe KI-Auswertungen werden noch nicht angelegt.
-- RLS isoliert Konten in PostgreSQL. Bilder liegen in einem privaten Bucket mit Kontozuordnung im Pfad. Remote-Bilder werden im Markdown nicht ungefragt geladen.
+- KI-Auswertungen werden getrennt von den Originalnotizen gespeichert. Aufgaben, Kontakte und Themen verweisen auf ihre Quellen.
+- Das eigene Backend prüft die Kontozuordnung bei jedem Datenzugriff. Anhänge sind nur nach Anmeldung zugänglich. Remote-Bilder werden im Markdown nicht ungefragt geladen.
 - Abmelden entfernt **nicht** die lokalen Konto-Caches. Diese Version ist für persönliche Windows-/Browserprofile gedacht, nicht für gemeinsam genutzte öffentliche Rechner.
-- Keine Ende-zu-Ende-Verschlüsselung oder App-Sperre in Version 0.1. Das Backend kann die synchronisierten Inhalte lesen.
+- Keine Ende-zu-Ende-Verschlüsselung oder App-Sperre. Das Backend kann die synchronisierten Inhalte lesen.
 
 ## Web bereitstellen
 
-`npm run build` erstellt eine statische Webapp unter `dist/`. Sie kann über Sites oder einen statischen HTTPS-Host bereitgestellt werden. `.openai/hosting.json` verweist auf die private Sites-Instanz. Die Cloud-Verbindung kann auch nach dem Deployment in der App konfiguriert werden. Lokale Browsernotizen werden nicht auf den Webhost hochgeladen.
+`npm run build` erstellt die Webapp unter `dist/`. Im Mittwald-Betrieb liefert der App-Container diese zusammen mit der API aus; siehe [SELF-HOSTING.md](docs/SELF-HOSTING.md). `.openai/hosting.json` gehört zur früheren privaten Vorschau. Lokale Browsernotizen werden erst nach ausdrücklichem Kopieren ins Konto synchronisiert.
 
 ## Prüfungen und Grenzen
 

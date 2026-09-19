@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
   app:
     image: ${NOTTO_IMAGE}
-    environment: &app-environment
+    environment:
       NODE_ENV: production
       APP_ORIGIN: https://noto-app.de
       DATABASE_URL: postgresql://notto:${POSTGRES_PASSWORD}@db:5432/notto
@@ -34,7 +34,13 @@ services:
   worker:
     image: ${NOTTO_IMAGE}
     environment:
-      <<: *app-environment
+      NODE_ENV: production
+      APP_ORIGIN: https://noto-app.de
+      DATABASE_URL: postgresql://notto:${POSTGRES_PASSWORD}@db:5432/notto
+      SETUP_EMAIL: ${SETUP_EMAIL}
+      SETUP_INVITE_TOKEN: ${SETUP_INVITE_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DATA_DIR: /data/attachments
       NOTTO_ROLE: worker
     depends_on:
       db:

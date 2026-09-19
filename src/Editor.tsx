@@ -332,7 +332,7 @@ export function Editor({
       {!compact && (
         <div className="editor-hint">
           <span>Bilder und PDFs hereinziehen</span>
-          <span>Strg + Enter zum Speichern</span>
+          <span className="save-shortcut-hint">Strg + Enter zum Speichern</span>
         </div>
       )}
       {history && note && (

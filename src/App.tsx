@@ -12,7 +12,6 @@ import {
   Hash,
   Inbox,
   Menu,
-  PanelRight,
   Pin,
   Plus,
   Settings2,
@@ -22,7 +21,6 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/core';
 import { Theme } from '@astryxdesign/core/theme';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
 import { useNotto } from './state';
@@ -229,7 +227,10 @@ function Notebook({
     </button>
   );
   return (
-    <div className={`notebook ${sidebar ? 'sidebar-open' : ''} ${selected || creating ? 'detail-open' : ''}`}>
+    <div
+      data-note-overview={!selected && !creating && !knowledgeOpen && !tasksOpen}
+      className={`notebook ${sidebar ? 'sidebar-open' : ''} ${selected || creating ? 'detail-open' : ''}`}
+    >
       {sidebar && (
         <button
           className="sidebar-scrim"
@@ -343,15 +344,6 @@ function Notebook({
           )}
         </nav>
         <div className="sidebar-bottom">
-          {desktop && (
-            <button
-              className="nav-item"
-              onClick={() => void invoke('show_widget').catch((e) => notify(String(e)))}
-            >
-              <PanelRight size={17} />
-              <span>Randwidget anzeigen</span>
-            </button>
-          )}
           {nav('trash', 'Papierkorb', <Trash2 size={17} />, notes.filter((n) => n.deleted).length)}
           <button className="nav-item" onClick={() => importInput.current?.click()}>
             <Upload size={17} />

@@ -112,3 +112,11 @@
     backdrop-filter: none;
   }
 }
+
+@media (max-width: 700px), (pointer: coarse) {
+  .notebook[data-note-overview='false'] .floating-search-trigger,
+  .floating-search-trigger kbd,
+  .save-shortcut-hint {
+    display: none;
+  }
+}

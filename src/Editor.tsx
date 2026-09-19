@@ -21,6 +21,8 @@ export function Editor({
   const [ready, setReady] = useState(false);
   const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [addingImages, setAddingImages] = useState(0);
+  const imageOperations = useRef(0);
   const [draftStatus, setDraftStatus] = useState('');
   const [error, setError] = useState('');
   const [history, setHistory] = useState(false);
@@ -90,7 +92,7 @@ export function Editor({
     [scope, draftId],
   );
   async function save(asCopy = false) {
-    if (saving || !ready || !content.trim()) return;
+    if (saving || imageOperations.current > 0 || !ready || !content.trim()) return;
     setSaving(true);
     setError('');
     try {
@@ -121,6 +123,9 @@ export function Editor({
     }
   }
   async function addFiles(files: File[]) {
+    if (!files.length) return;
+    imageOperations.current++;
+    setAddingImages(imageOperations.current);
     setError('');
     try {
       const markdown = [];
@@ -134,6 +139,9 @@ export function Editor({
       setTimeout(() => input.current?.focus(), 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      imageOperations.current--;
+      if (alive.current) setAddingImages(imageOperations.current);
     }
   }
   const dirty = content !== initial.current;
@@ -262,14 +270,14 @@ export function Editor({
             }}
           />
           <span className="draft-state" role="status">
-            {draftStatus || 'Markdown · nur von dir bearbeitet'}
+            {addingImages ? 'Bild wird gespeichert …' : draftStatus || 'Markdown · nur von dir bearbeitet'}
           </span>
         </div>
         <Action
           label={note && !dirty ? 'Gespeichert' : 'Festhalten'}
           variant="primary"
           icon={note && !dirty ? <Check size={16} /> : <Save size={16} />}
-          isDisabled={!ready || !content.trim() || Boolean(note && !dirty)}
+          isDisabled={!ready || addingImages > 0 || !content.trim() || Boolean(note && !dirty)}
           isLoading={saving}
           onClick={() => void save()}
         />

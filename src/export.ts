@@ -1,17 +1,22 @@
 import { zipSync, strToU8 } from 'fflate';
 import { save } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { allAttachmentIds, markdownFile, type Scope } from './domain';
+import { allAttachmentIds, attachmentIds, markdownFile, type Scope } from './domain';
 import { repo, desktop } from './repository';
 import { fetchAttachment } from './cloud';
-export async function exportNotebook(scope: Scope) {
+export async function buildExport(scope: Scope): Promise<Uint8Array> {
   const notes = await repo.list(scope);
   const drafts = await repo.drafts(scope);
   const files: Record<string, Uint8Array> = {};
   for (const note of notes) {
     files[`${note.deleted ? 'trash/' : ''}${note.id}.md`] = strToU8(markdownFile(note));
   }
-  const ids = [...new Set(notes.flatMap(allAttachmentIds))];
+  for (const [index, draft] of drafts.entries()) {
+    files[`draft-${index + 1}.md`] = strToU8(draft.content);
+  }
+  const ids = [
+    ...new Set([...notes.flatMap(allAttachmentIds), ...drafts.flatMap((d) => attachmentIds(d.content))]),
+  ];
   for (const id of ids) {
     const a = await fetchAttachment(scope, id);
     if (!a) throw new Error('Export unvollständig: Ein Bild fehlt. Bitte zuerst synchronisieren.');
@@ -28,7 +33,10 @@ export async function exportNotebook(scope: Scope) {
   files['README.txt'] = strToU8(
     'Notto-Export\nDie Markdown-Dateien enthalten deine Originalnotizen.\nnotto-backup.json enthält zusätzlich die Versionshistorie, Zustände und Entwürfe.\nGelöschte Notizen liegen im Ordner trash.\n',
   );
-  const bytes = zipSync(files);
+  return zipSync(files);
+}
+export async function exportNotebook(scope: Scope) {
+  const bytes = await buildExport(scope);
   const filename = `notto-${new Date().toISOString().slice(0, 10)}.zip`;
   if (desktop) {
     const path = await save({

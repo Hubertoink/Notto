@@ -34,6 +34,8 @@ import { WebAccess } from './Login';
 import { Widget } from './Widget';
 import { Knowledge, IntelligenceWorker } from './Knowledge';
 import './knowledge.css';
+import { TasksPage, TaskRow, useKnowledgeRecords } from './Tasks';
+import { tasksFor } from './task-store';
 import { desktop, repo } from './repository';
 import { noteShortcut, newNoteLabel } from './shortcuts';
 import {
@@ -91,12 +93,23 @@ function Notebook({
   const [creating, setCreating] = useState(false);
   const [settings, setSettings] = useState(false);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const records = useKnowledgeRecords(scope);
+  const tasks = tasksFor(notes, records, scope);
+  const openTaskNote = (id: string) => {
+    setTasksOpen(false);
+    setKnowledgeOpen(false);
+    setCreating(false);
+    setSelected(id);
+    setSidebar(false);
+  };
   const [sidebar, setSidebar] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setSelected(null);
     setKnowledgeOpen(false);
+    setTasksOpen(false);
     setCreating(false);
     setQuery('');
     setTag(null);
@@ -123,19 +136,22 @@ function Notebook({
     [notes, view, tag, query],
   );
   const selectedNote = notes.find((n) => n.id === selected);
-  const title = knowledgeOpen
-    ? 'Wissen & KI'
-    : tag
-      ? `#${tag}`
-      : view === 'pinned'
-        ? 'Angeheftet'
-        : view === 'archive'
-          ? 'Archiv'
-          : view === 'trash'
-            ? 'Papierkorb'
-            : 'Alle Notizen';
+  const title = tasksOpen
+    ? 'Aufgaben'
+    : knowledgeOpen
+      ? 'Wissen & KI'
+      : tag
+        ? `#${tag}`
+        : view === 'pinned'
+          ? 'Angeheftet'
+          : view === 'archive'
+            ? 'Archiv'
+            : view === 'trash'
+              ? 'Papierkorb'
+              : 'Alle Notizen';
   const openNew = () => {
     setKnowledgeOpen(false);
+    setTasksOpen(false);
     setSelected(null);
     setCreating(true);
     setSidebar(false);
@@ -147,6 +163,7 @@ function Notebook({
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setKnowledgeOpen(false);
+        setTasksOpen(false);
         search.current?.focus();
       }
       if (noteShortcut(e, desktop)) {
@@ -202,9 +219,10 @@ function Notebook({
   }
   const nav = (id: View, label: string, icon: React.ReactNode, count: number) => (
     <button
-      className={`nav-item ${view === id && !tag && !knowledgeOpen ? 'active' : ''}`}
+      className={`nav-item ${view === id && !tag && !knowledgeOpen && !tasksOpen ? 'active' : ''}`}
       onClick={() => {
         setKnowledgeOpen(false);
+        setTasksOpen(false);
         setView(id);
         setTag(null);
         setSidebar(false);
@@ -268,12 +286,33 @@ function Notebook({
             aria-current={knowledgeOpen ? 'page' : undefined}
             onClick={() => {
               setKnowledgeOpen(true);
+              setTasksOpen(false);
               setSidebar(false);
             }}
           >
             <Sparkles size={18} />
             <span>Wissen & KI</span>
           </button>
+          <button
+            className={`nav-item ${tasksOpen ? 'active' : ''}`}
+            aria-current={tasksOpen ? 'page' : undefined}
+            onClick={() => {
+              setTasksOpen(true);
+              setKnowledgeOpen(false);
+              setSidebar(false);
+            }}
+          >
+            <Check size={18} />
+            <span>Aufgaben</span>
+            <span className="nav-count">{tasks.filter((t) => !t.done).length || ''}</span>
+          </button>
+          <div className="sidebar-tasks" aria-label="Offene Aufgaben">
+            {tasks
+              .filter((t) => !t.done)
+              .map((task) => (
+                <TaskRow key={task.id} task={task} small />
+              ))}
+          </div>
           {nav(
             'archive',
             'Archiv',
@@ -295,6 +334,7 @@ function Notebook({
                 className={`nav-item ${tag === t ? 'active' : ''}`}
                 onClick={() => {
                   setKnowledgeOpen(false);
+                  setTasksOpen(false);
                   setTag(t);
                   setView('all');
                   setCreating(false);
@@ -379,6 +419,7 @@ function Notebook({
               value={query}
               onChange={(e) => {
                 setKnowledgeOpen(false);
+                setTasksOpen(false);
                 setQuery(e.target.value);
               }}
             />
@@ -406,6 +447,7 @@ function Notebook({
             active={knowledgeOpen}
             onOpen={(id) => {
               setKnowledgeOpen(false);
+              setTasksOpen(false);
               setCreating(false);
               setSelected(id);
               setView('all');
@@ -413,7 +455,10 @@ function Notebook({
             }}
           />
         </div>
-        <div className="work-area" hidden={knowledgeOpen}>
+        <div className="tasks-workspace" hidden={!tasksOpen}>
+          <TasksPage key={scope} tasks={tasks} onOpen={openTaskNote} />
+        </div>
+        <div className="work-area" hidden={knowledgeOpen || tasksOpen}>
           <section className="note-list-panel">
             <div className="list-heading">
               <div>

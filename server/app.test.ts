@@ -73,30 +73,28 @@ it('runs consented server jobs with quoted evidence without rewriting originals'
     payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
   });
   const environment = { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 10 };
-  const fetch = vi
-    .spyOn(globalThis, 'fetch')
-    .mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          status: 'completed',
-          output: [
-            {
-              content: [
-                {
-                  type: 'output_text',
-                  text: JSON.stringify({
-                    suggestions: [
-                      { kind: 'task', title: 'Steam einrichten', detail: 'Vier PCs', quote: note.content },
-                    ],
-                  }),
-                },
-              ],
-            },
-          ],
-        }),
-        { status: 200 },
-      ),
-    );
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  suggestions: [
+                    { kind: 'task', title: 'Steam einrichten', detail: 'Vier PCs', quote: note.content },
+                  ],
+                }),
+              },
+            ],
+          },
+        ],
+      }),
+      { status: 200 },
+    ),
+  );
   try {
     await workOnce(adapter, environment);
     expect(fetch).not.toHaveBeenCalled();
@@ -206,6 +204,28 @@ it('protects attachments and prevents overwriting immutable files', async () => 
       })
     ).statusCode,
   ).toBe(409);
+});
+it('syncs manual tasks as separate knowledge records', async () => {
+  const record = {
+    id: crypto.randomUUID(),
+    scope: alice,
+    noteId: crypto.randomUUID(),
+    revision: crypto.randomUUID(),
+    at: new Date().toISOString(),
+    kind: 'manual-task',
+    data: { title: 'Eigene Aufgabe', done: false },
+  };
+  const result = await app.inject({
+    method: 'POST',
+    url: '/api/knowledge',
+    headers: headers(aToken),
+    payload: [record],
+  });
+  expect(result.statusCode).toBe(200);
+  const read = await app.inject({ url: '/api/knowledge', headers: headers(aToken) });
+  expect(read.json().data.some((r: any) => r.document.id === record.id)).toBe(true);
+  const other = await app.inject({ url: '/api/knowledge', headers: headers(bToken) });
+  expect(other.json().data.some((r: any) => r.document.id === record.id)).toBe(false);
 });
 it('rejects foreign knowledge and cross-origin writes and revokes sessions on logout', async () => {
   expect(

@@ -1,0 +1,122 @@
+.tasks-workspace {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.tasks-page {
+  padding: 36px;
+  overflow: auto;
+  flex: 1;
+}
+.tasks-page h1 {
+  margin: 12px 0;
+}
+.task-create {
+  display: flex;
+  gap: 12px;
+  margin: 28px 0;
+}
+.task-create input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px;
+  color: var(--nt-text);
+  background: var(--nt-paper);
+  border: 1px solid var(--nt-line);
+  border-radius: 8px;
+}
+.task-create button {
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--nt-text);
+  color: var(--nt-paper);
+}
+.task-create button:disabled {
+  opacity: 0.5;
+}
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--nt-line);
+}
+.task-row input {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--nt-accent, #7886df);
+}
+.task-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.task-done .task-title {
+  text-decoration: line-through;
+  color: var(--nt-muted);
+}
+.task-source {
+  color: var(--nt-text);
+  text-decoration: underline;
+  background: transparent;
+  font-size: 12px;
+}
+.sidebar-tasks {
+  max-height: 165px;
+  overflow: auto;
+  margin: 0 8px 12px 20px;
+}
+.task-small {
+  font-size: 12px;
+  padding: 8px 2px;
+  border: 0;
+}
+.task-small .task-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.note-annotations {
+  margin: 8px 0 18px;
+  flex-shrink: 0;
+}
+.annotation-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--nt-muted);
+  border: 1px solid var(--nt-line);
+}
+.annotation-toggle.has-annotations {
+  color: var(--nt-text);
+  background: var(--nt-paper);
+}
+.annotation-panel {
+  border: 1px solid var(--nt-line);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 10px;
+  max-height: 360px;
+  overflow: auto;
+}
+.annotation-panel article {
+  border-top: 1px solid var(--nt-line);
+  padding: 16px 0;
+}
+.annotation-panel p {
+  line-height: 1.6;
+}
+.annotation-panel a {
+  display: block;
+  margin: 8px 0;
+  color: inherit;
+  text-decoration: underline;
+}
+.research-text {
+  white-space: pre-wrap;
+}

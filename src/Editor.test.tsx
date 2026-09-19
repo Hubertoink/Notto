@@ -8,6 +8,8 @@ import { neutralTheme } from '@astryxdesign/theme-neutral/built';
 import { Editor } from './Editor';
 import { NottoProvider } from './state';
 import { db, repo } from './repository';
+import { newNote } from './domain';
+import { knowledge } from './intelligence';
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 beforeAll(() => {
   Object.defineProperty(window, 'matchMedia', {
@@ -28,6 +30,7 @@ beforeEach(async () => {
   localStorage.clear();
   await db.notes.clear();
   await db.drafts.clear();
+  await db.knowledge.clear();
 });
 afterEach(() => {
   cleanup();
@@ -42,6 +45,26 @@ function renderEditor(saved = vi.fn()) {
     </Theme>,
   );
 }
+it('opens inline AI annotations and completes a task without changing the note', async () => {
+  const note = newNote('local', 'Steam einrichten');
+  await repo.put(note, null);
+  await knowledge.append(note, 'analysis', {
+    suggestions: [{ kind: 'task', title: 'Steam einrichten', detail: 'Vier PCs', quote: note.content }],
+  });
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
+  const checkbox = await screen.findByRole('checkbox', { name: 'Steam einrichten erledigt' });
+  await user.click(checkbox);
+  await waitFor(() => expect((checkbox as HTMLInputElement).checked).toBe(true));
+  expect(await repo.get('local', note.id)).toEqual(note);
+});
 it('recovers an unfinished draft after closing and saves its exact text', async () => {
   const user = userEvent.setup();
   const initial = renderEditor();

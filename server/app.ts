@@ -103,7 +103,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '0.4.2' };
+    return { ok: true, version: '0.5.0' };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (
@@ -289,7 +289,7 @@ export async function buildApp(db: Database, env: Environment) {
         z.object({
           id: uuid,
           scope: uuid,
-          kind: z.enum(['analysis', 'decision', 'extraction', 'research', 'embedding']),
+          kind: z.enum(['analysis', 'decision', 'extraction', 'research', 'embedding', 'manual-task']),
           noteId: uuid,
           revision: uuid,
           at: z.string().datetime(),

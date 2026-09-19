@@ -22,7 +22,7 @@ export interface KnowledgeRecord {
   id: string;
   scope: string;
   at: string;
-  kind: 'analysis' | 'decision' | 'extraction' | 'research' | 'embedding';
+  kind: 'analysis' | 'decision' | 'extraction' | 'research' | 'embedding' | 'manual-task';
   noteId: string;
   revision: string;
   data: unknown;

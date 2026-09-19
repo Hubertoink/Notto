@@ -5,6 +5,7 @@ import { newNote, reviseNote, tagsOf, type Note, type Revision } from './domain'
 import { repo } from './repository';
 import { useNotto } from './state';
 import { Dictation } from './Dictation';
+import { NoteAnnotations } from './Tasks';
 
 export function Editor({
   note,
@@ -221,6 +222,7 @@ export function Editor({
           {note.conflictOf && <span className="conflict-label">Konfliktkopie</span>}
         </div>
       )}
+      {note && !compact && <NoteAnnotations key={note.id} note={note} />}
       <div
         className={`editor-content ${preview ? 'is-preview' : ''}`}
         onDragOver={(e) => e.preventDefault()}

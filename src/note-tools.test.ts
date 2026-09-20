@@ -42,6 +42,15 @@ it('formats selections and removes formatting without losing surrounding text', 
   expect(link.text.slice(link.start, link.end)).toBe('https://');
 });
 
+it('inserts a table without losing selected lines or surrounding text', () => {
+  const result = formatText('Vorher\nGin | Lime\nRum\nNachher', 7, 21, 'table');
+  expect(result.text).toContain('Vorher');
+  expect(result.text).toContain('Nachher');
+  expect(result.text).toContain('Gin &#124; Lime');
+  expect(result.text).toContain('| --- | --- |');
+  expect(result.text.slice(result.start, result.end)).toBe('Bezeichnung');
+});
+
 it('preserves and validates collection metadata without inventing text history', () => {
   const note = newNote('local', 'Gedanke');
   const collections = normalizeCollections([' Jugendhaus ', 'jugendhaus', 'Medien   Workshop']);

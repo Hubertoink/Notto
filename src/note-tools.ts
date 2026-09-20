@@ -31,12 +31,23 @@ export function backlinks(note: Note, notes: Note[]): Note[] {
   );
 }
 
-export type Format = 'bold' | 'italic' | 'heading' | 'bullet' | 'number' | 'task' | 'quote' | 'link';
+export type Format =
+  'bold' | 'italic' | 'heading' | 'bullet' | 'number' | 'task' | 'quote' | 'link' | 'table';
 export function formatText(text: string, start: number, end: number, kind: Format) {
   let replacement: string;
   let selectionStart = start;
   let selectionEnd = end;
-  if (kind === 'bold' || kind === 'italic') {
+  if (kind === 'table') {
+    const prefix = start > 0 ? '\n\n' : '';
+    const selected = text.slice(start, end);
+    const rows = (selected || 'Eintrag')
+      .split(/\r?\n/)
+      .map((line) => `| ${line.replace(/\|/g, '&#124;')} |  |`)
+      .join('\n');
+    replacement = `${prefix}| Bezeichnung | Inhalt |\n| --- | --- |\n${rows}\n\n`;
+    selectionStart = start + prefix.length + 2;
+    selectionEnd = selectionStart + 'Bezeichnung'.length;
+  } else if (kind === 'bold' || kind === 'italic') {
     const marker = kind === 'bold' ? '**' : '*';
     const selected = text.slice(start, end) || 'Text';
     if (

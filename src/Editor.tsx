@@ -14,6 +14,7 @@ import {
   WandSparkles,
   Undo2,
   Bold,
+  Table2,
   Italic,
   Heading2,
   List,
@@ -558,6 +559,7 @@ export function Editor({
                 ['task', 'Checkbox', ListTodo],
                 ['quote', 'Zitat', Quote],
                 ['link', 'Weblink einfügen', Link],
+                ['table', 'Tabelle einfügen', Table2],
               ] as const
             ).map(([kind, label, Icon]) => (
               <button

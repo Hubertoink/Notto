@@ -557,6 +557,17 @@ textarea:focus-visible {
   justify-content: flex-end;
   gap: 12px;
 }
+.editor-reading {
+  /* Let the detail panel scroll the whole note instead of shrinking its text
+     underneath tags, collections and the footer on short/mobile viewports. */
+  flex: 1 0 auto;
+  min-width: 0;
+}
+.editor-content.is-preview {
+  display: block;
+  flex: 1 0 auto;
+  min-width: 0;
+}
 .editor-attachments {
   display: flex;
   flex-wrap: wrap;
@@ -657,6 +668,7 @@ textarea:focus-visible {
   padding-top: 15px;
 }
 .markdown {
+  min-width: 0;
   font-size: 16px;
   line-height: 1.85;
   overflow-wrap: anywhere;

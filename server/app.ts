@@ -106,7 +106,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '0.11.2' };
+    return { ok: true, version: '0.12.0' };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (
@@ -343,6 +343,7 @@ export async function buildApp(db: Database, env: Environment) {
         enabled: z.boolean(),
         auto: z.boolean(),
         autoResearch: z.boolean().default(false),
+        rewriteMode: z.enum(['correct', 'formulate']).default('correct'),
         model: z.string().max(100),
         excludedTags: z.string().max(2000),
         excludedNotes: z.array(uuid).max(10000),

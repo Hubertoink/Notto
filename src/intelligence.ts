@@ -67,6 +67,7 @@ export interface AIConfig {
   enabled: boolean;
   auto: boolean;
   autoResearch: boolean;
+  rewriteMode?: 'correct' | 'formulate';
   model: string;
   excludedTags: string;
   excludedNotes: string[];
@@ -76,6 +77,7 @@ export const defaults: AIConfig = {
   enabled: false,
   auto: false,
   autoResearch: false,
+  rewriteMode: 'correct',
   model: 'gpt-4.1-mini',
   excludedTags: 'privat',
   excludedNotes: [],

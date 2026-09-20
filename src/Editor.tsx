@@ -11,6 +11,8 @@ import { AttachmentTitle } from './AttachmentTitle';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  WandSparkles,
+  Undo2,
   Bold,
   Italic,
   Heading2,
@@ -37,6 +39,7 @@ import { useNotto } from './state';
 import { Dictation } from './Dictation';
 import { NoteAnnotations, useKnowledgeRecords } from './Tasks';
 import { collectionNames, createCollection } from './collections';
+import { rewriteNote } from './rewrite';
 
 export function Editor({
   note,
@@ -65,7 +68,9 @@ export function Editor({
   const [collectionInput, setCollectionInput] = useState('');
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [ready, setReady] = useState(false);
-  const [preview, setPreview] = useState(false);
+  const [preview, setPreview] = useState(Boolean(note) && !compact);
+  const [rewriting, setRewriting] = useState(false);
+  const [rewriteUndo, setRewriteUndo] = useState<{ before: string; after: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [addingImages, setAddingImages] = useState(0);
   const imageOperations = useRef(0);
@@ -294,6 +299,7 @@ export function Editor({
         initialCollectionRef.current = note?.collections || initialCollections;
         textRef.current = restored;
         if (d) {
+          setPreview(false);
           base.current = d.baseRevision;
           setDraftStatus('Entwurf wiederhergestellt');
         }
@@ -430,6 +436,27 @@ export function Editor({
       if (alive.current) setAddingImages(imageOperations.current);
     }
   }
+  async function rewrite() {
+    if (rewriting || saving || !ready || !content.trim()) return;
+    const before = textRef.current,
+      generation = editGeneration.current;
+    setRewriting(true);
+    setError('');
+    try {
+      const after = await rewriteNote(scope, before, note);
+      if (!alive.current) return;
+      if (editGeneration.current !== generation || textRef.current !== before)
+        throw new Error('Der Text wurde inzwischen geändert. Bitte die Überarbeitung erneut starten.');
+      change(after);
+      setRewriteUndo({ before, after });
+      setPreview(false);
+      notify('Überarbeitet – als Entwurf. Bitte vor dem Speichern prüfen.');
+    } catch (e) {
+      if (alive.current) setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (alive.current) setRewriting(false);
+    }
+  }
   const dirty =
     content !== initial.current ||
     JSON.stringify(collections) !== JSON.stringify(initialCollectionRef.current);
@@ -452,6 +479,30 @@ export function Editor({
           </button>
         )}
         <div className="toolbar">
+          {!compact && (
+            <Action
+              label={rewriting ? 'Wird überarbeitet …' : 'Mit KI überarbeiten'}
+              icon={<WandSparkles size={17} />}
+              isIconOnly
+              variant="ghost"
+              isDisabled={rewriting || saving || !ready || !content.trim()}
+              onClick={() => void rewrite()}
+            />
+          )}
+          {rewriteUndo && content === rewriteUndo.after && (
+            <Action
+              label="KI-Überarbeitung rückgängig"
+              icon={<Undo2 size={17} />}
+              isIconOnly
+              variant="ghost"
+              isDisabled={saving || rewriting}
+              onClick={() => {
+                change(rewriteUndo.before);
+                setRewriteUndo(null);
+                setPreview(false);
+              }}
+            />
+          )}
           <Action
             label={preview ? 'Bearbeiten' : 'Vorschau'}
             icon={preview ? <PenLine size={17} /> : <Eye size={17} />}

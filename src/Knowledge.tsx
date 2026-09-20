@@ -570,6 +570,20 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
             <input value={settings.excludedTags} onChange={(e) => update({ excludedTags: e.target.value })} />
           </label>
           <label>
+            Notizen mit KI überarbeiten
+            <select
+              value={settings.rewriteMode ?? 'correct'}
+              onChange={(e) => update({ rewriteMode: e.target.value as 'correct' | 'formulate' })}
+            >
+              <option value="correct">Nur Rechtschreibung, Grammatik und Formatierung</option>
+              <option value="formulate">Zusätzlich Gedanken als lesbare Sätze ausformulieren</option>
+            </select>
+          </label>
+          <p className="muted small">
+            Der Zauberstab in der Notiz verwendet diese Einstellung. Offene Fragen bleiben offen; die KI soll
+            keine Inhalte ergänzen.
+          </p>
+          <label>
             {scope !== 'local' && ownBackend()
               ? 'Maximale KI-Anfragen pro Tag im Konto (einschließlich Hintergrundaufträgen)'
               : 'Maximale KI-Anfragen pro Tag auf diesem Gerät'}
@@ -586,7 +600,8 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
           <p className="muted">
             Anfragen können Kosten verursachen. Das Anfragelimit ist kein Geldlimit. Fehlgeschlagene
             Hintergrundanalysen werden erst nach manueller Wiederholung oder einer neuen Fassung erneut
-            versucht. Recherche und OCR startest du ausdrücklich.
+            versucht. Webrecherche läuft bei aktivierter Automatik nach der Analyse; sonst startest du sie
+            manuell. OCR startest du ausdrücklich.
           </p>
         </fieldset>
       ) : tab === 'files' ? (

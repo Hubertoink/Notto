@@ -13,6 +13,7 @@ import { db, repo } from './repository';
 import { newNote } from './domain';
 import { knowledge } from './intelligence';
 import * as intelligence from './intelligence';
+import * as rewriting from './rewrite';
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 beforeAll(() => {
   vi.stubGlobal('CSS', { escape: (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '\\$&') });
@@ -55,6 +56,38 @@ function renderEditor(saved = vi.fn()) {
     </Theme>,
   );
 }
+it('applies a rewrite only to the draft and can restore the original wording', async () => {
+  vi.spyOn(rewriting, 'rewriteNote').mockResolvedValue('Ein lesbarer Gedanke.');
+  renderEditor();
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, 'gedanke kurz');
+  await user.click(screen.getByRole('button', { name: 'Mit KI überarbeiten' }));
+  await waitFor(() => expect(field.value).toBe('Ein lesbarer Gedanke.'));
+  expect(await repo.list('local')).toHaveLength(0);
+  await user.click(screen.getByRole('button', { name: 'KI-Überarbeitung rückgängig' }));
+  expect(field.value).toBe('gedanke kurz');
+});
+it('discards a delayed rewrite when the user has continued typing', async () => {
+  let finish!: (text: string) => void;
+  vi.spyOn(rewriting, 'rewriteNote').mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  renderEditor();
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, 'gedanke');
+  await user.click(screen.getByRole('button', { name: 'Mit KI überarbeiten' }));
+  await user.type(field, ' weiter');
+  finish('Alter Vorschlag');
+  await screen.findByText('Der Text wurde inzwischen geändert. Bitte die Überarbeitung erneut starten.');
+  expect(field.value).toBe('gedanke weiter');
+});
 it('opens and saves a widget draft in the main editor without consuming the other draft', async () => {
   const draft = {
     key: 'local:widget',
@@ -310,6 +343,8 @@ it('keeps an unsaved text draft when a drop adds a collection to the open note',
   );
   const view = render(renderNote(original));
   const user = userEvent.setup();
+  expect(screen.queryByRole('textbox', { name: 'Notiztext' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Bearbeiten' }));
   const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
   await waitFor(() => expect(field.disabled).toBe(false));
   await user.type(field, ' mit Entwurf');

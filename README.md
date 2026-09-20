@@ -154,3 +154,5 @@ Mit dem Testkonto **Anmelden** verwenden, keine Registrierung. Manuelle Cloud-Ei
 ## Notizsekretär mit Gedächtnis
 
 Unter **Wissen & KI → Notizsekretär** kann Noto mehrere Notizen untersuchen, belegte Übersichten und Beziehungen erarbeiten und Sammlungszuordnungen vorschlagen. Übernahmen sind nachvollziehbar und Zuordnungen lassen sich zurücknehmen. Arbeitsweise, Grenzen und Evaluationen: [AI-HARNESS.md](docs/AI-HARNESS.md).
+
+Bestehende Notizen öffnen in der Leseransicht. Neue Notizen und wiederhergestellte ungespeicherte Entwürfe öffnen zum Bearbeiten. Der Zauberstab **Mit KI überarbeiten** verbessert den aktuellen Text als Entwurf, mit direktem Rückgängig. Unter **Wissen & KI → KI einrichten → Notizen mit KI überarbeiten** lässt sich zwischen reiner Korrektur/Formatierung und zusätzlichem Ausformulieren wählen. Vor dem Speichern prüfen; die bisherige gespeicherte Fassung bleibt bis dahin unverändert. Links, Anhänge und Tags werden auf Erhalt geprüft.

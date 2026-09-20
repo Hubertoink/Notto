@@ -19,14 +19,14 @@ function RecordingWaveform({ stream }: { stream: MediaStream }) {
       source.connect(analyser);
       void context.resume().catch(() => undefined);
       const samples = new Uint8Array(analyser.frequencyBinCount);
-      const levels = new Float32Array(16);
-      analyser.smoothingTimeConstant = 0.75;
+      const levels = new Float32Array(8);
+      analyser.smoothingTimeConstant = 0.3;
       const binHz = context.sampleRate / analyser.fftSize;
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       let last = 0;
       const draw = (time: number) => {
         frame = requestAnimationFrame(draw);
-        if (time - last < (reduced ? 250 : 33)) return;
+        if (time - last < (reduced ? 250 : 16)) return;
         last = time;
         const element = canvas.current;
         const pen = element?.getContext('2d');
@@ -38,16 +38,16 @@ function RecordingWaveform({ stream }: { stream: MediaStream }) {
         const slot = width / levels.length;
         const barWidth = slot * 0.55;
         levels.forEach((previous, index) => {
-          // Logarithmic bands keep the speech range spread across all 16 bars.
-          const start = Math.max(1, Math.floor((80 * 100 ** (index / 16)) / binHz));
+          // Logarithmic bands spread the speech range across all bars.
+          const start = Math.max(1, Math.floor((80 * 100 ** (index / levels.length)) / binHz));
           const end = Math.min(
             samples.length,
-            Math.max(start + 1, Math.ceil((80 * 100 ** ((index + 1) / 16)) / binHz)),
+            Math.max(start + 1, Math.ceil((80 * 100 ** ((index + 1) / levels.length)) / binHz)),
           );
           let sum = 0;
           for (let bin = start; bin < end; bin++) sum += samples[bin] ** 2;
-          const level = Math.sqrt(sum / Math.max(1, end - start)) / 255;
-          levels[index] = previous + (level - previous) * (level > previous ? 0.65 : 0.25);
+          const level = Math.min(1, (Math.sqrt(sum / Math.max(1, end - start)) / 255) * 1.5);
+          levels[index] = previous + (level - previous) * (level > previous ? 0.95 : 0.2);
           const barHeight = Math.max(6, levels[index] * height * 0.9);
           pen.beginPath();
           pen.roundRect(

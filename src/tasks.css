@@ -160,7 +160,7 @@
 @container note-detail (min-width: 1000px) {
   .editor.editor-with-annotations {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr) clamp(380px, 38cqi, 460px);
     column-gap: 28px;
     align-content: start;
     max-width: 1440px;
@@ -184,5 +184,19 @@
     max-height: calc(100dvh - 220px);
     min-height: 180px;
     overscroll-behavior: contain;
+    font-size: 0.875rem;
+  }
+  .editor-with-annotations .annotation-panel .markdown {
+    font-size: inherit;
+    line-height: 1.65;
+  }
+  .editor-with-annotations .annotation-panel .markdown h1 {
+    font-size: 1.25rem;
+  }
+  .editor-with-annotations .annotation-panel .markdown h2 {
+    font-size: 1.125rem;
+  }
+  .editor-with-annotations .annotation-panel .markdown h3 {
+    font-size: 1rem;
   }
 }

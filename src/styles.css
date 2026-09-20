@@ -729,11 +729,24 @@ textarea:focus-visible {
   border-radius: 10px;
   margin: 15px 0;
 }
-.markdown table {
+.markdown-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.markdown .markdown-table-scroll table {
   border-collapse: collapse;
-  width: 100%;
-  display: block;
-  overflow: auto;
+  width: max-content;
+  min-width: 100%;
+  display: table;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.markdown-table-scroll th,
+.markdown-table-scroll td {
+  min-width: 8rem;
+  max-width: 24rem;
+  vertical-align: top;
 }
 .markdown th,
 .markdown td {

@@ -153,6 +153,16 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
       <Markdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={{
+          table: ({ children }) => (
+            <div
+              className="markdown-table-scroll"
+              role="region"
+              aria-label="Tabelle, horizontal scrollbar"
+              tabIndex={0}
+            >
+              <table>{children}</table>
+            </div>
+          ),
           img: ({ src, alt }) => <NoteImage src={src} alt={alt} scope={scope} />,
           a: ({ href, children }) =>
             /^notes\/[a-f0-9-]{36}$/.test(href || '') ? (

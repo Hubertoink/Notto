@@ -219,3 +219,23 @@ it('waits for an image to finish persisting before allowing the note to be saved
   await waitFor(() => expect(saved).toHaveBeenCalledOnce());
   expect((await repo.list('local'))[0].content).toContain('attachments/abc-123.png');
 });
+
+it('suggests existing tags and accepts a prefix match with the keyboard', async () => {
+  await repo.put(
+    newNote('local', '#jugendarbeit #jugendhaus #medien #konzeption #technologie #spiele'),
+    null,
+  );
+  renderEditor();
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' });
+  await waitFor(() => expect((field as HTMLTextAreaElement).disabled).toBe(false));
+  await user.type(field, '#');
+  expect(await screen.findAllByRole('option')).toHaveLength(5);
+  await user.type(field, 'Jugend');
+  expect(screen.getAllByRole('option')).toHaveLength(2);
+  await user.keyboard('{ArrowDown}{Enter}');
+  expect((field as HTMLTextAreaElement).value).toBe('#jugendhaus ');
+  expect(screen.queryByRole('listbox')).toBeNull();
+  await user.type(field, '#neuertag ');
+  expect((field as HTMLTextAreaElement).value).toBe('#jugendhaus #neuertag ');
+});

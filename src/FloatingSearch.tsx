@@ -1,4 +1,5 @@
-import { config, eligible, semanticSearch, type Evidence } from './intelligence';
+import { NoteMarkdown } from './components';
+import { ask, config, eligible, semanticSearch, type Evidence } from './intelligence';
 import './search.css';
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
@@ -27,6 +28,7 @@ export function FloatingSearch({
   const [semantic, setSemantic] = useState<{ query: string; hits: (Evidence & { score: number })[] } | null>(
     null,
   );
+  const [answer, setAnswer] = useState<{ text: string; sources: Evidence[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const generation = useRef(0);
@@ -35,14 +37,28 @@ export function FloatingSearch({
     setBusy(false);
     setError('');
     setSemantic(null);
+    setAnswer(null);
   }, [query, open, scope]);
-  const searchMeaning = async () => {
+  const searchMeaning = async (question = false) => {
     if (!query.trim() || busy) return;
     const request = ++generation.current;
     const searched = query;
     setBusy(true);
     setError('');
     try {
+      if (question) {
+        const result = await ask(
+          scope,
+          searched,
+          notes.filter((n) => n.scope === scope && !n.deleted),
+        );
+        if (request === generation.current)
+          setAnswer({
+            text: result.answer,
+            sources: result.citations.map((c) => ({ ...result.sources[c.index], text: c.quote })),
+          });
+        return;
+      }
       const hits = await semanticSearch(
         scope,
         searched,
@@ -83,6 +99,10 @@ export function FloatingSearch({
         related.push(note);
     }
   const results = [...direct, ...related];
+  const isQuestion = query.trim().endsWith('?') || query.trim().split(/\s+/).length >= 5;
+  const aiEnabled = config(scope).enabled;
+  const defaultAI = aiEnabled && query.trim() && (isQuestion || !results.length);
+  const actionLabel = isQuestion ? 'Notizbuch fragen' : 'Sinngemäß suchen';
   return (
     <>
       {!open && (
@@ -121,11 +141,17 @@ export function FloatingSearch({
               <input
                 ref={field}
                 aria-label="Suchbegriff"
-                placeholder="Notizen, Wörter oder #tags suchen …"
+                placeholder="Notizen suchen oder eine Frage stellen …"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && results[0]) {
+                  if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+                  e.preventDefault();
+                  if (defaultAI) {
+                    void searchMeaning(isQuestion);
+                    return;
+                  }
+                  if (results[0]) {
                     onSelect(results[0].id);
                     onClose();
                   }
@@ -137,8 +163,11 @@ export function FloatingSearch({
             </div>
             {query.trim() && (
               <div className="search-ai-controls">
-                <button onClick={() => void searchMeaning()} disabled={busy || !config(scope).enabled}>
-                  <Sparkles size={13} /> {busy ? 'Sucht sinngemäß …' : 'Sinngemäß suchen'}
+                <button
+                  onClick={() => void searchMeaning(isQuestion)}
+                  disabled={busy || !config(scope).enabled}
+                >
+                  <Sparkles size={13} /> {busy ? 'Wird gesucht …' : actionLabel}
                 </button>
                 {!config(scope).enabled && <p>KI-Suche unter „Wissen & KI“ aktivieren.</p>}
                 {error && <p role="alert">{error}</p>}
@@ -149,6 +178,30 @@ export function FloatingSearch({
                       : 'Keine zusätzlichen KI-Treffer.'}
                   </p>
                 )}
+              </div>
+            )}
+            {answer && (
+              <div className="search-answer">
+                <NoteMarkdown content={answer.text} scope={scope} />
+                {answer.sources
+                  .filter((source) =>
+                    notes.some(
+                      (n) => n.id === source.noteId && n.scope === scope && !n.deleted && eligible(n),
+                    ),
+                  )
+                  .map((source, i) => (
+                    <button
+                      key={i}
+                      className="text-button"
+                      onClick={() => {
+                        onSelect(source.noteId);
+                        onClose();
+                      }}
+                    >
+                      {titleOf(notes.find((n) => n.id === source.noteId)?.content || 'Quelle')}
+                      <blockquote>{source.text}</blockquote>
+                    </button>
+                  ))}
               </div>
             )}
             <div className="search-results" aria-busy={busy}>
@@ -169,7 +222,14 @@ export function FloatingSearch({
               ))}
               {!results.length && <p>Keine passenden Notizen.</p>}
             </div>
-            <div className="search-footer">Enter öffnet den ersten Treffer · Esc schließt</div>
+            <div className="search-footer">
+              {defaultAI
+                ? `Enter: ${actionLabel}`
+                : results.length
+                  ? 'Enter öffnet den ersten Treffer'
+                  : 'Suchbegriff ändern'}{' '}
+              · Esc schließt
+            </div>
           </motion.div>
         )}
       </dialog>

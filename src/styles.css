@@ -1420,3 +1420,69 @@ textarea:focus-visible {
   padding-left: 12px;
   padding-right: 12px;
 }
+
+button.tags-heading {
+  width: calc(100% - 22px);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.account-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin: 12px;
+  background: var(--nt-paper);
+  border: 1px solid var(--nt-line);
+  cursor: pointer;
+  font-weight: 700;
+}
+.all-tags {
+  display: grid;
+  gap: 4px;
+}
+.editor-content {
+  position: relative;
+}
+.tag-suggestions {
+  position: absolute;
+  bottom: 12px;
+  left: 20px;
+  z-index: 5;
+  width: min(360px, calc(100% - 40px));
+  padding: 10px;
+  border: 1px solid var(--nt-line);
+  border-radius: 12px;
+  background: var(--nt-paper);
+  box-shadow: 0 12px 35px #0003;
+  display: grid;
+  gap: 4px;
+}
+.tag-suggestions button {
+  text-align: left;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.tag-suggestions button[aria-selected='true'] {
+  background: #678edb33;
+}
+.tag-suggestions small {
+  padding: 4px 8px;
+}
+.search-answer {
+  padding: 20px;
+  max-height: 45vh;
+  overflow: auto;
+  border-bottom: 1px solid var(--nt-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+  }
+}

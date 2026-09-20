@@ -22,7 +22,7 @@ export function Editor({
   onSaved: (note: Note) => void;
   onClose?: () => void;
 }) {
-  const { scope, notify } = useNotto();
+  const { scope, notify, notes } = useNotto();
   const [content, setContent] = useState(note?.content ?? '');
   const [ready, setReady] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -36,6 +36,39 @@ export function Editor({
   const [history, setHistory] = useState(false);
   const [oldRevision, setOldRevision] = useState<Revision | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const [tagToken, setTagToken] = useState<{ start: number; end: number; query: string } | null>(null);
+  const [tagIndex, setTagIndex] = useState(0);
+  const tagOptions = [
+    ...new Set(
+      (notes || [])
+        .filter((n) => n.scope === scope && !n.deleted)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .flatMap((n) => tagsOf(n.content)),
+    ),
+  ]
+    .filter((t) => t.toLocaleLowerCase('de').startsWith(tagToken?.query.toLocaleLowerCase('de') || ''))
+    .slice(0, 5);
+  const inspectTag = (el: HTMLTextAreaElement) => {
+    const end = el.selectionStart;
+    const match = el.value.slice(0, end).match(/(?:^|\s)#([\p{L}\p{N}_-]*)$/u);
+    setTagToken(
+      match && el.selectionStart === el.selectionEnd
+        ? { start: end - match[1].length - 1, end, query: match[1] }
+        : null,
+    );
+    setTagIndex(0);
+  };
+  const acceptTag = (tag: string) => {
+    if (!tagToken) return;
+    const tail = content.slice(tagToken.end).replace(/^[\p{L}\p{N}_-]*/u, '');
+    const next = content.slice(0, tagToken.start) + '#' + tag + ' ';
+    change(next + tail);
+    setTagToken(null);
+    requestAnimationFrame(() => {
+      input.current?.focus();
+      input.current?.setSelectionRange(next.length, next.length);
+    });
+  };
   useEffect(() => {
     if (!compact) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -244,7 +277,17 @@ export function Editor({
                 ? 'Ein Gedanke, eine Idee, etwas für später …\n\n#thema'
                 : 'Ein Gedanke, eine Idee, etwas für später …\n\nMit #Hashtags behältst du den Überblick.'
             }
-            onChange={(e) => change(e.target.value)}
+            onChange={(e) => {
+              change(e.target.value);
+              inspectTag(e.target);
+            }}
+            onClick={(e) => inspectTag(e.currentTarget)}
+            onBlur={() => setTagToken(null)}
+            onKeyUp={(e) => {
+              if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) inspectTag(e.currentTarget);
+            }}
+            aria-controls={tagToken && tagOptions.length ? 'tag-suggestions' : undefined}
+            aria-activedescendant={tagToken && tagOptions.length ? `tag-option-${tagIndex}` : undefined}
             onPaste={(e) => {
               const images = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
               if (images.length) {
@@ -253,6 +296,23 @@ export function Editor({
               }
             }}
             onKeyDown={(e) => {
+              if (tagToken && !e.nativeEvent.isComposing && !e.ctrlKey && !e.metaKey) {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setTagToken(null);
+                  return;
+                }
+                if (tagOptions.length && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+                  e.preventDefault();
+                  if (e.key === 'Enter') acceptTag(tagOptions[tagIndex] || tagOptions[0]);
+                  else
+                    setTagIndex(
+                      (i) => (i + (e.key === 'ArrowDown' ? 1 : -1) + tagOptions.length) % tagOptions.length,
+                    );
+                  return;
+                }
+              }
               if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                 e.preventDefault();
                 void save();
@@ -261,6 +321,25 @@ export function Editor({
             spellCheck
             lang="de"
           />
+        )}
+        {!preview && tagToken && tagOptions.length > 0 && (
+          <div className="tag-suggestions" id="tag-suggestions" role="listbox" aria-label="Vorhandene Tags">
+            <small>{tagToken.query ? 'Passende Tags' : 'Zuletzt verwendete Tags'}</small>
+            {tagOptions.map((tag, i) => (
+              <button
+                type="button"
+                role="option"
+                aria-selected={i === tagIndex}
+                id={`tag-option-${i}`}
+                key={tag}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => acceptTag(tag)}
+              >
+                #{tag}
+              </button>
+            ))}
+            <small>↑ ↓ auswählen · Enter übernehmen · Esc schließen</small>
+          </div>
         )}
       </div>
       {!preview && attachmentIds(content).some((id) => id.endsWith('.pdf')) && (

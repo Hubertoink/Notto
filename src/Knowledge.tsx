@@ -13,7 +13,6 @@ import { analysisModels } from './ai-models';
 import { attachmentIds, titleOf, type Note } from './domain';
 import {
   analyze,
-  ask,
   config,
   defaults,
   decisionKey,
@@ -24,7 +23,6 @@ import {
   research,
   resolvedDecision,
   saveConfig,
-  semanticSearch,
   type Analysis,
   type AIConfig,
   type Decision,
@@ -275,9 +273,7 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
   const [busy, setBusy] = useState(''),
     [error, setError] = useState(''),
     [message, setMessage] = useState('');
-  const [query, setQuery] = useState(''),
-    [results, setResults] = useState<Evidence[]>([]),
-    [answer, setAnswer] = useState('');
+  const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
   const [correction, setCorrection] = useState<{
     note: Note;
     item: Suggestion;
@@ -373,10 +369,9 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
       <div className="knowledge-tabs segmented">
         {[
           ['overview', 'Überblick'],
-          ['task', 'Aufgaben'],
+          ['task', 'Aufgabenvorschläge'],
           ['contact', 'Kontakte'],
           ['topic', 'Themen'],
-          ['search', 'Suchen & Fragen'],
           ['files', 'Anhänge'],
           ['memory', 'Mein Kontext'],
           ['settings', 'KI einrichten'],
@@ -585,59 +580,6 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
             versucht. Recherche und OCR startest du ausdrücklich.
           </p>
         </fieldset>
-      ) : tab === 'search' ? (
-        <section className="knowledge-section">
-          <label>
-            Was möchtest du finden oder wissen?
-            <textarea
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Was steht für den Medienraum noch an?"
-            />
-          </label>
-          <div className="settings-actions">
-            <Action
-              label="Sinngemäß suchen"
-              isDisabled={!query.trim() || !!busy}
-              onClick={() =>
-                void run('Suchindex aufbauen und suchen', async () => {
-                  setAnswer('');
-                  setResults(await semanticSearch(scope, query, notes));
-                })
-              }
-            />
-            <Action
-              label="Notizbuch fragen"
-              variant="primary"
-              isDisabled={!query.trim() || !!busy}
-              onClick={() =>
-                void run('Belegte Antwort erstellen', async () => {
-                  const r = await ask(scope, query, notes);
-                  setAnswer(r.answer);
-                  setResults(r.citations.map((c) => ({ ...r.sources[c.index], text: c.quote })));
-                })
-              }
-            />
-          </div>
-          <p className="muted">
-            Beim ersten Suchen entsteht ein wiederverwendbarer Index. PDFs und Bilder werden nach der
-            Texterkennung berücksichtigt.
-          </p>
-          {answer && (
-            <div className="knowledge-card">
-              <NoteMarkdown content={answer} scope={scope} />
-            </div>
-          )}
-          {results.map((r, i) => (
-            <article className="knowledge-card" key={i}>
-              <button className="text-button" onClick={() => onOpen(r.noteId)}>
-                {titleOf(notes.find((n) => n.id === r.noteId)?.content || 'Original')}{' '}
-                {r.page ? `· PDF Seite ${r.page}` : ''}
-              </button>
-              <blockquote>{r.text}</blockquote>
-            </article>
-          ))}
-        </section>
       ) : tab === 'files' ? (
         <section className="knowledge-section">
           <p className="muted">
@@ -813,11 +755,57 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
         />
       ) : (
         <section className="knowledge-section">
+          <div className="knowledge-table-wrap">
+            <table
+              className="knowledge-table"
+              aria-label={tab === 'task' ? 'Aufgabenvorschläge' : 'Kontakte'}
+            >
+              <thead>
+                <tr>
+                  <th>Titel</th>
+                  <th>Status</th>
+                  <th>Notiz</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries
+                  .filter((e) => e.item.kind === tab)
+                  .map(({ note, item, decision }) => (
+                    <tr key={decisionKey(note.id, item)}>
+                      <td>
+                        <button
+                          className="text-button"
+                          onClick={() => setSelectedEntry(decisionKey(note.id, item))}
+                        >
+                          {decision?.title || item.title}
+                        </button>
+                      </td>
+                      <td>
+                        {decision?.status === 'done'
+                          ? 'Erledigt'
+                          : decision?.status === 'accepted'
+                            ? 'Übernommen'
+                            : decision?.status === 'dismissed'
+                              ? 'Abgelehnt'
+                              : 'Vorschlag'}
+                      </td>
+                      <td>
+                        <button className="text-button" onClick={() => onOpen(note.id)}>
+                          {titleOf(note.content)}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
           {entries
-            .filter((e) => e.item.kind === tab)
+            .filter((e) => e.item.kind === tab && decisionKey(e.note.id, e.item) === selectedEntry)
             .map(({ note, item, decision }, i) => (
-              <article
-                className={`knowledge-card ${decision?.status === 'dismissed' ? 'knowledge-dismissed' : ''}`}
+              <Modal
+                title={decision?.title || item.title}
+                onClose={() => setSelectedEntry(null)}
+                width={800}
                 key={`${note.id}:${i}`}
               >
                 <span className="eyebrow">
@@ -902,7 +890,7 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
                       <Sources sources={(r.data as Research).sources} />
                     </div>
                   ))}
-              </article>
+              </Modal>
             ))}
           {!entries.some((e) => e.item.kind === tab) && (
             <p>Noch keine Vorschläge. Starte eine Analyse im Überblick.</p>

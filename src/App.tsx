@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import { FloatingSearch } from './FloatingSearch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -5,7 +6,6 @@ import {
   Archive,
   ArrowLeft,
   Check,
-  ChevronDown,
   Cloud,
   CloudOff,
   FileText,
@@ -14,7 +14,6 @@ import {
   Menu,
   Pin,
   Plus,
-  Settings2,
   Sparkles,
   Trash2,
   Upload,
@@ -24,7 +23,7 @@ import { listen } from '@tauri-apps/api/event';
 import { Theme } from '@astryxdesign/core/theme';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
 import { useNotto } from './state';
-import { Action } from './components';
+import { Action, Modal } from './components';
 import { Editor } from './Editor';
 import { Settings } from './Settings';
 import { WebAccess } from './Login';
@@ -84,6 +83,12 @@ function Notebook({
   const drafts = useNewDrafts(scope);
   const visibleDrafts = view === 'all' ? drafts.filter((d) => !tag || tagsOf(d.content).includes(tag)) : [];
   const [settings, setSettings] = useState(false);
+  const [allTags, setAllTags] = useState(false);
+  const toggleTags = (open: boolean) => {
+    if (document.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.startViewTransition(() => flushSync(() => setAllTags(open)));
+    } else setAllTags(open);
+  };
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const records = useKnowledgeRecords(scope);
@@ -103,6 +108,7 @@ function Notebook({
     setTasksOpen(false);
     setCreating(false);
     setSearchOpen(false);
+    setAllTags(false);
     setTag(null);
     setView('all');
   }, [scope]);
@@ -110,7 +116,7 @@ function Notebook({
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const n of active) for (const t of tagsOf(n.content)) counts.set(t, (counts.get(t) || 0) + 1);
-    return [...counts].sort(([a], [b]) => a.localeCompare(b, 'de'));
+    return [...counts].sort(([a, ac], [b, bc]) => bc - ac || a.localeCompare(b, 'de'));
   }, [notes]);
   const filtered = useMemo(
     () =>
@@ -247,21 +253,7 @@ function Notebook({
         <div className="brand">
           <img className="brand-logo" src="/noto.png" alt="" />
           <span>noto</span>
-          <button
-            className="workspace-button"
-            aria-label="Kontoeinstellungen"
-            onClick={() => setSettings(true)}
-          >
-            <ChevronDown size={15} />
-          </button>
         </div>
-        <button className="workspace" onClick={() => setSettings(true)}>
-          <span className="workspace-avatar">{user?.email?.charAt(0).toUpperCase() || 'N'}</span>
-          <span>
-            <strong>{user ? 'Mein Notizbuch' : 'Lokales Notizbuch'}</strong>
-            <small>{user?.email || 'Nur auf diesem Gerät'}</small>
-          </span>
-        </button>
         <div className="sidebar-new">
           <Action
             label="Neue Notiz"
@@ -312,15 +304,20 @@ function Notebook({
             notes.filter((n) => n.archived && !n.deleted).length,
           )}
         </nav>
-        <div className="tags-heading">
+        <button
+          className="tags-heading"
+          style={{ viewTransitionName: allTags ? undefined : 'tags-popout' }}
+          onClick={() => toggleTags(true)}
+          aria-label="Alle Tags anzeigen"
+        >
           <span>DEINE TAGS</span>
           <Hash size={13} />
-        </div>
+        </button>
         <nav className="tag-navigation" aria-label="Tags">
           {tagCounts.length === 0 ? (
             <p className="empty-tags">Schreibe #thema in eine Notiz. Deine Tags erscheinen hier.</p>
           ) : (
-            tagCounts.map(([t, count]) => (
+            tagCounts.slice(0, 5).map(([t, count]) => (
               <button
                 key={t}
                 className={`nav-item ${tag === t ? 'active' : ''}`}
@@ -358,9 +355,13 @@ function Notebook({
               e.target.value = '';
             }}
           />
-          <button className="nav-item" onClick={() => setSettings(true)}>
-            <Settings2 size={17} />
-            <span>Einstellungen</span>
+          <button
+            className="account-avatar"
+            aria-label="Einstellungen öffnen"
+            title={user?.email || 'Lokales Notizbuch'}
+            onClick={() => setSettings(true)}
+          >
+            {user?.email?.charAt(0).toUpperCase() || 'N'}
           </button>
           <button
             className={`sync-indicator ${syncState === 'error' ? 'sync-error' : ''}`}
@@ -622,6 +623,33 @@ function Notebook({
           </motion.div>
         )}
       </AnimatePresence>
+      {allTags && (
+        <Modal title="Deine Tags" onClose={() => toggleTags(false)}>
+          <div className="all-tags" style={{ viewTransitionName: 'tags-popout' }}>
+            {tagCounts.map(([name, count]) => (
+              <button
+                className="nav-item"
+                key={name}
+                onClick={() => {
+                  setTag(name);
+                  setView('all');
+                  setKnowledgeOpen(false);
+                  setTasksOpen(false);
+                  setSelected(null);
+                  setCreating(false);
+                  setAllTags(false);
+                  setSidebar(false);
+                }}
+              >
+                <Hash size={16} />
+                <span>{name}</span>
+                <span className="nav-count">{count}</span>
+              </button>
+            ))}
+            {!tagCounts.length && <p>Schreibe #thema in eine Notiz, um einen Tag anzulegen.</p>}
+          </div>
+        </Modal>
+      )}
       {settings && <Settings mode={mode} setMode={setMode} onClose={() => setSettings(false)} />}
       <IntelligenceWorker />
     </div>

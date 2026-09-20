@@ -13,14 +13,18 @@ beforeAll(() => {
   };
 });
 const semanticSearch = vi.hoisted(() => vi.fn());
+const ask = vi.hoisted(() => vi.fn());
+vi.mock('./components', () => ({ NoteMarkdown: ({ content }: { content: string }) => <p>{content}</p> }));
 vi.mock('./intelligence', () => ({
   config: () => ({ enabled: true }),
   eligible: () => true,
   semanticSearch,
+  ask,
 }));
 afterEach(() => {
   cleanup();
   semanticSearch.mockReset();
+  ask.mockReset();
 });
 it('adds semantic matches to the same search without duplicating direct matches', async () => {
   const direct = newNote('local', 'Medienraum');
@@ -89,4 +93,28 @@ it('focuses search, filters across notes, excludes trash and opens with Enter', 
   fireEvent.keyDown(field, { key: 'Enter' });
   expect(onSelect).toHaveBeenCalledWith(note.id);
   expect(onClose).toHaveBeenCalled();
+});
+
+it('uses Enter for semantic search when no direct note matches', async () => {
+  semanticSearch.mockResolvedValue([]);
+  render(
+    <FloatingSearch scope="local" open onOpen={vi.fn()} onClose={vi.fn()} onSelect={vi.fn()} notes={[]} />,
+  );
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Jugend' } });
+  fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+  await waitFor(() => expect(semanticSearch).toHaveBeenCalledWith('local', 'Jugend', []));
+});
+it('answers questions on Enter without navigating away', async () => {
+  ask.mockResolvedValue({ answer: 'Deine letzte Aufgabe stammt von heute.', citations: [], sources: [] });
+  const select = vi.fn();
+  render(
+    <FloatingSearch scope="local" open onOpen={vi.fn()} onClose={vi.fn()} onSelect={select} notes={[]} />,
+  );
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'Wann habe ich meine letzte Aufgabe angelegt?' },
+  });
+  fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+  await screen.findByText('Deine letzte Aufgabe stammt von heute.');
+  expect(select).not.toHaveBeenCalled();
+  expect(semanticSearch).not.toHaveBeenCalled();
 });

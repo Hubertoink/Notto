@@ -93,7 +93,11 @@ export function Settings({
     await sync();
   }
   return (
-    <Modal title="Einstellungen" onClose={onClose} width={640}>
+    <Modal
+      title={user?.email ? `Einstellungen · ${user.email}` : 'Einstellungen · Lokales Notizbuch'}
+      onClose={onClose}
+      width={640}
+    >
       <section className="settings-section">
         <h3>Darstellung</h3>
         <div className="segmented" aria-label="Farbschema">

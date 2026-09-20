@@ -245,10 +245,12 @@ it('waits for an image to finish persisting before allowing the note to be saved
   );
   const input = view.container.querySelector('input[type="file"]') as HTMLInputElement;
   await user.upload(input, new File(['image'], 'bild.png', { type: 'image/png' }));
-  expect((screen.getByRole('button', { name: 'Festhalten' }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole('button', { name: 'Festhalten' }).getAttribute('aria-disabled')).toBe('true');
+  await user.click(screen.getByRole('button', { name: 'Festhalten' }));
+  expect(saved).not.toHaveBeenCalled();
   finish('![Bild](attachments/abc-123.png)');
   await waitFor(() =>
-    expect((screen.getByRole('button', { name: 'Festhalten' }) as HTMLButtonElement).disabled).toBe(false),
+    expect(screen.getByRole('button', { name: 'Festhalten' }).getAttribute('aria-disabled')).not.toBe('true'),
   );
   await user.click(screen.getByRole('button', { name: 'Festhalten' }));
   await waitFor(() => expect(saved).toHaveBeenCalledOnce());

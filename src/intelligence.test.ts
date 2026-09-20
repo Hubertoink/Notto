@@ -137,7 +137,7 @@ it('preserves user correction and completion across re-analysis', async () => {
 it('never sends excluded or deleted notes', async () => {
   const note = newNote('local', `#privat ${item.quote}`);
   expect(eligible(note)).toBe(false);
-  await expect(analyze(note)).rejects.toThrow('ausgeschlossen');
+  await expect(analyze(note)).rejects.toThrow('Tag #privat');
   expect(api).not.toHaveBeenCalled();
   expect(eligible({ ...note, content: 'normal', deleted: true })).toBe(false);
 });

@@ -4,6 +4,7 @@ import { Dialog } from '@astryxdesign/core/Dialog';
 import { X, ImageOff } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { invoke } from '@tauri-apps/api/core';
 import { fetchAttachment } from './cloud';
 import { desktop } from './repository';
@@ -150,7 +151,7 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
   return (
     <div className="markdown">
       <Markdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         components={{
           img: ({ src, alt }) => <NoteImage src={src} alt={alt} scope={scope} />,
           a: ({ href, children }) =>

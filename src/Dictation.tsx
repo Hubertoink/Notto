@@ -18,7 +18,10 @@ function RecordingWaveform({ stream }: { stream: MediaStream }) {
       source = context.createMediaStreamSource(stream);
       source.connect(analyser);
       void context.resume().catch(() => undefined);
-      const samples = new Uint8Array(analyser.fftSize);
+      const samples = new Uint8Array(analyser.frequencyBinCount);
+      const levels = new Float32Array(16);
+      analyser.smoothingTimeConstant = 0.75;
+      const binHz = context.sampleRate / analyser.fftSize;
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       let last = 0;
       const draw = (time: number) => {
@@ -28,19 +31,34 @@ function RecordingWaveform({ stream }: { stream: MediaStream }) {
         const element = canvas.current;
         const pen = element?.getContext('2d');
         if (!element || !pen) return;
-        analyser.getByteTimeDomainData(samples);
+        analyser.getByteFrequencyData(samples);
         const { width, height } = element;
         pen.clearRect(0, 0, width, height);
-        pen.strokeStyle = getComputedStyle(element).color;
-        pen.lineWidth = 2;
-        pen.beginPath();
-        samples.forEach((value, index) => {
-          const x = (index / (samples.length - 1)) * width;
-          const y = height / 2 + ((value - 128) / 128) * height * 0.46;
-          if (index === 0) pen.moveTo(x, y);
-          else pen.lineTo(x, y);
+        pen.fillStyle = getComputedStyle(element).color;
+        const slot = width / levels.length;
+        const barWidth = slot * 0.55;
+        levels.forEach((previous, index) => {
+          // Logarithmic bands keep the speech range spread across all 16 bars.
+          const start = Math.max(1, Math.floor((80 * 100 ** (index / 16)) / binHz));
+          const end = Math.min(
+            samples.length,
+            Math.max(start + 1, Math.ceil((80 * 100 ** ((index + 1) / 16)) / binHz)),
+          );
+          let sum = 0;
+          for (let bin = start; bin < end; bin++) sum += samples[bin] ** 2;
+          const level = Math.sqrt(sum / Math.max(1, end - start)) / 255;
+          levels[index] = previous + (level - previous) * (level > previous ? 0.65 : 0.25);
+          const barHeight = Math.max(6, levels[index] * height * 0.9);
+          pen.beginPath();
+          pen.roundRect(
+            index * slot + (slot - barWidth) / 2,
+            (height - barHeight) / 2,
+            barWidth,
+            barHeight,
+            Math.min(barWidth / 2, barHeight / 2),
+          );
+          pen.fill();
         });
-        pen.stroke();
       };
       frame = requestAnimationFrame(draw);
     } catch {

@@ -228,7 +228,10 @@ export function NoteAnnotations({
             style={{ overflow: 'hidden' }}
           >
             <div className="annotation-panel">
-              <p className="muted">KI-Vorschläge · separat vom Original gespeichert.</p>
+              <div className="annotation-label">
+                <Sparkles size={14} aria-hidden="true" />
+                <span>KI-Vorschläge · separat vom Original gespeichert.</span>
+              </div>
               <p className="muted annotation-update">
                 {analysis && !currentContent(note, analysis.revision)
                   ? 'Die Anmerkungen beziehen sich auf eine frühere Textversion. '

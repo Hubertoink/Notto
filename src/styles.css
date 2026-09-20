@@ -1960,3 +1960,15 @@ button.tags-heading {
     min-height: 40px;
   }
 }
+.annotation-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--nt-muted);
+}
+.conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}

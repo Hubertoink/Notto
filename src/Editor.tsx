@@ -375,7 +375,7 @@ export function Editor({
     )
       change(textRef.current);
   }, [note?.revision, change]);
-  async function save(asCopy = false) {
+  async function save(asCopy = false, overwrite = false) {
     if (saving || imageOperations.current > 0 || !ready || !content.trim()) return;
     setSaving(true);
     setError('');
@@ -384,7 +384,7 @@ export function Editor({
       let saved: Note;
       if (note && !asCopy) {
         const current = await repo.get(scope, note.id);
-        if (!current || current.revision !== base.current)
+        if (!current || (!overwrite && current.revision !== base.current))
           throw new Error(
             'Es gibt eine neuere Fassung. Dein Text ist als Entwurf gesichert. Speichere ihn als neue Notiz, um beide zu behalten.',
           );
@@ -814,9 +814,14 @@ export function Editor({
           <div className="inline-error" role="alert">
             {error}
             {note && (
-              <button className="text-button" onClick={() => void save(true)}>
-                Als neue Notiz sichern
-              </button>
+              <div className="conflict-actions">
+                <button className="text-button" onClick={() => void save(false, true)}>
+                  Als aktuelle Version übernehmen
+                </button>
+                <button className="text-button" onClick={() => void save(true)}>
+                  Als neue Notiz sichern
+                </button>
+              </div>
             )}
           </div>
         )}

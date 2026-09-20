@@ -155,3 +155,34 @@
 .research-text {
   white-space: pre-wrap;
 }
+
+/* Base this on the room left for the note, not the whole window. */
+@container note-detail (min-width: 1000px) {
+  .editor.editor-with-annotations {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    column-gap: 28px;
+    align-content: start;
+    max-width: 1440px;
+    width: 100%;
+    flex: 1 0 auto;
+  }
+  .editor-with-annotations > * {
+    grid-column: 1;
+    min-width: 0;
+  }
+  .editor-with-annotations > .note-annotations {
+    grid-column: 2;
+    grid-row: 1 / span 30;
+    align-self: start;
+    position: sticky;
+    top: 20px;
+    margin: 0;
+    width: 100% !important;
+  }
+  .editor-with-annotations .annotation-panel {
+    max-height: calc(100dvh - 220px);
+    min-height: 180px;
+    overscroll-behavior: contain;
+  }
+}

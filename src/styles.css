@@ -471,6 +471,8 @@ textarea:focus-visible {
   font-weight: 500;
 }
 .detail-panel {
+  container-type: inline-size;
+  container-name: note-detail;
   min-height: 0;
   flex: 1;
   min-width: 0;

@@ -464,7 +464,7 @@ export function Editor({
   const incoming = note ? backlinks(note, notes || []) : [];
   return (
     <section
-      className={`editor ${compact ? 'editor-compact' : ''} ${preview ? 'editor-reading' : ''}`}
+      className={`editor ${compact ? 'editor-compact' : ''} ${preview ? 'editor-reading' : ''} ${note && !compact ? 'editor-with-annotations' : ''}`}
       aria-label={note ? 'Notiz bearbeiten' : 'Neue Notiz'}
     >
       <div className="editor-top">

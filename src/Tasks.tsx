@@ -133,9 +133,18 @@ export function NoteAnnotations({
 }) {
   const records = useKnowledgeRecords(note.scope);
   const [open, setOpen] = useState(false);
+  const [docked, setDocked] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const panel = trigger.current?.closest('.detail-panel');
+    if (!panel || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setDocked(entry.contentRect.width >= 1000));
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, []);
+  const expanded = open || docked;
   const reduced = useReducedMotion();
   const refresh = async () => {
     if (updating || hasUnsavedChanges) return;
@@ -166,22 +175,24 @@ export function NoteAnnotations({
     <motion.div
       layout={!reduced}
       transition={{ type: 'spring', stiffness: 360, damping: 34 }}
-      className={`note-annotations annotation-shell ${open ? 'annotation-open' : ''}`}
-      style={{ width: open ? '100%' : 'fit-content' }}
+      className={`note-annotations annotation-shell ${expanded ? 'annotation-open' : ''}`}
+      style={{ width: expanded ? '100%' : 'fit-content' }}
     >
       <div className="annotation-heading">
         <button
           ref={trigger}
           className={`annotation-toggle ${items.length || research.length ? 'has-annotations' : ''}`}
-          aria-expanded={open}
-          onClick={() => setOpen(!open)}
+          aria-expanded={expanded}
+          onClick={() => {
+            if (!docked) setOpen(!open);
+          }}
           title="KI-Anmerkungen direkt in der Notiz anzeigen"
         >
           <Sparkles size={17} />
           <span>KI-Anmerkungen</span>
           <span>{items.length + uniqueResearch.length || ''}</span>
         </button>
-        {open && (
+        {open && !docked && (
           <button
             className="annotation-close icon-button"
             aria-label="Anmerkungen schließen"
@@ -195,7 +206,7 @@ export function NoteAnnotations({
         )}
       </div>
       <AnimatePresence initial={false}>
-        {open && (
+        {expanded && (
           <motion.div
             key="contents"
             initial={{ height: 0, opacity: 0 }}

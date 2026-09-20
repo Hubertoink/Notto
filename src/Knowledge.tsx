@@ -1,4 +1,5 @@
 import { AttachmentTitle } from './AttachmentTitle';
+import { AIActivity, type BackgroundJob } from './AIActivity';
 import { Topics } from './Topics';
 import { Organization } from './Organization';
 import { MemorySettings } from './Memory';
@@ -164,11 +165,16 @@ export function IntelligenceWorker() {
 
 export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen: (id: string) => void }) {
   const { scope, notes } = useNotto();
-  const [serverJobs, setServerJobs] = useState<{ id: string; status: string; error: string | null }[]>([]);
+  const [serverJobs, setServerJobs] = useState<BackgroundJob[]>([]);
+  const [jobsLoaded, setJobsLoaded] = useState(false);
+  const [jobsError, setJobsError] = useState('');
   const [serverKeyReady, setServerKeyReady] = useState<boolean | null>(null);
   useEffect(() => {
     if (!active || scope === 'local' || !ownBackend()) return;
     let current = true;
+    setServerJobs([]);
+    setJobsLoaded(false);
+    setJobsError('');
     const refresh = async () => {
       try {
         const [status, jobs] = await Promise.all([
@@ -178,8 +184,12 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
         if (current) {
           setServerKeyReady(status.configured);
           setServerJobs(jobs.jobs);
+          setJobsLoaded(true);
+          setJobsError('');
         }
-      } catch {}
+      } catch (error) {
+        if (current) setJobsError(error instanceof Error ? error.message : String(error));
+      }
     };
     void refresh();
     const timer = setInterval(() => void refresh(), 10000);
@@ -663,25 +673,15 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
         </section>
       ) : tab === 'overview' ? (
         <section className="knowledge-section">
-          {serverJobs.some(
-            (j) => j.status === 'pending' || j.status === 'running' || j.status === 'failed',
-          ) && (
-            <div className="knowledge-card">
-              <h3>Hintergrundaufträge auf deinem Server</h3>
-              {serverJobs
-                .filter((j) => ['pending', 'running', 'failed'].includes(j.status))
-                .slice(0, 5)
-                .map((j) => (
-                  <p key={j.id}>
-                    {j.status === 'running'
-                      ? 'Analyse läuft'
-                      : j.status === 'pending'
-                        ? 'Wartet auf Verarbeitung'
-                        : 'Analyse fehlgeschlagen'}
-                    {j.error ? ` · ${j.error}` : ''}
-                  </p>
-                ))}
-            </div>
+          {scope !== 'local' && ownBackend() && (
+            <AIActivity
+              jobs={serverJobs}
+              notes={notes}
+              loaded={jobsLoaded}
+              error={jobsError}
+              busy={busy}
+              onOpen={onOpen}
+            />
           )}
           <div className="knowledge-summary">
             <h3>

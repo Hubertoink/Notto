@@ -106,7 +106,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '0.13.2' };
+    return { ok: true, version: '0.13.3' };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (
@@ -364,7 +364,7 @@ export async function buildApp(db: Database, env: Environment) {
   app.get('/api/ai/jobs', async (req) => ({
     jobs: (
       await db.query(
-        'SELECT id,note_id,kind,status,error,created_at FROM jobs WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50',
+        "SELECT id,note_id,revision,kind,status,error,created_at,available_at FROM jobs WHERE user_id=$1 AND (status IN ('pending','running') OR id IN (SELECT id FROM jobs WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50)) ORDER BY created_at DESC",
         [req.nottoUser!.id],
       )
     ).rows,

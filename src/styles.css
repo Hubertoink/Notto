@@ -1972,3 +1972,46 @@ button.tags-heading {
   gap: 12px;
   margin-top: 8px;
 }
+.ai-activity {
+  margin-bottom: 28px;
+  padding: 18px 20px;
+  border: 1px solid var(--nt-line);
+  border-radius: 12px;
+}
+.ai-activity-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ai-activity-heading > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ai-activity-heading p {
+  margin: 5px 0 0;
+  color: var(--nt-muted);
+}
+.ai-activity-errors {
+  margin-top: 16px;
+  border-top: 1px solid var(--nt-line);
+  padding-top: 12px;
+}
+.ai-activity summary {
+  cursor: pointer;
+}
+.ai-activity-job {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  border-top: 1px solid var(--nt-line);
+  padding: 14px 0;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.ai-activity-job p {
+  margin: 0;
+}
+.ai-activity-job small {
+  color: var(--nt-muted);
+}

@@ -5,12 +5,12 @@ import { useKnowledgeRecords } from './Tasks';
 import { memoryState, memoryUsable, type Memory } from './memory-policy';
 import { saveMemory, suggestMemory } from './memory-client';
 import { config, eligible, knowledge } from './intelligence';
-import { titleOf } from './domain';
+import { contentRevision, titleOf } from './domain';
 import { Action, Modal } from './components';
 import './memory.css';
 
 const categories = {
-  fact: 'Über mich',
+  fact: 'Projektwissen & Kontext',
   instruction: 'So soll Noto arbeiten',
   preference: 'Das hat Noto gelernt',
 };
@@ -25,6 +25,10 @@ export function MemorySettings() {
   const [reviewOnly, setReviewOnly] = useState(false);
   const [editing, setEditing] = useState<Memory | null>(null);
   const [text, setText] = useState('');
+  const [project, setProject] = useState('');
+  const [validUntil, setValidUntil] = useState('');
+  const [ownStatement, setOwnStatement] = useState(false);
+  const [supersedes, setSupersedes] = useState<string[]>([]);
   const [selectedNote, setSelectedNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -64,20 +68,29 @@ export function MemorySettings() {
   const sourcesNow = (entry: Memory) =>
     entry.sources.map((source) => {
       const note = notes.find((n) => n.id === source.noteId);
+      if (!note || !eligible(note) || (source.quote && !note.content.includes(source.quote)))
+        throw new Error(
+          'Der bisherige Beleg fehlt. Prüfe die Quelle erneut oder bestätige den Text ausdrücklich als eigene Angabe.',
+        );
       return {
         ...source,
-        revision: note?.revision ?? source.revision,
-        quote: note?.content.includes(source.quote ?? '') ? source.quote : undefined,
+        revision: contentRevision(note),
       };
     });
-  const usable = (entry: Memory) => memoryUsable(entry, notes, config(scope), scope);
-  const needsReview = (entry: Memory) => entry.status === 'suggested' || !usable(entry);
+  const usable = (entry: Memory) =>
+    !state.superseded.includes(entry.key) && memoryUsable(entry, notes, config(scope), scope);
+  const needsReview = (entry: Memory) =>
+    !state.superseded.includes(entry.key) && (entry.status === 'suggested' || !usable(entry));
   const available = state.entries.filter((e) => e.status === 'active' && usable(e));
   const pending = state.entries.filter(needsReview).length;
   const openEditor = (category: keyof typeof categories, entry: Memory | null = null) => {
     setTab(category);
     setEditing(entry);
     setText(entry?.text ?? '');
+    setProject(entry?.project ?? '');
+    setValidUntil(entry?.validUntil?.slice(0, 10) ?? '');
+    setOwnStatement(false);
+    setSupersedes(entry?.supersedes ?? []);
     setEditorOpen(true);
   };
   return (
@@ -192,13 +205,17 @@ export function MemorySettings() {
                   <article className="memory-card" key={entry.key}>
                     <div className="memory-card-top">
                       <span className={`memory-entry-status ${needsReview(entry) ? 'needs-review' : ''}`}>
-                        {!usable(entry)
-                          ? 'Quelle prüfen'
-                          : entry.status === 'suggested'
-                            ? 'Vorschlag'
-                            : state.enabled
-                              ? 'Aktiv'
-                              : 'Pausiert'}
+                        {state.superseded.includes(entry.key)
+                          ? 'Ersetzt'
+                          : entry.validUntil && Date.parse(entry.validUntil) <= Date.now()
+                            ? 'Abgelaufen'
+                            : !usable(entry)
+                              ? 'Quelle prüfen'
+                              : entry.status === 'suggested'
+                                ? 'Vorschlag'
+                                : state.enabled
+                                  ? 'Aktiv'
+                                  : 'Pausiert'}
                       </span>
                       <button
                         className="memory-edit"
@@ -211,6 +228,13 @@ export function MemorySettings() {
                       </button>
                     </div>
                     <p>{entry.text}</p>
+                    {entry.project && <small className="muted">Projekt: {entry.project}</small>}
+                    {entry.validUntil && (
+                      <small className="muted">
+                        {' '}
+                        · Gültig bis {new Date(entry.validUntil).toLocaleDateString('de')}
+                      </small>
+                    )}
                     {entry.status === 'suggested' && usable(entry) && (
                       <button
                         className="memory-add"
@@ -223,8 +247,8 @@ export function MemorySettings() {
                     )}
                     {!usable(entry) && (
                       <small className="muted">
-                        Die Quelle wurde geändert oder ist nicht freigegeben. Dieser Eintrag wird nicht
-                        verwendet.
+                        Dieser Eintrag wird nicht verwendet: Er wurde ersetzt, ist abgelaufen oder seine
+                        Quelle muss erneut geprüft werden.
                       </small>
                     )}
                     <details>
@@ -241,6 +265,17 @@ export function MemorySettings() {
                       ) : (
                         <p className="muted">Von dir eingetragen.</p>
                       )}
+                      <button
+                        className="text-button"
+                        disabled={busy}
+                        onClick={() => {
+                          openEditor(category);
+                          setProject(entry.project ?? '');
+                          setSupersedes([entry.key]);
+                        }}
+                      >
+                        Durch neue Information ersetzen
+                      </button>
                       <button
                         className="text-button"
                         disabled={busy}
@@ -328,7 +363,10 @@ export function MemorySettings() {
                   category: tab,
                   text: text.trim(),
                   status: 'active',
-                  sources: editing ? sourcesNow(editing) : [],
+                  sources: editing && !ownStatement ? sourcesNow(editing) : [],
+                  project: project.trim() || undefined,
+                  validUntil: validUntil ? `${validUntil}T23:59:59.999Z` : undefined,
+                  supersedes,
                 });
                 setEditing(null);
                 setText('');
@@ -354,6 +392,27 @@ export function MemorySettings() {
                 }
               />
             </label>
+            <label>
+              Projekt oder Themenbereich (optional)
+              <input value={project} maxLength={120} onChange={(event) => setProject(event.target.value)} />
+            </label>
+            <label>
+              Gültig bis (optional)
+              <input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />
+            </label>
+            {!!editing?.sources.length && (
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={ownStatement}
+                  onChange={(event) => setOwnStatement(event.target.checked)}
+                />
+                Als eigene Angabe bestätigen und vom bisherigen Quellenbeleg lösen
+              </label>
+            )}
+            {supersedes.length > 0 && (
+              <p className="muted">Dieser Eintrag ersetzt die bisherige Information im KI-Kontext.</p>
+            )}
             <div className="settings-actions">
               <button className="memory-save" type="submit" disabled={busy || !text.trim()}>
                 {editing ? 'Änderungen speichern' : 'Eintrag speichern'}

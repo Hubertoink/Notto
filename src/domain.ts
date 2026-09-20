@@ -17,9 +17,11 @@ export interface Note {
   archived: boolean;
   deleted: boolean;
   conflictOf?: string;
+  collections?: string[];
   history: Revision[];
 }
 export interface Draft {
+  collections?: string[];
   key: string;
   scope: Scope;
   noteId: string | null;
@@ -33,6 +35,21 @@ export interface Attachment {
   name: string;
   mime: string;
   bytes: Uint8Array;
+}
+// Sync revisions also change for pinning/collections. Knowledge refers to text revisions.
+export function contentRevision(note: Pick<Note, 'revision' | 'content'> & Partial<Pick<Note, 'history'>>) {
+  const last = note.history?.at(-1);
+  return last?.content === note.content ? last.revision : note.revision;
+}
+export function currentContent(
+  note: Pick<Note, 'revision' | 'content'> & Partial<Pick<Note, 'history'>>,
+  revision: string,
+) {
+  return (
+    note.revision === revision ||
+    contentRevision(note) === revision ||
+    !!note.history?.some((entry) => entry.revision === revision && entry.content === note.content)
+  );
 }
 export const LOCAL_SCOPE = 'local';
 export const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
@@ -60,6 +77,8 @@ export function titleOf(content: string): string {
       .map((s) =>
         s
           .replace(/^#{1,6}\s+/, '')
+          .replace(/\[((?:\\.|[^\]\\])*)\]\([^)]*\)/g, '$1')
+          .replace(/(\*\*|__|~~|`)/g, '')
           .replace(/(?:^|\s)#[\p{L}\p{N}_/-]+/gu, ' ')
           .trim(),
       )
@@ -95,7 +114,7 @@ export function newNote(scope: Scope, content: string, now = new Date().toISOStr
 }
 export function reviseNote(
   note: Note,
-  patch: Partial<Pick<Note, 'content' | 'pinned' | 'archived' | 'deleted'>>,
+  patch: Partial<Pick<Note, 'content' | 'pinned' | 'archived' | 'deleted' | 'collections'>>,
   now = new Date().toISOString(),
 ): Note {
   const revision = crypto.randomUUID();
@@ -132,7 +151,7 @@ export function allAttachmentIds(note: Note): string[] {
   return [...new Set([note.content, ...note.history.map((r) => r.content)].flatMap(attachmentIds))];
 }
 export function markdownFile(note: Note): string {
-  return `---\nnotto_id: ${note.id}\ncreated: ${note.createdAt}\nupdated: ${note.updatedAt}\ntags: ${JSON.stringify(tagsOf(note.content))}\npinned: ${note.pinned}\narchived: ${note.archived}\n---\n\n${note.content}`;
+  return `---\nnotto_id: ${note.id}\ncreated: ${note.createdAt}\nupdated: ${note.updatedAt}\ncollections: ${JSON.stringify(note.collections || [])}\ntags: ${JSON.stringify(tagsOf(note.content))}\npinned: ${note.pinned}\narchived: ${note.archived}\n---\n\n${note.content}`;
 }
 export function importedMarkdown(text: string): string {
   if (!/^---\r?\nnotto_id: /.test(text)) return text;
@@ -157,6 +176,10 @@ export function validNote(value: unknown): value is Note {
     typeof n.pinned === 'boolean' &&
     typeof n.archived === 'boolean' &&
     typeof n.deleted === 'boolean' &&
+    (n.collections === undefined ||
+      (Array.isArray(n.collections) &&
+        n.collections.length <= 30 &&
+        n.collections.every((c) => typeof c === 'string' && c.trim().length > 0 && c.length <= 60))) &&
     Array.isArray(n.history) &&
     n.history.length > 0 &&
     n.history.every(

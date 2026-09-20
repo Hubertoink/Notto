@@ -10,6 +10,40 @@ import { desktop } from './repository';
 import { useNotto } from './state';
 import { PdfAttachment } from './PdfAttachment';
 import { uniqueSources } from './knowledge-policy';
+import { titleOf } from './domain';
+
+export function NoteReferenceLink({
+  id,
+  scope,
+  fallback,
+}: {
+  id: string;
+  scope: string;
+  fallback?: ReactNode;
+}) {
+  const { notes = [], notify } = useNotto();
+  const note = notes.find((n) => n.id === id && n.scope === scope && !n.deleted);
+  if (!note)
+    return (
+      <span className="note-reference missing" title="Notiz gelöscht oder nicht verfügbar">
+        {fallback || 'Nicht verfügbare Notiz'}
+      </span>
+    );
+  return (
+    <a
+      className="note-reference"
+      href={`#note-${id}`}
+      onClick={(e) => {
+        e.preventDefault();
+        if (desktop && new URLSearchParams(location.search).get('window') === 'widget') {
+          void invoke('open_main', { noteId: id }).catch((e) => notify(String(e)));
+        } else window.dispatchEvent(new CustomEvent('notto-open-note', { detail: { id, scope } }));
+      }}
+    >
+      ↗ {titleOf(note.content)}
+    </a>
+  );
+}
 
 export function WebLink({ href, children }: { href?: string; children: ReactNode }) {
   const { notify } = useNotto();
@@ -120,7 +154,9 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
         components={{
           img: ({ src, alt }) => <NoteImage src={src} alt={alt} scope={scope} />,
           a: ({ href, children }) =>
-            /^attachments\/[a-f0-9-]+\.pdf$/.test(href || '') ? (
+            /^notes\/[a-f0-9-]{36}$/.test(href || '') ? (
+              <NoteReferenceLink scope={scope} id={href!.slice(6)} fallback={children} />
+            ) : /^attachments\/[a-f0-9-]+\.pdf$/.test(href || '') ? (
               <PdfAttachment scope={scope} id={href!.slice(12)}>
                 {children}
               </PdfAttachment>

@@ -4,10 +4,12 @@ import { z } from 'zod';
 import { limit, type Database } from './database.js';
 import { availableModels } from './models.js';
 import { analysisModel } from '../src/ai-models.js';
+import { permittedTools } from '../src/agent-policy.js';
 export interface AIEnvironment {
   openaiKey?: string;
   models: string[];
   dailyLimit: number;
+  dataDir?: string;
 }
 export async function openai(
   db: Database,
@@ -22,6 +24,10 @@ export async function openai(
     throw Object.assign(new Error('Ungültige KI-Funktion'), { statusCode: 400 });
   let payload: BodyInit;
   const headers: Record<string, string> = { Authorization: `Bearer ${env.openaiKey}` };
+  const preferences = await db.query('SELECT document FROM ai_settings WHERE user_id=$1', [userId]);
+  const settings = preferences.rows[0]?.document ?? { excludedNotes: [], excludedTags: '' };
+  if (settings.enabled === false)
+    throw Object.assign(new Error('KI wurde für dieses Notizbuch ausgeschaltet.'), { statusCode: 403 });
   if (endpoint === 'audio/transcriptions') {
     const audio = z
         .string()
@@ -48,37 +54,44 @@ export async function openai(
     if (!body.input) throw Object.assign(new Error('KI-Eingabe fehlt'), { statusCode: 400 });
     const clean: Record<string, unknown> = { model, input: body.input };
     if (endpoint === 'responses') {
-      const [memories, notes, preferences] = await Promise.all([
-        db.query(
-          "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'kind' IN ('memory','decision','analysis')",
-          [userId],
-        ),
-        db.query('SELECT document FROM notes WHERE user_id=$1', [userId]),
-        db.query('SELECT document FROM ai_settings WHERE user_id=$1', [userId]),
-      ]);
-      const settings = preferences.rows[0]?.document ?? { excludedNotes: [], excludedTags: '' };
-      const context = memoryContext(
-        memories.rows.map((r) => r.document),
-        notes.rows.map((r) => ({ ...r.document, scope: userId })),
-        settings,
-        userId,
-        body.input,
-      );
+      const tools = permittedTools(body.tools);
+      const web = tools.some((tool) => tool.type === 'web_search');
+      const [memories, notes] =
+        body.memory === false
+          ? [{ rows: [] }, { rows: [] }]
+          : await Promise.all([
+              db.query(
+                "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'kind' IN ('memory','decision','analysis')",
+                [userId],
+              ),
+              db.query('SELECT document FROM notes WHERE user_id=$1', [userId]),
+            ]);
+      const context =
+        body.memory === false
+          ? ''
+          : memoryContext(
+              memories.rows.map((r) => r.document),
+              notes.rows.map((r) => ({ ...r.document, scope: userId })),
+              settings,
+              userId,
+              body.memoryQuery ?? body.input,
+            );
       Object.assign(clean, {
         store: false,
         instructions: `${knowledgeRole}\n${body.instructions ?? ''}${context}`,
         text: body.text,
         max_output_tokens: 4000,
         max_tool_calls: 2,
-        ...(Array.isArray(body.tools) && body.tools.length
-          ? { tools: [{ type: 'web_search' }], include: ['web_search_call.action.sources'] }
-          : {}),
+        ...(tools.length ? { tools, parallel_tool_calls: false } : {}),
+        include: web ? ['web_search_call.action.sources'] : ['reasoning.encrypted_content'],
       });
     } else clean.encoding_format = 'float';
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(clean);
   }
-  await limit(db, `ai:${userId}`, env.dailyLimit, 86400);
+  const personalLimit =
+    Number.isInteger(settings.dailyLimit) && settings.dailyLimit > 0 ? settings.dailyLimit : env.dailyLimit;
+  await limit(db, `ai:${userId}`, Math.min(env.dailyLimit, personalLimit), 86400);
   const response = await fetch(`https://api.openai.com/v1/${endpoint}`, {
     method: 'POST',
     headers,

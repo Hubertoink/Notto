@@ -9,6 +9,7 @@ import { buildApp } from './app';
 import type { Database } from './database';
 import { digest } from './security';
 import { newNote, reviseNote } from '../src/domain';
+import { notebookTools } from '../src/agent-tools';
 const pg = new PGlite();
 const origin = 'http://localhost:3000';
 let app: Awaited<ReturnType<typeof buildApp>>, dir: string;
@@ -23,6 +24,150 @@ const headers = (secret?: string) => ({
   origin,
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
+});
+it('enforces the saved account quota for worker and interactive requests and preserves notebook tools', async () => {
+  await pg.query('DELETE FROM rate_limits WHERE key=$1', [`ai:${alice}`]);
+  await pg.query(
+    'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
+    [
+      alice,
+      JSON.stringify({
+        enabled: true,
+        auto: true,
+        autoResearch: false,
+        model: 'gpt-4.1-mini',
+        excludedNotes: [],
+        excludedTags: '',
+        dailyLimit: 1,
+      }),
+    ],
+  );
+  const fetch = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(async () => new Response(JSON.stringify({ output: [] })));
+  try {
+    const environment = { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 };
+    await openai(
+      adapter,
+      alice,
+      'responses',
+      { model: 'gpt-4.1-mini', input: 'Atlas', tools: notebookTools },
+      environment,
+    );
+    const body = JSON.parse(String(fetch.mock.calls[0][1]?.body));
+    expect(body.tools).toEqual(notebookTools);
+    expect(body.include).toContain('reasoning.encrypted_content');
+    await expect(
+      openai(adapter, alice, 'responses', { model: 'gpt-4.1-mini', input: 'Noch einmal' }, environment),
+    ).rejects.toMatchObject({ statusCode: 429 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally {
+    fetch.mockRestore();
+    await pg.query('DELETE FROM rate_limits WHERE key=$1', [`ai:${alice}`]);
+  }
+});
+it('discards a worker result when a note is excluded during the request', async () => {
+  await pg.exec('DELETE FROM jobs');
+  const note = newNote(alice, 'Atlas: vier PCs einrichten');
+  const settings = {
+    enabled: true,
+    auto: true,
+    autoResearch: false,
+    model: 'gpt-4.1-mini',
+    excludedNotes: [] as string[],
+    excludedTags: '',
+    dailyLimit: 100,
+  };
+  await pg.query(
+    'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
+    [alice, JSON.stringify(settings)],
+  );
+  await app.inject({
+    method: 'POST',
+    url: '/api/notes/push',
+    headers: headers(aToken),
+    payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
+  });
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+    await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+      alice,
+      JSON.stringify({ ...settings, excludedNotes: [note.id] }),
+    ]);
+    return new Response(
+      JSON.stringify({
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  suggestions: [
+                    { kind: 'task', title: 'PCs einrichten', detail: 'Vier', quote: note.content },
+                  ],
+                }),
+              },
+            ],
+          },
+        ],
+      }),
+    );
+  });
+  try {
+    await workOnce(adapter, { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 });
+    expect(fetch).toHaveBeenCalledOnce();
+    const saved = await pg.query(
+      "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'noteId'=$2 AND document->>'kind'='analysis'",
+      [alice, note.id],
+    );
+    expect(saved.rows).toHaveLength(0);
+  } finally {
+    fetch.mockRestore();
+    await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+  }
+});
+it('defers quota-limited jobs until the next day without exhausting attempts', async () => {
+  await pg.exec('DELETE FROM jobs');
+  const note = newNote(alice, 'Atlas: vier PCs einrichten');
+  await pg.query(
+    'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
+    [
+      alice,
+      JSON.stringify({
+        enabled: true,
+        auto: true,
+        autoResearch: false,
+        model: 'gpt-4.1-mini',
+        excludedNotes: [],
+        excludedTags: '',
+        dailyLimit: 1,
+      }),
+    ],
+  );
+  await pg.query(
+    'INSERT INTO rate_limits(key,bucket,count) VALUES($1,$2,1) ON CONFLICT(key,bucket) DO UPDATE SET count=1',
+    [`ai:${alice}`, Math.floor(Date.now() / 86400000)],
+  );
+  await app.inject({
+    method: 'POST',
+    url: '/api/notes/push',
+    headers: headers(aToken),
+    payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
+  });
+  const fetch = vi.spyOn(globalThis, 'fetch');
+  try {
+    await workOnce(adapter, { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 });
+    const job = (await pg.query('SELECT status,attempts,available_at FROM jobs WHERE note_id=$1', [note.id]))
+      .rows[0] as any;
+    expect(job.status).toBe('pending');
+    expect(job.attempts).toBe(0);
+    expect(new Date(job.available_at).getTime()).toBeGreaterThan(Date.now());
+    expect(fetch).not.toHaveBeenCalled();
+  } finally {
+    fetch.mockRestore();
+    await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+    await pg.query('DELETE FROM rate_limits WHERE key=$1', [`ai:${alice}`]);
+  }
 });
 it('allows desktop attachment upload preflight including PUT', async () => {
   for (const origin of ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost']) {
@@ -339,4 +484,32 @@ it('rejects foreign knowledge and cross-origin writes and revokes sessions on lo
       .statusCode,
   ).toBe(200);
   expect((await app.inject({ url: '/api/notes', headers: headers(bToken) })).statusCode).toBe(401);
+});
+
+it('syncs empty collections and rejects invalid collection names', async () => {
+  const record = {
+    id: crypto.randomUUID(),
+    noteId: crypto.randomUUID(),
+    revision: crypto.randomUUID(),
+    scope: alice,
+    at: new Date().toISOString(),
+    kind: 'collection',
+    data: { name: 'Jugendhaus' },
+  };
+  const saved = await app.inject({
+    method: 'POST',
+    url: '/api/knowledge',
+    headers: headers(aToken),
+    payload: [record],
+  });
+  expect(saved.statusCode).toBe(200);
+  const list = await app.inject({ method: 'GET', url: '/api/knowledge', headers: headers(aToken) });
+  expect(list.json().data.some((r: any) => r.document.id === record.id)).toBe(true);
+  const bad = await app.inject({
+    method: 'POST',
+    url: '/api/knowledge',
+    headers: headers(aToken),
+    payload: [{ ...record, id: crypto.randomUUID(), data: { name: ' ' } }],
+  });
+  expect(bad.statusCode).toBe(400);
 });

@@ -1,5 +1,6 @@
 import { AttachmentTitle } from './AttachmentTitle';
 import { Topics } from './Topics';
+import { Organization } from './Organization';
 import { MemorySettings } from './Memory';
 import { Sources } from './components';
 import { useEffect, useRef, useState } from 'react';
@@ -20,6 +21,7 @@ import {
   extract,
   knowledge,
   latest,
+  indexNotebook,
   research,
   resolvedDecision,
   saveConfig,
@@ -128,7 +130,9 @@ export function IntelligenceWorker() {
                 failed.current.add(decisionKey(next.note.id, next.item));
                 notify(`Recherche pausiert: ${String(e)}`);
               }
+            if (next) return;
           }
+          await indexNotebook(scope, notes);
           return;
         }
         try {
@@ -369,6 +373,7 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
       <div className="knowledge-tabs segmented">
         {[
           ['overview', 'Überblick'],
+          ['organize', 'Notizsekretär'],
           ['task', 'Aufgabenvorschläge'],
           ['contact', 'Kontakte'],
           ['topic', 'Themen'],
@@ -433,7 +438,9 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
           {message}
         </p>
       )}
-      {tab === 'memory' ? (
+      {tab === 'organize' ? (
+        <Organization key={scope} scope={scope} notes={notes} records={records} onOpen={onOpen} />
+      ) : tab === 'memory' ? (
         <MemorySettings key={scope} />
       ) : tab === 'settings' ? (
         <fieldset className="settings-section ai-settings-fields" disabled={saving || !settingsReady}>
@@ -563,7 +570,9 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
             <input value={settings.excludedTags} onChange={(e) => update({ excludedTags: e.target.value })} />
           </label>
           <label>
-            Maximale KI-Anfragen pro Tag auf diesem Gerät
+            {scope !== 'local' && ownBackend()
+              ? 'Maximale KI-Anfragen pro Tag im Konto (einschließlich Hintergrundaufträgen)'
+              : 'Maximale KI-Anfragen pro Tag auf diesem Gerät'}
             <input
               type="number"
               min="1"

@@ -1,6 +1,7 @@
+import { collectionNames, createCollection, addNoteToCollection, NOTE_DRAG_TYPE } from './collections';
 import { flushSync } from 'react-dom';
 import { FloatingSearch } from './FloatingSearch';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Archive,
@@ -9,6 +10,7 @@ import {
   Cloud,
   CloudOff,
   FileText,
+  FolderOpen,
   Hash,
   Inbox,
   Menu,
@@ -36,6 +38,7 @@ import { tasksFor } from './task-store';
 import { desktop, repo } from './repository';
 import { noteShortcut, newNoteLabel } from './shortcuts';
 import { excerptOf, importedMarkdown, newNote, reviseNote, tagsOf, titleOf, type Note } from './domain';
+import { noteBackground, readNoteBackground, type NoteBackgroundId } from './note-backgrounds';
 
 type View = 'all' | 'pinned' | 'archive' | 'trash';
 export default function App() {
@@ -47,10 +50,16 @@ export default function App() {
     setModeState(m);
     localStorage.setItem('notto-theme', m);
   };
+  const [noteBackgroundId, setNoteBackgroundId] = useState<NoteBackgroundId>(() => readNoteBackground());
+  const setNoteBackground = (id: NoteBackgroundId) => {
+    setNoteBackgroundId(id);
+    localStorage.setItem('notto-note-background', id);
+  };
   useEffect(() => {
     const update = (e: StorageEvent) => {
       if (e.key === 'notto-theme')
         setModeState(e.newValue === 'dark' || e.newValue === 'light' ? e.newValue : 'system');
+      if (e.key === 'notto-note-background') setNoteBackgroundId(readNoteBackground());
     };
     window.addEventListener('storage', update);
     return () => window.removeEventListener('storage', update);
@@ -61,7 +70,18 @@ export default function App() {
   }, [widget]);
   return (
     <Theme theme={neutralTheme} mode={mode}>
-      <WebAccess>{widget ? <Widget /> : <Notebook mode={mode} setMode={setMode} />}</WebAccess>
+      <WebAccess>
+        {widget ? (
+          <Widget />
+        ) : (
+          <Notebook
+            mode={mode}
+            setMode={setMode}
+            noteBackground={noteBackgroundId}
+            setNoteBackground={setNoteBackground}
+          />
+        )}
+      </WebAccess>
     </Theme>
   );
 }
@@ -69,19 +89,35 @@ export default function App() {
 function Notebook({
   mode,
   setMode,
+  noteBackground: noteBackgroundId,
+  setNoteBackground,
 }: {
   mode: 'system' | 'light' | 'dark';
   setMode: (m: 'system' | 'light' | 'dark') => void;
+  noteBackground: NoteBackgroundId;
+  setNoteBackground: (id: NoteBackgroundId) => void;
 }) {
   const { notes, scope, user, loading, notify, notice, sync, syncState, syncError } = useNotto();
   const [view, setView] = useState<View>('all');
   const [tag, setTag] = useState<string | null>(null);
+  const [collection, setCollection] = useState<string | null>(null);
+  const [collectionDialog, setCollectionDialog] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [collectionBusy, setCollectionBusy] = useState(false);
+  const [collectionError, setCollectionError] = useState('');
+  const [dragCollection, setDragCollection] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [draftSource, setDraftSource] = useState<'widget' | undefined>();
   const drafts = useNewDrafts(scope);
-  const visibleDrafts = view === 'all' ? drafts.filter((d) => !tag || tagsOf(d.content).includes(tag)) : [];
+  const visibleDrafts =
+    view === 'all'
+      ? drafts.filter(
+          (d) =>
+            (!tag || tagsOf(d.content).includes(tag)) && (!collection || d.collections?.includes(collection)),
+        )
+      : [];
   const [settings, setSettings] = useState(false);
   const [allTags, setAllTags] = useState(false);
   const toggleTags = (open: boolean) => {
@@ -109,7 +145,9 @@ function Notebook({
     setCreating(false);
     setSearchOpen(false);
     setAllTags(false);
+    setCollectionDialog(false);
     setTag(null);
+    setCollection(null);
     setView('all');
   }, [scope]);
   const active = notes.filter((n) => !n.deleted && !n.archived);
@@ -118,6 +156,28 @@ function Notebook({
     for (const n of active) for (const t of tagsOf(n.content)) counts.set(t, (counts.get(t) || 0) + 1);
     return [...counts].sort(([a, ac], [b, bc]) => bc - ac || a.localeCompare(b, 'de'));
   }, [notes]);
+  const collectionCounts = useMemo(() => {
+    const counts = new Map<string, number>(collectionNames(notes, records, scope).map((name) => [name, 0]));
+    for (const n of notes.filter((n) => n.scope === scope && !n.deleted && !n.archived))
+      for (const name of n.collections || []) counts.set(name, (counts.get(name) || 0) + 1);
+    return [...counts].sort(([a], [b]) => a.localeCompare(b, 'de'));
+  }, [notes, records, scope]);
+  useEffect(() => {
+    const openReference = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; scope: string }>).detail;
+      if (
+        detail?.scope !== scope ||
+        !notes.some((n) => n.id === detail.id && n.scope === scope && !n.deleted)
+      )
+        return;
+      openTaskNote(detail.id);
+      setTag(null);
+      setCollection(null);
+      setView('all');
+    };
+    window.addEventListener('notto-open-note', openReference);
+    return () => window.removeEventListener('notto-open-note', openReference);
+  }, [notes, scope]);
   const filtered = useMemo(
     () =>
       notes
@@ -126,25 +186,28 @@ function Notebook({
             (view === 'trash' ? n.deleted : !n.deleted) &&
             (view === 'archive' ? n.archived : view === 'trash' ? true : !n.archived) &&
             (view === 'pinned' ? n.pinned : true) &&
-            (!tag || tagsOf(n.content).includes(tag)),
+            (!tag || tagsOf(n.content).includes(tag)) &&
+            (!collection || n.collections?.includes(collection)),
         )
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt)),
-    [notes, view, tag],
+    [notes, view, tag, collection],
   );
   const selectedNote = notes.find((n) => n.id === selected);
   const title = tasksOpen
     ? 'Aufgaben'
     : knowledgeOpen
       ? 'Wissen & KI'
-      : tag
-        ? `#${tag}`
-        : view === 'pinned'
-          ? 'Angeheftet'
-          : view === 'archive'
-            ? 'Archiv'
-            : view === 'trash'
-              ? 'Papierkorb'
-              : 'Alle Notizen';
+      : collection
+        ? collection
+        : tag
+          ? `#${tag}`
+          : view === 'pinned'
+            ? 'Angeheftet'
+            : view === 'archive'
+              ? 'Archiv'
+              : view === 'trash'
+                ? 'Papierkorb'
+                : 'Alle Notizen';
   const openNew = () => {
     setDraftSource(undefined);
     setKnowledgeOpen(false);
@@ -221,12 +284,13 @@ function Notebook({
   }
   const nav = (id: View, label: string, icon: React.ReactNode, count: number) => (
     <button
-      className={`nav-item ${view === id && !tag && !knowledgeOpen && !tasksOpen ? 'active' : ''}`}
+      className={`nav-item ${view === id && !tag && !collection && !knowledgeOpen && !tasksOpen ? 'active' : ''}`}
       onClick={() => {
         setKnowledgeOpen(false);
         setTasksOpen(false);
         setView(id);
         setTag(null);
+        setCollection(null);
         setSidebar(false);
         setCreating(false);
         setSelected(null);
@@ -239,6 +303,13 @@ function Notebook({
   );
   return (
     <div
+      style={
+        {
+          '--nt-note-background': noteBackground(noteBackgroundId).src
+            ? `url("${noteBackground(noteBackgroundId).src}")`
+            : 'none',
+        } as CSSProperties
+      }
       data-note-overview={!selected && !creating && !knowledgeOpen && !tasksOpen}
       className={`notebook ${sidebar ? 'sidebar-open' : ''} ${selected || creating ? 'detail-open' : ''}`}
     >
@@ -325,6 +396,7 @@ function Notebook({
                   setKnowledgeOpen(false);
                   setTasksOpen(false);
                   setTag(t);
+                  setCollection(null);
                   setView('all');
                   setCreating(false);
                   setSelected(null);
@@ -336,6 +408,74 @@ function Notebook({
                 <span className="nav-count">{count}</span>
               </button>
             ))
+          )}
+        </nav>
+        <div className="tags-heading">
+          <span>SAMMLUNGEN</span>
+          <button
+            className="collection-add"
+            type="button"
+            aria-label="Sammlung anlegen"
+            title="Sammlung anlegen"
+            onClick={() => {
+              setNewCollectionName('');
+              setCollectionError('');
+              setCollectionDialog(true);
+            }}
+          >
+            <Plus size={15} />
+          </button>
+        </div>
+        <nav className="collection-navigation" aria-label="Sammlungen">
+          {collectionCounts.map(([name, count]) => (
+            <button
+              key={name}
+              className={`nav-item ${collection === name && !knowledgeOpen && !tasksOpen ? 'active' : ''} ${dragCollection === name ? 'collection-drop-target' : ''}`}
+              onDragOver={(e) => {
+                if (!e.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                setDragCollection(name);
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragCollection(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragCollection(null);
+                let payload: { id?: string; scope?: string };
+                try {
+                  payload = JSON.parse(e.dataTransfer.getData(NOTE_DRAG_TYPE));
+                } catch {
+                  return;
+                }
+                if (
+                  payload.scope !== scope ||
+                  !notes.some((n) => n.id === payload.id && n.scope === scope && !n.deleted)
+                )
+                  return;
+                void addNoteToCollection(scope, payload.id!, name)
+                  .then(() => notify(`Zu „${name}“ hinzugefügt`))
+                  .catch((error) => notify(String(error)));
+              }}
+              onClick={() => {
+                setCollection(name);
+                setTag(null);
+                setView('all');
+                setKnowledgeOpen(false);
+                setTasksOpen(false);
+                setCreating(false);
+                setSelected(null);
+                setSidebar(false);
+              }}
+            >
+              <FolderOpen size={15} />
+              <span>{name}</span>
+              <span className="nav-count">{count}</span>
+            </button>
+          ))}
+          {!collectionCounts.length && (
+            <p className="empty-tags">Mit + anlegen, dann Notizen hierher ziehen.</p>
           )}
         </nav>
         <div className="sidebar-bottom">
@@ -410,6 +550,7 @@ function Notebook({
             openTaskNote(id);
             setView('all');
             setTag(null);
+            setCollection(null);
           }}
         />
 
@@ -424,6 +565,7 @@ function Notebook({
               setSelected(id);
               setView('all');
               setTag(null);
+              setCollection(null);
             }}
           />
         </div>
@@ -476,11 +618,17 @@ function Notebook({
                   <strong>
                     {view === 'trash'
                       ? 'Dein Papierkorb ist leer'
-                      : view === 'archive'
-                        ? 'Noch nichts archiviert'
-                        : 'Hier beginnt dein Notizbuch'}
+                      : collection
+                        ? 'Diese Sammlung ist noch leer'
+                        : view === 'archive'
+                          ? 'Noch nichts archiviert'
+                          : 'Hier beginnt dein Notizbuch'}
                   </strong>
-                  <p>Halte einen Gedanken fest. Die Ordnung kann später kommen.</p>
+                  <p>
+                    {collection
+                      ? 'Ziehe Notizen auf die Sammlung oder lege hier eine neue Notiz an.'
+                      : 'Halte einen Gedanken fest. Die Ordnung kann später kommen.'}
+                  </p>
                   {view === 'all' && (
                     <Action label="Erste Notiz schreiben" icon={<Plus size={16} />} onClick={openNew} />
                   )}
@@ -490,6 +638,12 @@ function Notebook({
                   <button
                     key={n.id}
                     className={`note-card ${selected === n.id && !creating ? 'selected' : ''}`}
+                    draggable={!n.deleted}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(NOTE_DRAG_TYPE, JSON.stringify({ id: n.id, scope }));
+                      e.dataTransfer.effectAllowed = 'copy';
+                    }}
+                    onDragEnd={() => setDragCollection(null)}
                     onClick={() => {
                       setSelected(n.id);
                       setCreating(false);
@@ -576,6 +730,7 @@ function Notebook({
                 key={`${scope}:${creating ? (draftSource ?? 'new') : selectedNote!.id}`}
                 draftSource={creating ? draftSource : undefined}
                 note={creating ? undefined : selectedNote}
+                initialCollections={creating && collection ? [collection] : []}
                 onSaved={(n) => {
                   setSelected(n.id);
                   setCreating(false);
@@ -623,6 +778,67 @@ function Notebook({
           </motion.div>
         )}
       </AnimatePresence>
+      {collectionDialog && (
+        <Modal
+          title="Sammlung anlegen"
+          onClose={() => {
+            if (!collectionBusy) setCollectionDialog(false);
+          }}
+        >
+          <form
+            className="new-collection-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (collectionBusy || !newCollectionName.trim()) return;
+              setCollectionBusy(true);
+              setCollectionError('');
+              const existing = collectionNames(notes, records, scope).find(
+                (n) => n.toLocaleLowerCase('de') === newCollectionName.trim().toLocaleLowerCase('de'),
+              );
+              void createCollection(scope, existing || newCollectionName)
+                .then((name) => {
+                  setCollection(name);
+                  setView('all');
+                  setTag(null);
+                  setKnowledgeOpen(false);
+                  setTasksOpen(false);
+                  setCreating(false);
+                  setSelected(null);
+                  setCollectionDialog(false);
+                  setSidebar(false);
+                })
+                .catch((error) => setCollectionError(String(error)))
+                .finally(() => setCollectionBusy(false));
+            }}
+          >
+            <label>
+              Name
+              <input
+                autoFocus
+                aria-label="Name der Sammlung"
+                value={newCollectionName}
+                maxLength={60}
+                placeholder="Zum Beispiel Jugendhaus"
+                onChange={(e) => setNewCollectionName(e.target.value)}
+                disabled={collectionBusy}
+              />
+            </label>
+            <p className="muted small">Ziehe anschließend Notizen aus „Alle Notizen“ auf die Sammlung.</p>
+            {collectionError && (
+              <p role="alert" className="inline-error">
+                {collectionError}
+              </p>
+            )}
+            <button
+              className="collection-submit"
+              type="submit"
+              disabled={collectionBusy || !newCollectionName.trim()}
+            >
+              {collectionBusy ? 'Wird angelegt …' : 'Sammlung anlegen'}
+            </button>
+          </form>
+        </Modal>
+      )}
       {allTags && (
         <Modal title="Deine Tags" onClose={() => toggleTags(false)}>
           <div className="all-tags" style={{ viewTransitionName: 'tags-popout' }}>
@@ -632,12 +848,14 @@ function Notebook({
                 key={name}
                 onClick={() => {
                   setTag(name);
+                  setCollection(null);
                   setView('all');
                   setKnowledgeOpen(false);
                   setTasksOpen(false);
                   setSelected(null);
                   setCreating(false);
                   setAllTags(false);
+                  setCollectionDialog(false);
                   setSidebar(false);
                 }}
               >
@@ -650,7 +868,15 @@ function Notebook({
           </div>
         </Modal>
       )}
-      {settings && <Settings mode={mode} setMode={setMode} onClose={() => setSettings(false)} />}
+      {settings && (
+        <Settings
+          mode={mode}
+          setMode={setMode}
+          noteBackground={noteBackgroundId}
+          setNoteBackground={setNoteBackground}
+          onClose={() => setSettings(false)}
+        />
+      )}
       <IntelligenceWorker />
     </div>
   );

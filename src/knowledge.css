@@ -235,6 +235,39 @@
   text-align: left;
   font-size: 13px;
 }
+.organization textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 12px 0;
+  padding: 12px;
+  font: inherit;
+  resize: vertical;
+  color: inherit;
+  background: var(--nt-paper);
+  border: 1px solid var(--nt-line);
+  border-radius: 8px;
+}
+.organization-proposal {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--nt-line);
+}
+.organization-source blockquote {
+  margin: 8px 0 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--nt-line);
+  overflow-wrap: anywhere;
+}
+.organization details {
+  margin: 10px 0;
+}
+.organization summary {
+  cursor: pointer;
+}
+.organization .settings-actions {
+  flex-wrap: wrap;
+}
 .knowledge-content .memory-settings {
   max-width: 780px;
 }

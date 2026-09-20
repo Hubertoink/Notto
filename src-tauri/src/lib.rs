@@ -52,7 +52,7 @@ fn materialize(root: &Path, n: &Value) -> Result<()> {
     let path = scope_path(root, scope)?
         .join("notes")
         .join(format!("{id}.md"));
-    let data=format!("---\nnotto_id: {}\ncreated: {}\nupdated: {}\npinned: {}\narchived: {}\ndeleted: {}\n---\n\n{}",id,n["createdAt"].as_str().unwrap_or(""),n["updatedAt"].as_str().unwrap_or(""),n["pinned"],n["archived"],n["deleted"],n["content"].as_str().unwrap_or(""));
+    let data=format!("---\nnotto_id: {}\ncreated: {}\nupdated: {}\npinned: {}\narchived: {}\ndeleted: {}\ncollections: {}\n---\n\n{}",id,n["createdAt"].as_str().unwrap_or(""),n["updatedAt"].as_str().unwrap_or(""),n["pinned"],n["archived"],n["deleted"],n.get("collections").unwrap_or(&json!([])),n["content"].as_str().unwrap_or(""));
     atomic_write(&path, data.as_bytes())
 }
 // Keep external edits as separate notes before repairing/replacing a projection.

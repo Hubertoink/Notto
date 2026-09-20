@@ -2,14 +2,18 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent } from '@testing-library/react';
 import { Sources, NoteMarkdown } from './components';
+import { newNote, type Note } from './domain';
+import { noteLink } from './note-tools';
 import { uniqueSources } from './knowledge-policy';
 const invoke = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@tauri-apps/api/core', () => ({ invoke, isTauri: () => true }));
 vi.mock('./repository', () => ({ desktop: true }));
-vi.mock('./state', () => ({ useNotto: () => ({ notify: vi.fn() }) }));
+const data = vi.hoisted(() => ({ notes: [] as Note[] }));
+vi.mock('./state', () => ({ useNotto: () => ({ notify: vi.fn(), notes: data.notes }) }));
 afterEach(() => {
   cleanup();
   invoke.mockClear();
+  data.notes = [];
 });
 it('deduplicates existing citations and opens desktop sources through the native browser command', () => {
   render(
@@ -36,4 +40,19 @@ it('handles inline research links identically and excludes non-web sources', () 
       { title: 'bad', url: 'javascript:alert(1)' },
     ]),
   ).toEqual([]);
+});
+
+it('opens internal links in the notebook and never exposes another account', () => {
+  const target = newNote('local', 'Unsere Grundsätze');
+  data.notes = [target];
+  const open = vi.fn();
+  window.addEventListener('notto-open-note', open);
+  const view = render(<NoteMarkdown scope="local" content={noteLink(target)} />);
+  fireEvent.click(screen.getByRole('link', { name: '↗ Unsere Grundsätze' }));
+  expect(open.mock.calls[0][0].detail).toEqual({ id: target.id, scope: 'local' });
+  expect(invoke).not.toHaveBeenCalled();
+  data.notes = [{ ...target, scope: 'other' }];
+  view.rerender(<NoteMarkdown scope="local" content={noteLink(target)} />);
+  expect(screen.queryByRole('link')).toBeNull();
+  window.removeEventListener('notto-open-note', open);
 });

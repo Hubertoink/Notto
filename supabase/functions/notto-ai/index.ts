@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { permittedTools } from '../../../src/agent-tools.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -64,18 +65,18 @@ Deno.serve(async (req: Request) => {
       if (!permitted.includes(body.model))
         return json({ error: 'Modell auf dem Server nicht freigeschaltet' }, 400);
       const clean: Record<string, unknown> = { model: body.model, input: body.input };
-      if (endpoint === 'responses')
+      if (endpoint === 'responses') {
+        const tools = permittedTools(body.tools);
         Object.assign(clean, {
           store: false,
           instructions: body.instructions,
           text: body.text,
           max_output_tokens: 4000,
           max_tool_calls: 2,
-          ...(body.tools?.length
-            ? { tools: [{ type: 'web_search' }], include: ['web_search_call.action.sources'] }
-            : {}),
+          ...(tools.length ? { tools, parallel_tool_calls: false } : {}),
+          include: tools.some((tool) => tool.type === 'web_search') ? ['web_search_call.action.sources'] : ['reasoning.encrypted_content'],
         });
-      else clean.encoding_format = 'float';
+      } else clean.encoding_format = 'float';
       payload = JSON.stringify(clean);
     }
     const response = await fetch(`https://api.openai.com/v1/${endpoint}`, {

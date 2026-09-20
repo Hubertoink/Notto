@@ -133,7 +133,7 @@ Abhängigkeiten sind über `package-lock.json` und `src-tauri/Cargo.lock` festge
 
 ## Persönlicher Kontext
 
-Unter **Wissen & KI → Mein Kontext** findest du die Übersicht **Über mich**, **So soll Noto arbeiten** und **Das hat Noto gelernt**. Du kannst direkt Informationen und Anweisungen hinzufügen, vorhandene Einträge bearbeiten und Vorschläge über **Jetzt prüfen** bestätigen. Die Übersicht zeigt freigegebene Einträge und bietet eine Pause für die Personalisierung. Einträge gehören zum jeweiligen Notizbuch und werden im angemeldeten Konto zwischen Web und Desktop synchronisiert. Lokaler Kontext bleibt im lokalen Notizbuch.
+Unter **Wissen & KI → Mein Kontext** findest du die Übersicht **Projektwissen & Kontext**, **So soll Noto arbeiten** und **Das hat Noto gelernt**. Du kannst direkt Informationen und Anweisungen hinzufügen, vorhandene Einträge bearbeiten und Vorschläge über **Jetzt prüfen** bestätigen. Die Übersicht zeigt freigegebene Einträge und bietet eine Pause für die Personalisierung. Einträge gehören zum jeweiligen Notizbuch und werden im angemeldeten Konto zwischen Web und Desktop synchronisiert. Lokaler Kontext bleibt im lokalen Notizbuch.
 
 - Eigene Anweisungen und manuell gespeicherte Informationen gelten sofort für künftige KI-Anfragen.
 - Aus einer ausgewählten Notiz lassen sich belegte Kontextvorschläge erstellen; diese musst du bestätigen.
@@ -143,3 +143,14 @@ Unter **Wissen & KI → Mein Kontext** findest du die Übersicht **Über mich**,
 - Kontext wird bei Textanfragen einschließlich Hintergrundanalysen berücksichtigt, nicht beim Erstellen von Suchvektoren oder Transkriptionen. Je Anfrage werden höchstens 30 aktive Einträge mit insgesamt 10.000 Textzeichen ausgewählt; Anweisungen zuerst, sonst nach Wortüberschneidung.
 
 Das Gedächtnis ergänzt die Anfrage; es trainiert kein eigenes Modell und führt keine externen Aktionen aus. Originalnotizen bleiben unverändert. Die Antwortqualität mit echten Modellen sowie die Darstellung auf unterschiedlichen Geräten müssen weiterhin praktisch beurteilt werden.
+# Lokale Entwicklung mit Testkonto
+
+`npm run dev` startet die Oberfläche auf http://127.0.0.1:1420 und ein lokales Test-Backend auf Port 3001. Die API läuft über den Vite-Proxy. Docker oder eine PostgreSQL-Installation sind dafür nicht nötig.
+
+Beim ersten Start entsteht `test@noto.local` mit zufälligem Passwort und Beispielnotizen. Das Passwort steht in `.notto-dev/test-account.json`. Datenbank und Anhänge bleiben unter `.notto-dev/` erhalten; das Verzeichnis ist von Git ausgeschlossen. Für lokale KI kann `OPENAI_API_KEY` in `.notto-dev/ai.env` hinterlegt werden.
+
+Mit dem Testkonto **Anmelden** verwenden, keine Registrierung. Manuelle Cloud-Einstellungen und `VITE_NOTTO_SERVER_URL` überschreiben das lokale Standardziel. Produktions-Builds verwenden weiterhin `https://noto-app.de`.
+
+## Notizsekretär mit Gedächtnis
+
+Unter **Wissen & KI → Notizsekretär** kann Noto mehrere Notizen untersuchen, belegte Übersichten und Beziehungen erarbeiten und Sammlungszuordnungen vorschlagen. Übernahmen sind nachvollziehbar und Zuordnungen lassen sich zurücknehmen. Arbeitsweise, Grenzen und Evaluationen: [AI-HARNESS.md](docs/AI-HARNESS.md).

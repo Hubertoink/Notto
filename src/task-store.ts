@@ -1,4 +1,5 @@
 import type { Note } from './domain';
+import { currentContent } from './domain';
 import {
   decisionKey,
   knowledge,
@@ -35,7 +36,8 @@ export function tasksFor(notes: Note[], records: KnowledgeRecord[], scope: strin
   }
   for (const note of notes.filter((n) => n.scope === scope && !n.deleted)) {
     const analysis = noteAnalysis(scoped, note);
-    const current = (analysis?.data as Analysis | undefined)?.suggestions ?? [];
+    const current =
+      analysis && currentContent(note, analysis.revision) ? (analysis.data as Analysis).suggestions : [];
     const retained = scoped
       .filter((r) => r.kind === 'analysis' && r.noteId === note.id)
       .flatMap((r) => (r.data as Analysis).suggestions)

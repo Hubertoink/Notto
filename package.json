@@ -1,10 +1,10 @@
 {
   "name": "notto",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "dev": "node scripts/dev.mjs",
     "build": "tsc -b && vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "start:server": "node build-server/server/main.js",
@@ -12,7 +12,9 @@
     "tauri": "tauri",
     "desktop": "node scripts/desktop.mjs dev",
     "desktop:build": "node scripts/desktop.mjs build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:harness": "vitest run src/harness.test.ts src/memory-policy.test.ts server/app.test.ts server/sources.test.ts src/Organization.test.tsx",
+    "eval:harness:live": "tsx scripts/eval-harness.ts"
   },
   "dependencies": {
     "@astryxdesign/core": "0.6.2",

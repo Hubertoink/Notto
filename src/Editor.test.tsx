@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@astryxdesign/core/theme';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
@@ -93,7 +93,7 @@ it('saves, edits and forgets personal instructions in the settings surface', asy
     </Theme>,
   );
   const user = userEvent.setup();
-  expect(screen.getByRole('region', { name: 'Über mich' })).toBeTruthy();
+  expect(screen.getByRole('region', { name: 'Projektwissen & Kontext' })).toBeTruthy();
   expect(screen.getByRole('region', { name: 'Das hat Noto gelernt' })).toBeTruthy();
   await user.click(screen.getByRole('button', { name: 'Anweisung hinzufügen' }));
   let input = screen.getByRole('textbox', { name: 'Kontexteintrag' });
@@ -137,7 +137,9 @@ it('opens inline AI annotations and completes a task without changing the note',
 it('refreshes outdated annotations from the saved revision and closes through the icon', async () => {
   const note = newNote('local', 'Aktuelle Fassung');
   await repo.put(note, null);
-  await knowledge.append({ ...note, revision: 'old-revision' }, 'analysis', { suggestions: [] });
+  await knowledge.append({ scope: note.scope, id: note.id, revision: 'old-revision' }, 'analysis', {
+    suggestions: [],
+  });
   const analyze = vi.spyOn(intelligence, 'analyze').mockImplementation(async (n) => {
     await knowledge.append(n, 'analysis', { suggestions: [] });
   });
@@ -238,4 +240,86 @@ it('suggests existing tags and accepts a prefix match with the keyboard', async 
   expect(screen.queryByRole('listbox')).toBeNull();
   await user.type(field, '#neuertag ');
   expect((field as HTMLTextAreaElement).value).toBe('#jugendhaus #neuertag ');
+});
+
+it('formats selected text through icons and keeps editing at the selection', async () => {
+  renderEditor();
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, 'Hallo Welt');
+  field.setSelectionRange(6, 10);
+  fireEvent.click(screen.getByRole('button', { name: 'Fett (Strg B)' }));
+  expect(field.value).toBe('Hallo **Welt**');
+  expect(field.selectionStart).toBe(8);
+  expect(field.selectionEnd).toBe(12);
+  await user.keyboard('{Control>}b{/Control}');
+  expect(field.value).toBe('Hallo Welt');
+});
+
+it('inserts a note reference with keyboard selection and shows current titles after renaming', async () => {
+  const target = newNote('local', 'Unsere Grundsätze');
+  await repo.put(target, null);
+  renderEditor();
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, 'Siehe ');
+  fireEvent.click(screen.getByRole('button', { name: 'Notiz verlinken' }));
+  await screen.findByRole('option', { name: 'Unsere Grundsätze' });
+  await user.keyboard('{Enter}');
+  expect(field.value).toBe(`Siehe [Unsere Grundsätze](notes/${target.id}) `);
+  await repo.put({ ...target, revision: crypto.randomUUID(), content: 'Neue Grundsätze' }, target.revision);
+  await user.click(screen.getByRole('button', { name: 'Vorschau' }));
+  await screen.findAllByRole('link', { name: '↗ Neue Grundsätze' });
+});
+
+it('retains collections in drafts and saves several memberships with the note', async () => {
+  const saved = vi.fn();
+  const view = renderEditor(saved);
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, 'Projektplanung');
+  await user.click(screen.getByRole('button', { name: 'Sammlungen' }));
+  for (const name of ['Jugendhaus', 'Medien']) {
+    await user.type(screen.getByRole('textbox', { name: 'Sammlung' }), name);
+    await user.click(screen.getByRole('button', { name: 'Hinzufügen' }));
+  }
+  await waitFor(async () =>
+    expect((await repo.draft('local', null))?.collections).toEqual(['Jugendhaus', 'Medien']),
+  );
+  view.unmount();
+  renderEditor(saved);
+  await screen.findByText('Jugendhaus');
+  await user.click(screen.getByRole('button', { name: 'Festhalten' }));
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(saved.mock.calls[0][0].collections).toEqual(['Jugendhaus', 'Medien']);
+});
+
+it('keeps an unsaved text draft when a drop adds a collection to the open note', async () => {
+  const original = newNote('local', 'Originaltext');
+  await repo.put(original, null);
+  const saved = vi.fn();
+  const renderNote = (note: typeof original) => (
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={saved} />
+      </NottoProvider>
+    </Theme>
+  );
+  const view = render(renderNote(original));
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, ' mit Entwurf');
+  const updated = { ...original, collections: ['Jugendhaus'], revision: crypto.randomUUID() };
+  await repo.put(updated, original.revision);
+  view.rerender(renderNote(updated));
+  await screen.findByText('Jugendhaus');
+  expect(field.value).toBe('Originaltext mit Entwurf');
+  await user.click(screen.getByRole('button', { name: 'Festhalten' }));
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(saved.mock.calls[0][0].collections).toEqual(['Jugendhaus']);
+  expect(saved.mock.calls[0][0].content).toBe('Originaltext mit Entwurf');
 });

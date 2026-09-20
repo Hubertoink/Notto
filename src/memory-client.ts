@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { knowledge, eligible, config, request, responseText } from './intelligence';
 import { memorySchema, type Memory } from './memory-policy';
 import type { Note } from './domain';
+import { contentRevision, currentContent } from './domain';
+import { repo } from './repository';
 
 export async function saveMemory(scope: string, value: Memory) {
   const data = memorySchema.parse(value);
@@ -27,17 +29,31 @@ export async function suggestMemory(note: Note) {
   const result = schema.parse(JSON.parse(responseText(response)));
   if (result.facts.some((f) => !f.quote.trim() || !note.content.includes(f.quote)))
     throw new Error('Vorschläge verworfen: Quellenbeleg stimmt nicht.');
+  const current = await repo.get(note.scope, note.id);
+  if (!current || !eligible(current) || !currentContent(current, contentRevision(note)))
+    throw new Error('Die Quelle wurde geändert. Bitte erneut prüfen.');
   const existing = await knowledge.list(note.scope);
   let added = 0;
   for (const fact of result.facts) {
-    const key = `fact:${note.id}:${note.revision}:${await fingerprint(fact.quote)}`;
-    if (existing.some((r) => r.kind === 'memory' && (r.data as Memory).key === key)) continue;
+    const hash = await fingerprint(fact.quote);
+    const key = `fact:${note.id}:${hash}`;
+    // Legacy keys included the revision. Keep forgotten facts forgotten across edits, too.
+    if (
+      existing.some(
+        (r) =>
+          r.kind === 'memory' &&
+          ((r.data as Memory).key === key ||
+            ((r.data as Memory).key.startsWith(`fact:${note.id}:`) &&
+              (r.data as Memory).key.endsWith(`:${hash}`))),
+      )
+    )
+      continue;
     await saveMemory(note.scope, {
       key,
       category: 'fact',
       text: fact.text,
       status: 'suggested',
-      sources: [{ noteId: note.id, revision: note.revision, quote: fact.quote }],
+      sources: [{ noteId: note.id, revision: contentRevision(note), quote: fact.quote }],
     });
     added++;
   }

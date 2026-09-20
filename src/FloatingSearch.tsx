@@ -4,7 +4,7 @@ import './search.css';
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Search, Sparkles, X } from 'lucide-react';
-import { matchesQuery, titleOf, excerptOf, type Note } from './domain';
+import { currentContent, matchesQuery, titleOf, excerptOf, type Note } from './domain';
 
 export function FloatingSearch({
   open,
@@ -25,10 +25,16 @@ export function FloatingSearch({
   const field = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [query, setQuery] = useState('');
-  const [semantic, setSemantic] = useState<{ query: string; hits: (Evidence & { score: number })[] } | null>(
-    null,
-  );
-  const [answer, setAnswer] = useState<{ text: string; sources: Evidence[] } | null>(null);
+  const [semantic, setSemantic] = useState<{
+    query: string;
+    hits: (Evidence & { score: number })[];
+    coverage?: { indexed: number; total: number };
+  } | null>(null);
+  const [answer, setAnswer] = useState<{
+    text: string;
+    sources: Evidence[];
+    coverage?: { indexed: number; total: number };
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const generation = useRef(0);
@@ -56,6 +62,7 @@ export function FloatingSearch({
           setAnswer({
             text: result.answer,
             sources: result.citations.map((c) => ({ ...result.sources[c.index], text: c.quote })),
+            coverage: result.coverage,
           });
         return;
       }
@@ -64,7 +71,7 @@ export function FloatingSearch({
         searched,
         notes.filter((n) => n.scope === scope && !n.deleted),
       );
-      if (request === generation.current) setSemantic({ query: searched, hits });
+      if (request === generation.current) setSemantic({ query: searched, hits, coverage: hits.coverage });
     } catch (error) {
       if (request === generation.current) setError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -91,7 +98,7 @@ export function FloatingSearch({
         (n) =>
           n.id === hit.noteId &&
           n.scope === scope &&
-          n.revision === hit.revision &&
+          currentContent(n, hit.revision) &&
           !n.deleted &&
           eligible(n),
       );
@@ -178,32 +185,50 @@ export function FloatingSearch({
                       : 'Keine zusätzlichen KI-Treffer.'}
                   </p>
                 )}
+                {(semantic?.coverage ?? answer?.coverage) &&
+                  (semantic?.coverage ?? answer?.coverage)!.indexed <
+                    (semantic?.coverage ?? answer?.coverage)!.total && (
+                    <p role="status">
+                      Die sinngemäße Suche wird noch aufgebaut. Die Volltextsuche berücksichtigt bereits alle
+                      freigegebenen Notizen.
+                    </p>
+                  )}
               </div>
             )}
-            {answer && (
-              <div className="search-answer">
-                <NoteMarkdown content={answer.text} scope={scope} />
-                {answer.sources
-                  .filter((source) =>
-                    notes.some(
-                      (n) => n.id === source.noteId && n.scope === scope && !n.deleted && eligible(n),
-                    ),
-                  )
-                  .map((source, i) => (
-                    <button
-                      key={i}
-                      className="text-button"
-                      onClick={() => {
-                        onSelect(source.noteId);
-                        onClose();
-                      }}
-                    >
-                      {titleOf(notes.find((n) => n.id === source.noteId)?.content || 'Quelle')}
-                      <blockquote>{source.text}</blockquote>
-                    </button>
-                  ))}
-              </div>
-            )}
+            {answer &&
+              answer.sources.every((source) =>
+                notes.some(
+                  (n) =>
+                    n.id === source.noteId &&
+                    n.scope === scope &&
+                    !n.deleted &&
+                    eligible(n) &&
+                    currentContent(n, source.revision),
+                ),
+              ) && (
+                <div className="search-answer">
+                  <NoteMarkdown content={answer.text} scope={scope} />
+                  {answer.sources
+                    .filter((source) =>
+                      notes.some(
+                        (n) => n.id === source.noteId && n.scope === scope && !n.deleted && eligible(n),
+                      ),
+                    )
+                    .map((source, i) => (
+                      <button
+                        key={i}
+                        className="text-button"
+                        onClick={() => {
+                          onSelect(source.noteId);
+                          onClose();
+                        }}
+                      >
+                        {titleOf(notes.find((n) => n.id === source.noteId)?.content || 'Quelle')}
+                        <blockquote>{source.text}</blockquote>
+                      </button>
+                    ))}
+                </div>
+              )}
             <div className="search-results" aria-busy={busy}>
               <p className="muted">{query ? `${results.length} Treffer` : 'Zuletzt bearbeitet'}</p>
               {[...direct.slice(0, 40), ...related].map((n) => (

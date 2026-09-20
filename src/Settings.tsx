@@ -8,15 +8,20 @@ import { allAttachmentIds, newNote } from './domain';
 import { exportNotebook } from './export';
 import { useNotto } from './state';
 import { useCaptureShortcut, shortcutOptions, shortcutLabel } from './shortcuts';
+import { noteBackgrounds, type NoteBackgroundId } from './note-backgrounds';
 
 export function Settings({
   onClose,
   mode,
   setMode,
+  noteBackground,
+  setNoteBackground,
 }: {
   onClose: () => void;
   mode: 'system' | 'light' | 'dark';
   setMode: (mode: 'system' | 'light' | 'dark') => void;
+  noteBackground: NoteBackgroundId;
+  setNoteBackground: (background: NoteBackgroundId) => void;
 }) {
   const { scope, user, notify, sync, syncState, syncError, lastSync } = useNotto();
   const shortcut = useCaptureShortcut();
@@ -113,6 +118,31 @@ export function Settings({
               {item.label}
             </button>
           ))}
+        </div>
+        <div className="note-background-setting">
+          <div>
+            <strong>Notizfläche</strong>
+            <p className="muted small">Wähle einen Hintergrund für das geöffnete Notizfeld.</p>
+          </div>
+          <div className="note-background-grid" aria-label="Hintergrund der Notizfläche">
+            {noteBackgrounds.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`note-background-option ${noteBackground === item.id ? 'selected' : ''}`}
+                aria-pressed={noteBackground === item.id}
+                onClick={() => setNoteBackground(item.id)}
+              >
+                <span
+                  className="note-background-preview"
+                  style={item.src ? { backgroundImage: `url("${item.src}")` } : undefined}
+                >
+                  {!item.src && <span className="note-background-none">Aa</span>}
+                </span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
       <section className="settings-section">

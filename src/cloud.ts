@@ -13,7 +13,11 @@ export function readCloudConfig(): CloudConfig {
       JSON.parse(localStorage.getItem('notto-cloud') || 'null') || {
         url:
           import.meta.env.VITE_NOTTO_SERVER_URL ||
-          (import.meta.env.MODE === 'test' ? '' : 'https://noto-app.de'),
+          (import.meta.env.MODE === 'test'
+            ? ''
+            : import.meta.env.DEV
+              ? window.location.origin
+              : 'https://noto-app.de'),
         key: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
       }
     );

@@ -6,6 +6,7 @@ import { addTask, checkTask, newest, noteAnalysis, tasksFor, type Task } from '.
 import { useNotto } from './state';
 import { Sources, NoteMarkdown } from './components';
 import type { Note } from './domain';
+import { currentContent } from './domain';
 import './tasks.css';
 
 export function useKnowledgeRecords(scope: string) {
@@ -206,7 +207,7 @@ export function NoteAnnotations({
             <div className="annotation-panel">
               <p className="muted">KI-Vorschläge · separat vom Original gespeichert.</p>
               <p className="muted annotation-update">
-                {analysis && analysis.revision !== note.revision
+                {analysis && !currentContent(note, analysis.revision)
                   ? 'Die Anmerkungen beziehen sich auf eine frühere Textversion. '
                   : ''}
                 <button

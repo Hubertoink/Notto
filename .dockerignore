@@ -4,6 +4,7 @@ build-server
 .git
 .env*
 .notto-deploy
+.notto-dev
 .tools
 output
 Astryx Library

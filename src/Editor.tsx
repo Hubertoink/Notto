@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { AttachmentTitle } from './AttachmentTitle';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
+  ArrowLeft,
   Bold,
   Italic,
   Heading2,
@@ -43,6 +44,7 @@ export function Editor({
   draftSource,
   initialCollections = [],
   onSaved,
+  onBack,
   onClose,
 }: {
   note?: Note;
@@ -50,6 +52,7 @@ export function Editor({
   draftSource?: 'widget';
   initialCollections?: string[];
   onSaved: (note: Note) => void;
+  onBack?: () => void;
   onClose?: () => void;
 }) {
   const { scope, notify, notes } = useNotto();
@@ -438,6 +441,16 @@ export function Editor({
       aria-label={note ? 'Notiz bearbeiten' : 'Neue Notiz'}
     >
       <div className="editor-top">
+        {onBack && !compact && (
+          <button
+            type="button"
+            className="mobile-back icon-button"
+            aria-label="Zur Notizliste"
+            onClick={onBack}
+          >
+            <ArrowLeft size={20} />
+          </button>
+        )}
         <div className="toolbar">
           <Action
             label={preview ? 'Bearbeiten' : 'Vorschau'}

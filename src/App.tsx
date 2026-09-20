@@ -675,15 +675,6 @@ function Notebook({
           <section className="detail-panel">
             {(selectedNote || creating) && (
               <div className="detail-actions">
-                <button
-                  className="mobile-back text-button"
-                  onClick={() => {
-                    setSelected(null);
-                    setCreating(false);
-                  }}
-                >
-                  <ArrowLeft size={16} /> Zurück
-                </button>
                 <span>{selectedNote?.deleted ? 'Im Papierkorb' : ''}</span>
                 <div className="toolbar">
                   {selectedNote && !selectedNote.deleted && (
@@ -716,6 +707,14 @@ function Notebook({
             )}
             {selectedNote?.deleted ? (
               <div className="welcome">
+                <button
+                  type="button"
+                  className="mobile-back icon-button"
+                  aria-label="Zur Notizliste"
+                  onClick={() => setSelected(null)}
+                >
+                  <ArrowLeft size={20} />
+                </button>
                 <Trash2 size={32} />
                 <h2>Im Papierkorb aufbewahrt.</h2>
                 <p>Diese Notiz und ihre bisherigen Versionen sind noch vorhanden.</p>
@@ -731,6 +730,10 @@ function Notebook({
                 draftSource={creating ? draftSource : undefined}
                 note={creating ? undefined : selectedNote}
                 initialCollections={creating && collection ? [collection] : []}
+                onBack={() => {
+                  setSelected(null);
+                  setCreating(false);
+                }}
                 onSaved={(n) => {
                   setSelected(n.id);
                   setCreating(false);

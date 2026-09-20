@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Cloud, Download, FolderOpen, LogOut, Monitor, Moon, Sun } from 'lucide-react';
+import { Cloud, Download, FolderOpen, LogOut, Monitor, Moon, Sun, Upload } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Action, Modal, readableDate } from './components';
 import { cloud, configured, readCloudConfig, saveCloudConfig, ownBackend } from './cloud';
@@ -11,12 +11,14 @@ import { useCaptureShortcut, shortcutOptions, shortcutLabel } from './shortcuts'
 import { noteBackgrounds, type NoteBackgroundId } from './note-backgrounds';
 
 export function Settings({
+  onImport,
   onClose,
   mode,
   setMode,
   noteBackground,
   setNoteBackground,
 }: {
+  onImport?: () => void;
   onClose: () => void;
   mode: 'system' | 'light' | 'dark';
   setMode: (mode: 'system' | 'light' | 'dark') => void;
@@ -291,6 +293,7 @@ export function Settings({
       </section>
       <section className="settings-section">
         <h3>Deine Daten</h3>
+        {onImport && <Action label="Markdown importieren" icon={<Upload size={16} />} onClick={onImport} />}
         <p className="muted">Exportiere Markdown, Bilder, Entwürfe und Versionshistorie zusammen als ZIP.</p>
         <div className="settings-actions">
           <Action

@@ -831,6 +831,7 @@ export function Editor({
             />
             <Action
               label="Bild oder PDF hinzufügen"
+              tooltip="Bild oder PDF hinzufügen – Dateien kannst du auch in die Notiz ziehen"
               icon={<ImagePlus size={18} />}
               isIconOnly
               variant="ghost"
@@ -864,6 +865,7 @@ export function Editor({
           </div>
           <Action
             label={note && !dirty ? 'Gespeichert' : 'Festhalten'}
+            tooltip="Notiz speichern (Strg + Enter)"
             variant="primary"
             icon={note && !dirty ? <Check size={16} /> : <Save size={16} />}
             isDisabled={!ready || addingImages > 0 || !content.trim() || Boolean(note && !dirty)}
@@ -871,12 +873,6 @@ export function Editor({
             onClick={() => void save()}
           />
         </div>
-        {!compact && (
-          <div className="editor-hint">
-            <span>Bilder und PDFs hereinziehen</span>
-            <span className="save-shortcut-hint">Strg + Enter zum Speichern</span>
-          </div>
-        )}
         {history && note && (
           <Modal
             title="Versionshistorie"

@@ -18,7 +18,6 @@ import {
   Plus,
   Sparkles,
   Trash2,
-  Upload,
   WifiOff,
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
@@ -480,10 +479,6 @@ function Notebook({
         </nav>
         <div className="sidebar-bottom">
           {nav('trash', 'Papierkorb', <Trash2 size={17} />, notes.filter((n) => n.deleted).length)}
-          <button className="nav-item" onClick={() => importInput.current?.click()}>
-            <Upload size={17} />
-            <span>Markdown importieren</span>
-          </button>
           <input
             ref={importInput}
             type="file"
@@ -873,6 +868,10 @@ function Notebook({
       )}
       {settings && (
         <Settings
+          onImport={() => {
+            setSettings(false);
+            importInput.current?.click();
+          }}
           mode={mode}
           setMode={setMode}
           noteBackground={noteBackgroundId}

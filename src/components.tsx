@@ -1,8 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Button, type ButtonProps } from '@astryxdesign/core/Button';
 import { Dialog } from '@astryxdesign/core/Dialog';
 import { X, ImageOff } from 'lucide-react';
-import Markdown from 'react-markdown';
+import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { invoke } from '@tauri-apps/api/core';
@@ -151,34 +151,36 @@ function NoteImage({ src, alt, scope }: { src?: string; alt?: string; scope: str
   );
 }
 export function NoteMarkdown({ content, scope }: { content: string; scope: string }) {
+  // Stable component types keep loaded attachments mounted during save/status updates.
+  const components = useMemo<Components>(
+    () => ({
+      table: ({ children }) => (
+        <div
+          className="markdown-table-scroll"
+          role="region"
+          aria-label="Tabelle, horizontal scrollbar"
+          tabIndex={0}
+        >
+          <table>{children}</table>
+        </div>
+      ),
+      img: ({ src, alt }) => <NoteImage src={src} alt={alt} scope={scope} />,
+      a: ({ href, children }) =>
+        /^notes\/[a-f0-9-]{36}$/.test(href || '') ? (
+          <NoteReferenceLink scope={scope} id={href!.slice(6)} fallback={children} />
+        ) : /^attachments\/[a-f0-9-]+\.pdf$/.test(href || '') ? (
+          <PdfAttachment scope={scope} id={href!.slice(12)}>
+            {children}
+          </PdfAttachment>
+        ) : (
+          <WebLink href={href}>{children}</WebLink>
+        ),
+    }),
+    [scope],
+  );
   return (
     <div className="markdown">
-      <Markdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
-        components={{
-          table: ({ children }) => (
-            <div
-              className="markdown-table-scroll"
-              role="region"
-              aria-label="Tabelle, horizontal scrollbar"
-              tabIndex={0}
-            >
-              <table>{children}</table>
-            </div>
-          ),
-          img: ({ src, alt }) => <NoteImage src={src} alt={alt} scope={scope} />,
-          a: ({ href, children }) =>
-            /^notes\/[a-f0-9-]{36}$/.test(href || '') ? (
-              <NoteReferenceLink scope={scope} id={href!.slice(6)} fallback={children} />
-            ) : /^attachments\/[a-f0-9-]+\.pdf$/.test(href || '') ? (
-              <PdfAttachment scope={scope} id={href!.slice(12)}>
-                {children}
-              </PdfAttachment>
-            ) : (
-              <WebLink href={href}>{children}</WebLink>
-            ),
-        }}
-      >
+      <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
         {content}
       </Markdown>
     </div>

@@ -67,6 +67,11 @@ export function Editor({
   const initialCollectionRef = useRef(collections);
   const [collectionInput, setCollectionInput] = useState('');
   const [collectionsOpen, setCollectionsOpen] = useState(false);
+  useEffect(() => {
+    // The picker is an editing aid; keep it compact whenever another note opens.
+    setCollectionsOpen(false);
+    setCollectionInput('');
+  }, [note?.id]);
   const [ready, setReady] = useState(false);
   const [preview, setPreview] = useState(Boolean(note) && !compact);
   const [rewriting, setRewriting] = useState(false);

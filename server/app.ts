@@ -105,7 +105,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '0.10.0' };
+    return { ok: true, version: '0.10.1' };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (
@@ -378,3 +378,4 @@ export async function buildApp(db: Database, env: Environment) {
   }
   return app;
 }
+

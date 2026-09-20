@@ -95,7 +95,6 @@ const environment = {
   secureCookies: false,
   models: [],
   openaiKey: process.env.OPENAI_API_KEY,
-  dailyLimit: Number(process.env.AI_DAILY_LIMIT || 100),
 };
 const app = await buildApp(db, environment);
 await app.listen({ host: '127.0.0.1', port: 3001 });

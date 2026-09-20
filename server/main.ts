@@ -15,7 +15,6 @@ const env: Environment = {
     .split(',')
     .map((v) => v.trim())
     .filter(Boolean),
-  dailyLimit: Number(process.env.AI_DAILY_LIMIT || 100),
 };
 await migrate(
   db,

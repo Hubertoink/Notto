@@ -25,7 +25,7 @@ const headers = (secret?: string) => ({
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
 });
-it('enforces the saved account quota for worker and interactive requests and preserves notebook tools', async () => {
+it('ignores legacy daily quotas and preserves notebook tools', async () => {
   await pg.query('DELETE FROM rate_limits WHERE key=$1', [`ai:${alice}`]);
   await pg.query(
     'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
@@ -59,8 +59,8 @@ it('enforces the saved account quota for worker and interactive requests and pre
     expect(body.include).toContain('reasoning.encrypted_content');
     await expect(
       openai(adapter, alice, 'responses', { model: 'gpt-4.1-mini', input: 'Noch einmal' }, environment),
-    ).rejects.toMatchObject({ statusCode: 429 });
-    expect(fetch).toHaveBeenCalledTimes(1);
+    ).resolves.toEqual({ output: [] });
+    expect(fetch).toHaveBeenCalledTimes(2);
   } finally {
     fetch.mockRestore();
     await pg.query('DELETE FROM rate_limits WHERE key=$1', [`ai:${alice}`]);
@@ -126,7 +126,7 @@ it('discards a worker result when a note is excluded during the request', async 
     await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
   }
 });
-it('defers quota-limited jobs until the next day without exhausting attempts', async () => {
+it('resumes jobs deferred by the removed daily quota without waiting until tomorrow', async () => {
   await pg.exec('DELETE FROM jobs');
   const note = newNote(alice, 'Atlas: vier PCs einrichten');
   await pg.query(
@@ -154,15 +154,28 @@ it('defers quota-limited jobs until the next day without exhausting attempts', a
     headers: headers(aToken),
     payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
   });
-  const fetch = vi.spyOn(globalThis, 'fetch');
+  await pg.query(
+    "UPDATE jobs SET available_at=now()+interval '1 day',error='Tageslimit erreicht. Fortsetzung am nächsten UTC-Tag.' WHERE note_id=$1",
+    [note.id],
+  );
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        status: 'completed',
+        output: [{ content: [{ type: 'output_text', text: JSON.stringify({ suggestions: [] }) }] }],
+      }),
+    ),
+  );
   try {
     await workOnce(adapter, { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 });
-    const job = (await pg.query('SELECT status,attempts,available_at FROM jobs WHERE note_id=$1', [note.id]))
-      .rows[0] as any;
-    expect(job.status).toBe('pending');
-    expect(job.attempts).toBe(0);
-    expect(new Date(job.available_at).getTime()).toBeGreaterThan(Date.now());
-    expect(fetch).not.toHaveBeenCalled();
+    const job = (
+      await pg.query("SELECT status,attempts,available_at FROM jobs WHERE note_id=$1 AND kind='analysis'", [
+        note.id,
+      ])
+    ).rows[0] as any;
+    expect(job.status).toBe('done');
+    expect(job.attempts).toBe(1);
+    expect(fetch).toHaveBeenCalledOnce();
   } finally {
     fetch.mockRestore();
     await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);

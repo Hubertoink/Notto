@@ -72,7 +72,8 @@ export interface AIConfig {
   model: string;
   excludedTags: string;
   excludedNotes: string[];
-  dailyLimit: number;
+  /** Legacy setting, ignored; retained for existing saved configurations. */
+  dailyLimit?: number;
 }
 export const defaults: AIConfig = {
   enabled: false,
@@ -82,7 +83,6 @@ export const defaults: AIConfig = {
   model: 'gpt-4.1-mini',
   excludedTags: 'privat',
   excludedNotes: [],
-  dailyLimit: 40,
 };
 export function config(scope: string): AIConfig {
   try {
@@ -170,11 +170,6 @@ export const knowledge = {
 export async function request(scope: string, endpoint: string, body: Record<string, unknown>): Promise<any> {
   const c = config(scope);
   if (!c.enabled) throw new Error('KI zuerst in „Wissen & KI“ aktivieren.');
-  const day = new Date().toISOString().slice(0, 10),
-    key = `notto-ai-usage:${scope}:${day}`;
-  const count = Number(localStorage.getItem(key) || 0);
-  if (count >= c.dailyLimit) throw new Error('Dein tägliches Anfragelimit ist erreicht.');
-  localStorage.setItem(key, String(count + 1));
   if (endpoint === 'responses') {
     if (scope !== 'local' && ownBackend()) await knowledge.sync(scope);
     else if (body.memory !== false) {

@@ -20,7 +20,7 @@ function text(response: any) {
 }
 export async function workOnce(db: Database, env: AIEnvironment) {
   const { rows } = await db.query(
-    "UPDATE jobs SET status='running',lease_until=now()+interval '4 minutes',attempts=attempts+1 WHERE id=(SELECT id FROM jobs WHERE (status='pending' AND available_at<=now()) OR (status='running' AND lease_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *",
+    "UPDATE jobs SET status='running',error=NULL,lease_until=now()+interval '4 minutes',attempts=attempts+1 WHERE id=(SELECT id FROM jobs WHERE (status='pending' AND (available_at<=now() OR error='Tageslimit erreicht. Fortsetzung am nächsten UTC-Tag.')) OR (status='running' AND lease_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *",
   );
   const job = rows[0];
   if (!job) return false;
@@ -271,13 +271,6 @@ export async function workOnce(db: Database, env: AIEnvironment) {
     await db.query("UPDATE jobs SET status='done',lease_until=NULL,error=NULL WHERE id=$1", [job.id]);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'KI-Auftrag fehlgeschlagen.';
-    if ((error as { statusCode?: number }).statusCode === 429) {
-      await db.query(
-        "UPDATE jobs SET status='pending',error=$2,lease_until=NULL,attempts=greatest(0,attempts-1),available_at=(date_trunc('day',now() AT TIME ZONE 'UTC')+interval '1 day') AT TIME ZONE 'UTC' WHERE id=$1",
-        [job.id, 'Tageslimit erreicht. Fortsetzung am nächsten UTC-Tag.'],
-      );
-      return true;
-    }
     await db.query(
       "UPDATE jobs SET status=$2,error=$3,lease_until=NULL,available_at=now()+interval '5 minutes' WHERE id=$1",
       [job.id, job.attempts >= 3 ? 'failed' : 'pending', message.slice(0, 500)],

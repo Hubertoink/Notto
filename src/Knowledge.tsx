@@ -593,25 +593,10 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
             Der Zauberstab in der Notiz verwendet diese Einstellung. Offene Fragen bleiben offen; die KI soll
             keine Inhalte ergänzen.
           </p>
-          <label>
-            {scope !== 'local' && ownBackend()
-              ? 'Maximale KI-Anfragen pro Tag im Konto (einschließlich Hintergrundaufträgen)'
-              : 'Maximale KI-Anfragen pro Tag auf diesem Gerät'}
-            <input
-              type="number"
-              min="1"
-              max="200"
-              value={settings.dailyLimit}
-              onChange={(e) =>
-                update({ dailyLimit: Math.max(1, Math.min(200, Number(e.target.value) || 1)) })
-              }
-            />
-          </label>
           <p className="muted">
-            Anfragen können Kosten verursachen. Das Anfragelimit ist kein Geldlimit. Fehlgeschlagene
-            Hintergrundanalysen werden erst nach manueller Wiederholung oder einer neuen Fassung erneut
-            versucht. Webrecherche läuft bei aktivierter Automatik nach der Analyse; sonst startest du sie
-            manuell. OCR startest du ausdrücklich.
+            Fehlgeschlagene Hintergrundaufträge werden bis zu dreimal versucht. Webrecherche läuft bei
+            aktivierter Automatik nach der Analyse; sonst startest du sie manuell. OCR startest du
+            ausdrücklich.
           </p>
         </fieldset>
       ) : tab === 'files' ? (

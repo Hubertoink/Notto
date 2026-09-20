@@ -347,7 +347,6 @@ export async function buildApp(db: Database, env: Environment) {
         model: z.string().max(100),
         excludedTags: z.string().max(2000),
         excludedNotes: z.array(uuid).max(10000),
-        dailyLimit: z.number().int().min(1).max(200),
       })
       .parse(req.body);
     await db.query(

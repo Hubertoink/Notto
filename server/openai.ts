@@ -1,14 +1,15 @@
 import { memoryContext } from '../src/memory-policy.js';
 import { knowledgeRole } from '../src/knowledge-policy.js';
 import { z } from 'zod';
-import { limit, type Database } from './database.js';
+import { type Database } from './database.js';
 import { availableModels } from './models.js';
 import { analysisModel } from '../src/ai-models.js';
 import { permittedTools } from '../src/agent-policy.js';
 export interface AIEnvironment {
   openaiKey?: string;
   models: string[];
-  dailyLimit: number;
+  /** Ignored legacy deployment option. */
+  dailyLimit?: number;
   dataDir?: string;
 }
 export async function openai(
@@ -89,9 +90,6 @@ export async function openai(
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(clean);
   }
-  const personalLimit =
-    Number.isInteger(settings.dailyLimit) && settings.dailyLimit > 0 ? settings.dailyLimit : env.dailyLimit;
-  await limit(db, `ai:${userId}`, Math.min(env.dailyLimit, personalLimit), 86400);
   const response = await fetch(`https://api.openai.com/v1/${endpoint}`, {
     method: 'POST',
     headers,

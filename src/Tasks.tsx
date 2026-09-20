@@ -134,6 +134,7 @@ export function NoteAnnotations({
   const records = useKnowledgeRecords(note.scope);
   const [open, setOpen] = useState(false);
   const [docked, setDocked] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('notto-ai-sidebar') !== 'closed');
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
@@ -146,7 +147,11 @@ export function NoteAnnotations({
     return () => observer.disconnect();
   }, []);
   const expanded = docked ? sidebarOpen : open;
+  // Keep the occupied column until AnimatePresence has removed its contents.
+  // Otherwise the exiting panel participates in the collapsed auto-width track.
+  const layoutExpanded = expanded || closing;
   const toggle = (next: boolean) => {
+    setClosing(docked && !next);
     if (docked) {
       setSidebarOpen(next);
       localStorage.setItem('notto-ai-sidebar', next ? 'open' : 'closed');
@@ -182,8 +187,8 @@ export function NoteAnnotations({
     <motion.div
       layout={!reduced && !docked}
       transition={{ type: 'spring', stiffness: 360, damping: 34 }}
-      className={`note-annotations annotation-shell ${expanded ? 'annotation-open' : ''}`}
-      style={{ width: expanded ? '100%' : 'fit-content' }}
+      className={`note-annotations annotation-shell ${layoutExpanded ? 'annotation-open' : ''}`}
+      style={{ width: layoutExpanded ? '100%' : 'fit-content' }}
     >
       <div className="annotation-heading">
         <button
@@ -212,7 +217,7 @@ export function NoteAnnotations({
           </button>
         )}
       </div>
-      <AnimatePresence initial={false}>
+      <AnimatePresence initial={false} onExitComplete={() => setClosing(false)}>
         {expanded && (
           <motion.div
             key="contents"

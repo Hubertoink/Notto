@@ -1,5 +1,5 @@
 import { AttachmentTitle } from './AttachmentTitle';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, Eye, History, ImagePlus, PenLine, Save, X } from 'lucide-react';
 import { Action, Modal, NoteMarkdown, readableDate } from './components';
 import { newNote, reviseNote, tagsOf, attachmentIds, type Note, type Revision } from './domain';
@@ -36,6 +36,13 @@ export function Editor({
   const [history, setHistory] = useState(false);
   const [oldRevision, setOldRevision] = useState<Revision | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const acceptedTagCaret = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (acceptedTagCaret.current === null) return;
+    input.current?.focus();
+    input.current?.setSelectionRange(acceptedTagCaret.current, acceptedTagCaret.current);
+    acceptedTagCaret.current = null;
+  }, [content]);
   const [tagToken, setTagToken] = useState<{ start: number; end: number; query: string } | null>(null);
   const [tagIndex, setTagIndex] = useState(0);
   const tagOptions = [
@@ -62,12 +69,9 @@ export function Editor({
     if (!tagToken) return;
     const tail = content.slice(tagToken.end).replace(/^[\p{L}\p{N}_-]*/u, '');
     const next = content.slice(0, tagToken.start) + '#' + tag + ' ';
+    acceptedTagCaret.current = next.length;
     change(next + tail);
     setTagToken(null);
-    requestAnimationFrame(() => {
-      input.current?.focus();
-      input.current?.setSelectionRange(next.length, next.length);
-    });
   };
   useEffect(() => {
     if (!compact) return;

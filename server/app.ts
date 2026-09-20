@@ -378,4 +378,3 @@ export async function buildApp(db: Database, env: Environment) {
   }
   return app;
 }
-

@@ -3,9 +3,73 @@ import { Mic, Square } from 'lucide-react';
 import { Action, Modal } from './components';
 import { request } from './intelligence';
 
+function RecordingWaveform({ stream }: { stream: MediaStream }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setSeconds((value) => value + 1), 1000);
+    let context: AudioContext | undefined;
+    let source: MediaStreamAudioSourceNode | undefined;
+    let frame = 0;
+    try {
+      context = new AudioContext();
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      source = context.createMediaStreamSource(stream);
+      source.connect(analyser);
+      void context.resume().catch(() => undefined);
+      const samples = new Uint8Array(analyser.fftSize);
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let last = 0;
+      const draw = (time: number) => {
+        frame = requestAnimationFrame(draw);
+        if (time - last < (reduced ? 250 : 33)) return;
+        last = time;
+        const element = canvas.current;
+        const pen = element?.getContext('2d');
+        if (!element || !pen) return;
+        analyser.getByteTimeDomainData(samples);
+        const { width, height } = element;
+        pen.clearRect(0, 0, width, height);
+        pen.strokeStyle = getComputedStyle(element).color;
+        pen.lineWidth = 2;
+        pen.beginPath();
+        samples.forEach((value, index) => {
+          const x = (index / (samples.length - 1)) * width;
+          const y = height / 2 + ((value - 128) / 128) * height * 0.46;
+          if (index === 0) pen.moveTo(x, y);
+          else pen.lineTo(x, y);
+        });
+        pen.stroke();
+      };
+      frame = requestAnimationFrame(draw);
+    } catch {
+      // Recording remains available even when audio analysis is unsupported.
+    }
+    return () => {
+      clearInterval(interval);
+      cancelAnimationFrame(frame);
+      source?.disconnect();
+      if (context && context.state !== 'closed') void context.close().catch(() => undefined);
+    };
+  }, [stream]);
+  return (
+    <div className="recording-monitor">
+      <div className="recording-status">
+        <span role="status">● Aufnahme läuft</span>
+        <time>
+          {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')} / 3:00
+        </time>
+      </div>
+      <canvas ref={canvas} width={800} height={120} aria-hidden="true" />
+    </div>
+  );
+}
+
 export function Dictation({ scope, onInsert }: { scope: string; onInsert: (text: string) => void }) {
   const [open, setOpen] = useState(false),
     [recording, setRecording] = useState(false),
+    [starting, setStarting] = useState(false),
     [busy, setBusy] = useState(false),
     [text, setText] = useState(''),
     [error, setError] = useState('');
@@ -53,6 +117,8 @@ export function Dictation({ scope, onInsert }: { scope: string; onInsert: (text:
     }
   }
   async function start() {
+    if (starting || recording) return;
+    setStarting(true);
     setError('');
     setText('');
     cancelled.current = false;
@@ -92,7 +158,10 @@ export function Dictation({ scope, onInsert }: { scope: string; onInsert: (text:
       setRecording(true);
       timer.current = setTimeout(stop, 180000);
     } catch (e) {
-      setError(String(e));
+      stream.current?.getTracks().forEach((track) => track.stop());
+      if (alive.current && !cancelled.current) setError(String(e));
+    } finally {
+      if (alive.current) setStarting(false);
     }
   }
   const close = () => {
@@ -112,7 +181,7 @@ export function Dictation({ scope, onInsert }: { scope: string; onInsert: (text:
         onClick={() => setOpen(true)}
       />
       {open && (
-        <Modal title="Gedanken einsprechen" onClose={close}>
+        <Modal title="Gedanken einsprechen" onClose={close} className="dictation-dialog">
           <p className="muted">
             Die Aufnahme (maximal drei Minuten) wird nach dem Stoppen an OpenAI zur Transkription gesendet.
             Prüfe den Text, bevor du ihn einfügst.
@@ -122,20 +191,20 @@ export function Dictation({ scope, onInsert }: { scope: string; onInsert: (text:
               {error}
             </p>
           )}
-          <div className="settings-actions">
+          {recording && stream.current && <RecordingWaveform stream={stream.current} />}
+          <div className="settings-actions dictation-actions">
             {recording ? (
               <Action label="Aufnahme stoppen" icon={<Square size={16} />} variant="primary" onClick={stop} />
             ) : (
               <Action
-                label="Aufnahme starten"
+                label={starting ? 'Mikrofon wird geöffnet …' : 'Aufnahme starten'}
                 icon={<Mic size={16} />}
-                isDisabled={busy}
+                isDisabled={busy || starting}
                 onClick={() => void start()}
               />
             )}
             <Action label="Abbrechen" onClick={close} />
           </div>
-          {recording && <p role="status">Mikrofon aktiv · Aufnahme läuft</p>}
           {busy && <p role="status">Text wird erkannt …</p>}
           {error && audio.current && (
             <Action

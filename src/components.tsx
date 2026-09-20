@@ -85,14 +85,17 @@ export function Modal({
   children,
   onClose,
   width = 560,
+  className,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   width?: number;
+  className?: string;
 }) {
   return (
     <Dialog
+      className={className}
       isOpen
       onOpenChange={(open) => !open && onClose()}
       purpose="form"

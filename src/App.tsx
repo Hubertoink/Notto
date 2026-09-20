@@ -339,146 +339,148 @@ function Notebook({
             onClick={openNew}
           />
         </div>
-        <nav aria-label="Notizbücher">
-          {nav('all', 'Alle Notizen', <Inbox size={18} />, active.length)}
-          {nav('pinned', 'Angeheftet', <Pin size={17} />, active.filter((n) => n.pinned).length)}
+        <div className="sidebar-scroll">
+          <nav aria-label="Notizbücher">
+            {nav('all', 'Alle Notizen', <Inbox size={18} />, active.length)}
+            {nav('pinned', 'Angeheftet', <Pin size={17} />, active.filter((n) => n.pinned).length)}
+            <button
+              className={`nav-item ${knowledgeOpen ? 'active' : ''}`}
+              aria-current={knowledgeOpen ? 'page' : undefined}
+              onClick={() => {
+                setKnowledgeOpen(true);
+                setTasksOpen(false);
+                setSidebar(false);
+              }}
+            >
+              <Sparkles size={18} />
+              <span>Wissen & KI</span>
+            </button>
+            <button
+              className={`nav-item ${tasksOpen ? 'active' : ''}`}
+              aria-current={tasksOpen ? 'page' : undefined}
+              onClick={() => {
+                setTasksOpen(true);
+                setKnowledgeOpen(false);
+                setSidebar(false);
+              }}
+            >
+              <Check size={18} />
+              <span>Aufgaben</span>
+              <span className="nav-count">{tasks.filter((t) => !t.done).length || ''}</span>
+            </button>
+            {nav(
+              'archive',
+              'Archiv',
+              <Archive size={17} />,
+              notes.filter((n) => n.archived && !n.deleted).length,
+            )}
+          </nav>
           <button
-            className={`nav-item ${knowledgeOpen ? 'active' : ''}`}
-            aria-current={knowledgeOpen ? 'page' : undefined}
-            onClick={() => {
-              setKnowledgeOpen(true);
-              setTasksOpen(false);
-              setSidebar(false);
-            }}
+            className="tags-heading"
+            style={{ viewTransitionName: allTags ? undefined : 'tags-popout' }}
+            onClick={() => toggleTags(true)}
+            aria-label="Alle Tags anzeigen"
           >
-            <Sparkles size={18} />
-            <span>Wissen & KI</span>
+            <span>DEINE TAGS</span>
+            <Hash size={13} />
           </button>
-          <button
-            className={`nav-item ${tasksOpen ? 'active' : ''}`}
-            aria-current={tasksOpen ? 'page' : undefined}
-            onClick={() => {
-              setTasksOpen(true);
-              setKnowledgeOpen(false);
-              setSidebar(false);
-            }}
-          >
-            <Check size={18} />
-            <span>Aufgaben</span>
-            <span className="nav-count">{tasks.filter((t) => !t.done).length || ''}</span>
-          </button>
-          {nav(
-            'archive',
-            'Archiv',
-            <Archive size={17} />,
-            notes.filter((n) => n.archived && !n.deleted).length,
-          )}
-        </nav>
-        <button
-          className="tags-heading"
-          style={{ viewTransitionName: allTags ? undefined : 'tags-popout' }}
-          onClick={() => toggleTags(true)}
-          aria-label="Alle Tags anzeigen"
-        >
-          <span>DEINE TAGS</span>
-          <Hash size={13} />
-        </button>
-        <nav className="tag-navigation" aria-label="Tags">
-          {tagCounts.length === 0 ? (
-            <p className="empty-tags">Schreibe #thema in eine Notiz. Deine Tags erscheinen hier.</p>
-          ) : (
-            tagCounts.slice(0, 5).map(([t, count]) => (
+          <nav className="tag-navigation" aria-label="Tags">
+            {tagCounts.length === 0 ? (
+              <p className="empty-tags">Schreibe #thema in eine Notiz. Deine Tags erscheinen hier.</p>
+            ) : (
+              tagCounts.slice(0, 5).map(([t, count]) => (
+                <button
+                  key={t}
+                  className={`nav-item ${tag === t ? 'active' : ''}`}
+                  onClick={() => {
+                    setKnowledgeOpen(false);
+                    setTasksOpen(false);
+                    setTag(t);
+                    setCollection(null);
+                    setView('all');
+                    setCreating(false);
+                    setSelected(null);
+                    setSidebar(false);
+                  }}
+                >
+                  <Hash size={15} />
+                  <span>{t}</span>
+                  <span className="nav-count">{count}</span>
+                </button>
+              ))
+            )}
+          </nav>
+          <div className="tags-heading">
+            <span>SAMMLUNGEN</span>
+            <button
+              className="collection-add"
+              type="button"
+              aria-label="Sammlung anlegen"
+              title="Sammlung anlegen"
+              onClick={() => {
+                setNewCollectionName('');
+                setCollectionError('');
+                setCollectionDialog(true);
+              }}
+            >
+              <Plus size={15} />
+            </button>
+          </div>
+          <nav className="collection-navigation" aria-label="Sammlungen">
+            {collectionCounts.map(([name, count]) => (
               <button
-                key={t}
-                className={`nav-item ${tag === t ? 'active' : ''}`}
+                key={name}
+                className={`nav-item ${collection === name && !knowledgeOpen && !tasksOpen ? 'active' : ''} ${dragCollection === name ? 'collection-drop-target' : ''}`}
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                  setDragCollection(name);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragCollection(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragCollection(null);
+                  let payload: { id?: string; scope?: string };
+                  try {
+                    payload = JSON.parse(e.dataTransfer.getData(NOTE_DRAG_TYPE));
+                  } catch {
+                    return;
+                  }
+                  if (
+                    payload.scope !== scope ||
+                    !notes.some((n) => n.id === payload.id && n.scope === scope && !n.deleted)
+                  )
+                    return;
+                  void addNoteToCollection(scope, payload.id!, name)
+                    .then(() => notify(`Zu „${name}“ hinzugefügt`))
+                    .catch((error) => notify(String(error)));
+                }}
                 onClick={() => {
+                  setCollection(name);
+                  setTag(null);
+                  setView('all');
                   setKnowledgeOpen(false);
                   setTasksOpen(false);
-                  setTag(t);
-                  setCollection(null);
-                  setView('all');
                   setCreating(false);
                   setSelected(null);
                   setSidebar(false);
                 }}
               >
-                <Hash size={15} />
-                <span>{t}</span>
+                <FolderOpen size={15} />
+                <span>{name}</span>
                 <span className="nav-count">{count}</span>
               </button>
-            ))
-          )}
-        </nav>
-        <div className="tags-heading">
-          <span>SAMMLUNGEN</span>
-          <button
-            className="collection-add"
-            type="button"
-            aria-label="Sammlung anlegen"
-            title="Sammlung anlegen"
-            onClick={() => {
-              setNewCollectionName('');
-              setCollectionError('');
-              setCollectionDialog(true);
-            }}
-          >
-            <Plus size={15} />
-          </button>
-        </div>
-        <nav className="collection-navigation" aria-label="Sammlungen">
-          {collectionCounts.map(([name, count]) => (
-            <button
-              key={name}
-              className={`nav-item ${collection === name && !knowledgeOpen && !tasksOpen ? 'active' : ''} ${dragCollection === name ? 'collection-drop-target' : ''}`}
-              onDragOver={(e) => {
-                if (!e.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'copy';
-                setDragCollection(name);
-              }}
-              onDragLeave={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragCollection(null);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragCollection(null);
-                let payload: { id?: string; scope?: string };
-                try {
-                  payload = JSON.parse(e.dataTransfer.getData(NOTE_DRAG_TYPE));
-                } catch {
-                  return;
-                }
-                if (
-                  payload.scope !== scope ||
-                  !notes.some((n) => n.id === payload.id && n.scope === scope && !n.deleted)
-                )
-                  return;
-                void addNoteToCollection(scope, payload.id!, name)
-                  .then(() => notify(`Zu „${name}“ hinzugefügt`))
-                  .catch((error) => notify(String(error)));
-              }}
-              onClick={() => {
-                setCollection(name);
-                setTag(null);
-                setView('all');
-                setKnowledgeOpen(false);
-                setTasksOpen(false);
-                setCreating(false);
-                setSelected(null);
-                setSidebar(false);
-              }}
-            >
-              <FolderOpen size={15} />
-              <span>{name}</span>
-              <span className="nav-count">{count}</span>
-            </button>
-          ))}
-          {!collectionCounts.length && (
-            <p className="empty-tags">Mit + anlegen, dann Notizen hierher ziehen.</p>
-          )}
-        </nav>
-        <div className="sidebar-bottom">
+            ))}
+            {!collectionCounts.length && (
+              <p className="empty-tags">Mit + anlegen, dann Notizen hierher ziehen.</p>
+            )}
+          </nav>
           {nav('trash', 'Papierkorb', <Trash2 size={17} />, notes.filter((n) => n.deleted).length)}
+        </div>
+        <div className="sidebar-bottom">
           <input
             ref={importInput}
             type="file"

@@ -467,461 +467,466 @@ export function Editor({
       className={`editor ${compact ? 'editor-compact' : ''} ${preview ? 'editor-reading' : ''} ${note && !compact ? 'editor-with-annotations' : ''}`}
       aria-label={note ? 'Notiz bearbeiten' : 'Neue Notiz'}
     >
-      <div className="editor-top">
-        {onBack && !compact && (
-          <button
-            type="button"
-            className="mobile-back icon-button"
-            aria-label="Zur Notizliste"
-            onClick={onBack}
-          >
-            <ArrowLeft size={20} />
-          </button>
-        )}
-        <div className="toolbar">
-          {!compact && (
-            <Action
-              label={rewriting ? 'Wird überarbeitet …' : 'Mit KI überarbeiten'}
-              icon={<WandSparkles size={17} />}
-              isIconOnly
-              variant="ghost"
-              isDisabled={rewriting || saving || !ready || !content.trim()}
-              onClick={() => void rewrite()}
-            />
-          )}
-          {rewriteUndo && content === rewriteUndo.after && (
-            <Action
-              label="KI-Überarbeitung rückgängig"
-              icon={<Undo2 size={17} />}
-              isIconOnly
-              variant="ghost"
-              isDisabled={saving || rewriting}
-              onClick={() => {
-                change(rewriteUndo.before);
-                setRewriteUndo(null);
-                setPreview(false);
-              }}
-            />
-          )}
-          <Action
-            label={preview ? 'Bearbeiten' : 'Vorschau'}
-            icon={preview ? <PenLine size={17} /> : <Eye size={17} />}
-            isIconOnly
-            variant="ghost"
-            onClick={() => setPreview(!preview)}
-          />
-          {note && !compact && (
-            <Action
-              label="Versionshistorie"
-              icon={<History size={17} />}
-              isIconOnly
-              variant="ghost"
-              onClick={() => setHistory(true)}
-            />
-          )}
-          {onClose && (
-            <Action
-              label="Schließen, Entwurf behalten"
-              icon={<X size={17} />}
-              isIconOnly
-              variant="ghost"
-              onClick={onClose}
-            />
-          )}
-        </div>
-      </div>
-      {note && !compact && (
-        <div className="note-meta">
-          Erstellt {readableDate(note.createdAt)} · {note.history.length}{' '}
-          {note.history.length === 1 ? 'Textversion' : 'Textversionen'}
-          {note.conflictOf && <span className="conflict-label">Konfliktkopie</span>}
-        </div>
-      )}
-      {note && !compact && <NoteAnnotations key={note.id} note={note} hasUnsavedChanges={dirty} />}
-      {!preview && (
-        <div className="formatting-toolbar" role="toolbar" aria-label="Text formatieren">
-          {(
-            [
-              ['bold', 'Fett (Strg B)', Bold],
-              ['italic', 'Kursiv (Strg I)', Italic],
-              ['heading', 'Überschrift', Heading2],
-              ['bullet', 'Aufzählung', List],
-              ['number', 'Nummerierte Liste', ListOrdered],
-              ['task', 'Checkbox', ListTodo],
-              ['quote', 'Zitat', Quote],
-              ['link', 'Weblink einfügen', Link],
-            ] as const
-          ).map(([kind, label, Icon]) => (
+      <div className="editor-heading">
+        <div className="editor-top">
+          {onBack && !compact && (
             <button
-              key={kind}
               type="button"
-              aria-label={label}
-              title={label}
+              className="mobile-back icon-button"
+              aria-label="Zur Notizliste"
+              onClick={onBack}
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
+          <div className="toolbar">
+            {!compact && (
+              <Action
+                label={rewriting ? 'Wird überarbeitet …' : 'Mit KI überarbeiten'}
+                icon={<WandSparkles size={17} />}
+                isIconOnly
+                variant="ghost"
+                isDisabled={rewriting || saving || !ready || !content.trim()}
+                onClick={() => void rewrite()}
+              />
+            )}
+            {rewriteUndo && content === rewriteUndo.after && (
+              <Action
+                label="KI-Überarbeitung rückgängig"
+                icon={<Undo2 size={17} />}
+                isIconOnly
+                variant="ghost"
+                isDisabled={saving || rewriting}
+                onClick={() => {
+                  change(rewriteUndo.before);
+                  setRewriteUndo(null);
+                  setPreview(false);
+                }}
+              />
+            )}
+            <Action
+              label={preview ? 'Bearbeiten' : 'Vorschau'}
+              icon={preview ? <PenLine size={17} /> : <Eye size={17} />}
+              isIconOnly
+              variant="ghost"
+              onClick={() => setPreview(!preview)}
+            />
+            {note && !compact && (
+              <Action
+                label="Versionshistorie"
+                icon={<History size={17} />}
+                isIconOnly
+                variant="ghost"
+                onClick={() => setHistory(true)}
+              />
+            )}
+            {onClose && (
+              <Action
+                label="Schließen, Entwurf behalten"
+                icon={<X size={17} />}
+                isIconOnly
+                variant="ghost"
+                onClick={onClose}
+              />
+            )}
+          </div>
+        </div>
+        {note && !compact && (
+          <div className="note-meta">
+            Erstellt {readableDate(note.createdAt)} · {note.history.length}{' '}
+            {note.history.length === 1 ? 'Textversion' : 'Textversionen'}
+            {note.conflictOf && <span className="conflict-label">Konfliktkopie</span>}
+          </div>
+        )}
+      </div>
+      {note && !compact && <NoteAnnotations key={note.id} note={note} hasUnsavedChanges={dirty} />}
+      <div className="editor-body">
+        {!preview && (
+          <div className="formatting-toolbar" role="toolbar" aria-label="Text formatieren">
+            {(
+              [
+                ['bold', 'Fett (Strg B)', Bold],
+                ['italic', 'Kursiv (Strg I)', Italic],
+                ['heading', 'Überschrift', Heading2],
+                ['bullet', 'Aufzählung', List],
+                ['number', 'Nummerierte Liste', ListOrdered],
+                ['task', 'Checkbox', ListTodo],
+                ['quote', 'Zitat', Quote],
+                ['link', 'Weblink einfügen', Link],
+              ] as const
+            ).map(([kind, label, Icon]) => (
+              <button
+                key={kind}
+                type="button"
+                aria-label={label}
+                title={label}
+                disabled={!ready || saving}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => format(kind)}
+              >
+                <Icon size={17} />
+              </button>
+            ))}
+            <span className="toolbar-separator" />
+            <button
+              type="button"
+              aria-label="Notiz verlinken"
+              title="Notiz verlinken ([[)"
               disabled={!ready || saving}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => format(kind)}
+              onClick={insertReference}
             >
-              <Icon size={17} />
+              <FileSymlink size={17} />
             </button>
-          ))}
-          <span className="toolbar-separator" />
-          <button
-            type="button"
-            aria-label="Notiz verlinken"
-            title="Notiz verlinken ([[)"
-            disabled={!ready || saving}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={insertReference}
-          >
-            <FileSymlink size={17} />
-          </button>
-        </div>
-      )}
-      <div
-        className={`editor-content ${preview ? 'is-preview' : ''}`}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault();
-          void addFiles(Array.from(e.dataTransfer.files));
-        }}
-      >
-        {preview ? (
-          <NoteMarkdown content={content || '*Noch kein Text.*'} scope={scope} />
-        ) : (
-          <textarea
-            ref={input}
-            aria-label="Notiztext"
-            value={content}
-            disabled={!ready || saving}
-            placeholder={
-              compact
-                ? 'Ein Gedanke, eine Idee, etwas für später …\n\n#thema'
-                : 'Ein Gedanke, eine Idee, etwas für später …\n\nMit #Hashtags behältst du den Überblick.'
-            }
-            onChange={(e) => {
-              change(e.target.value);
-              inspectTag(e.target);
-            }}
-            onClick={(e) => inspectTag(e.currentTarget)}
-            onBlur={() => setTagToken(null)}
-            onKeyUp={(e) => {
-              if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) inspectTag(e.currentTarget);
-            }}
-            aria-controls={tagToken && suggestions.length ? 'tag-suggestions' : undefined}
-            aria-activedescendant={tagToken && suggestions.length ? `tag-option-${tagIndex}` : undefined}
-            onPaste={(e) => {
-              const images = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
-              if (images.length) {
-                e.preventDefault();
-                void addFiles(images);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (
-                !e.nativeEvent.isComposing &&
-                (e.ctrlKey || e.metaKey) &&
-                !e.altKey &&
-                ['b', 'i'].includes(e.key.toLowerCase())
-              ) {
-                e.preventDefault();
-                format(e.key.toLowerCase() === 'b' ? 'bold' : 'italic');
-                return;
-              }
-              if (tagToken && !e.nativeEvent.isComposing && !e.ctrlKey && !e.metaKey) {
-                if (e.key === 'Escape') {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setTagToken(null);
-                  return;
-                }
-                if (suggestions.length && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
-                  e.preventDefault();
-                  if (e.key === 'Enter') acceptSuggestion((suggestions[tagIndex] || suggestions[0]).id);
-                  else
-                    setTagIndex(
-                      (i) => (i + (e.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length,
-                    );
-                  return;
-                }
-              }
-              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                e.preventDefault();
-                void save();
-              }
-            }}
-            spellCheck
-            lang="de"
-          />
-        )}
-        {!preview &&
-          tagToken &&
-          tagPosition &&
-          (suggestions.length > 0 || tagToken.kind === 'note') &&
-          createPortal(
-            <div
-              className="tag-suggestions"
-              style={tagPosition}
-              id="tag-suggestions"
-              role="listbox"
-              aria-label={tagToken.kind === 'note' ? 'Notiz auswählen' : 'Vorhandene Tags'}
-            >
-              {suggestions.map((suggestion, i) => (
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={i === tagIndex}
-                  id={`tag-option-${i}`}
-                  key={suggestion.id}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => acceptSuggestion(suggestion.id)}
-                >
-                  {suggestion.label}
-                </button>
-              ))}
-              {!suggestions.length && <p className="suggestions-empty">Keine passende Notiz</p>}
-            </div>,
-            document.body,
-          )}
-      </div>
-      {!preview && attachmentIds(content).some((id) => id.endsWith('.pdf')) && (
-        <div className="editor-attachments" aria-label="PDF-Anhänge">
-          {attachmentIds(content)
-            .filter((id) => id.endsWith('.pdf'))
-            .map((id) => {
-              return (
-                <PdfAttachment key={id} scope={scope} id={id}>
-                  <AttachmentTitle content={content} scope={scope} id={id} />
-                </PdfAttachment>
-              );
-            })}
-        </div>
-      )}
-      {tagsOf(content).length > 0 && (
-        <div className="editor-tags">
-          {tagsOf(content).map((tag) => (
-            <span className="tag" key={tag}>
-              #{tag}
-            </span>
-          ))}
-        </div>
-      )}
-      {!compact && (
-        <div className="note-collections">
-          <button
-            type="button"
-            className="text-button"
-            aria-expanded={collectionsOpen}
-            onClick={() => setCollectionsOpen(!collectionsOpen)}
-          >
-            <FolderOpen size={15} /> Sammlungen{collections.length ? ` · ${collections.length}` : ''}
-          </button>
-          {collections.map((name) => (
-            <span className="collection-chip" key={name}>
-              {name}
-              <button
-                type="button"
-                aria-label={`${name} aus dieser Notiz entfernen`}
-                disabled={!ready || saving}
-                onClick={() => updateCollections(collections.filter((c) => c !== name))}
-              >
-                <X size={12} />
-              </button>
-            </span>
-          ))}
-          {collectionsOpen && (
-            <div className="collection-picker">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  addCollection(collectionInput);
-                }}
-              >
-                <input
-                  aria-label="Sammlung"
-                  placeholder="Sammlung suchen oder anlegen …"
-                  maxLength={60}
-                  value={collectionInput}
-                  onChange={(e) => setCollectionInput(e.target.value)}
-                  disabled={!ready || saving}
-                />
-                <button
-                  type="submit"
-                  disabled={!ready || saving || !collectionInput.trim() || collections.length >= 30}
-                >
-                  Hinzufügen
-                </button>
-              </form>
-              {knownCollections
-                .filter(
-                  (c) =>
-                    !collections.includes(c) &&
-                    c.toLocaleLowerCase('de').includes(collectionInput.toLocaleLowerCase('de')),
-                )
-                .sort((a, b) => a.localeCompare(b, 'de'))
-                .slice(0, 8)
-                .map((c) => (
-                  <button
-                    className="collection-choice"
-                    type="button"
-                    key={c}
-                    disabled={!ready || saving || collections.length >= 30}
-                    onClick={() => addCollection(c)}
-                  >
-                    <FolderOpen size={14} />
-                    {c}
-                  </button>
-                ))}
-              <small>
-                Eine Notiz kann in mehreren Sammlungen liegen. Änderungen werden mit der Notiz gespeichert.
-              </small>
-            </div>
-          )}
-        </div>
-      )}
-      {(outgoing.length > 0 || incoming.length > 0) && (
-        <div className="note-connections">
-          {outgoing.length > 0 && (
-            <details>
-              <summary>Verlinkt · {outgoing.length}</summary>
-              <ul>
-                {outgoing.map((n) => (
-                  <li key={n.id}>
-                    <NoteReferenceLink id={n.id} scope={scope} />
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-          {incoming.length > 0 && (
-            <details>
-              <summary>Erwähnt in · {incoming.length}</summary>
-              <ul>
-                {incoming.map((n) => (
-                  <li key={n.id}>
-                    <NoteReferenceLink id={n.id} scope={scope} />
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
-      {error && (
-        <div className="inline-error" role="alert">
-          {error}
-          {note && (
-            <button className="text-button" onClick={() => void save(true)}>
-              Als neue Notiz sichern
-            </button>
-          )}
-        </div>
-      )}
-      <div className="editor-footer">
-        <div className="editor-tools">
-          <Dictation
-            scope={scope}
-            onInsert={(text) => {
-              const position = input.current?.selectionStart ?? textRef.current.length;
-              change(textRef.current.slice(0, position) + text + textRef.current.slice(position));
-            }}
-          />
-          <Action
-            label="Bild oder PDF hinzufügen"
-            icon={<ImagePlus size={18} />}
-            isIconOnly
-            variant="ghost"
-            onClick={() => file.current?.click()}
-          />
-          <input
-            ref={file}
-            type="file"
-            hidden
-            multiple
-            accept="image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf,.pdf"
-            onChange={(e) => {
-              void addFiles(Array.from(e.target.files ?? []));
-              e.target.value = '';
-            }}
-          />
-          <span
-            className={`draft-state save-indicator ${error ? 'save-error' : addingImages || draftStatus.includes('wird') ? 'save-writing' : draftStatus ? 'save-saved' : ''}`}
-            role="status"
-            aria-label={
-              error
-                ? 'Speicherfehler'
-                : addingImages
-                  ? 'Anhang wird gespeichert'
-                  : draftStatus || 'Noch kein Entwurf'
-            }
-            title={error || draftStatus || 'Noch kein Entwurf'}
-          >
-            <Save size={17} />
-          </span>
-        </div>
-        <Action
-          label={note && !dirty ? 'Gespeichert' : 'Festhalten'}
-          variant="primary"
-          icon={note && !dirty ? <Check size={16} /> : <Save size={16} />}
-          isDisabled={!ready || addingImages > 0 || !content.trim() || Boolean(note && !dirty)}
-          isLoading={saving}
-          onClick={() => void save()}
-        />
-      </div>
-      {!compact && (
-        <div className="editor-hint">
-          <span>Bilder und PDFs hereinziehen</span>
-          <span className="save-shortcut-hint">Strg + Enter zum Speichern</span>
-        </div>
-      )}
-      {history && note && (
-        <Modal
-          title="Versionshistorie"
-          onClose={() => {
-            setHistory(false);
-            setOldRevision(null);
-          }}
-          width={720}
-        >
-          <p className="muted">
-            Eine Wiederherstellung wird als neue Version gespeichert. Frühere Fassungen bleiben erhalten.
-          </p>
-          <div className="history-layout">
-            <div className="history-list">
-              {[...note.history].reverse().map((r, i) => (
-                <button
-                  key={r.revision}
-                  className={`history-item ${oldRevision?.revision === r.revision ? 'selected' : ''}`}
-                  onClick={() => setOldRevision(r)}
-                >
-                  {readableDate(r.savedAt)}
-                  <span>{i === 0 ? 'Aktuelle Textversion' : `Version ${note.history.length - i}`}</span>
-                </button>
-              ))}
-            </div>
-            <div className="history-preview">
-              <NoteMarkdown
-                content={(oldRevision ?? note.history[note.history.length - 1]).content}
-                scope={scope}
-              />
-            </div>
           </div>
-          <div className="modal-actions">
-            <Action label="Schließen" onClick={() => setHistory(false)} />
-            <Action
-              label="Als Entwurf übernehmen"
-              variant="primary"
-              isDisabled={!oldRevision}
-              onClick={() => {
-                if (oldRevision) {
-                  change(oldRevision.content);
-                  setHistory(false);
-                  setPreview(false);
+        )}
+        <div
+          className={`editor-content ${preview ? 'is-preview' : ''}`}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            void addFiles(Array.from(e.dataTransfer.files));
+          }}
+        >
+          {preview ? (
+            <NoteMarkdown content={content || '*Noch kein Text.*'} scope={scope} />
+          ) : (
+            <textarea
+              ref={input}
+              aria-label="Notiztext"
+              value={content}
+              disabled={!ready || saving}
+              placeholder={
+                compact
+                  ? 'Ein Gedanke, eine Idee, etwas für später …\n\n#thema'
+                  : 'Ein Gedanke, eine Idee, etwas für später …\n\nMit #Hashtags behältst du den Überblick.'
+              }
+              onChange={(e) => {
+                change(e.target.value);
+                inspectTag(e.target);
+              }}
+              onClick={(e) => inspectTag(e.currentTarget)}
+              onBlur={() => setTagToken(null)}
+              onKeyUp={(e) => {
+                if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) inspectTag(e.currentTarget);
+              }}
+              aria-controls={tagToken && suggestions.length ? 'tag-suggestions' : undefined}
+              aria-activedescendant={tagToken && suggestions.length ? `tag-option-${tagIndex}` : undefined}
+              onPaste={(e) => {
+                const images = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
+                if (images.length) {
+                  e.preventDefault();
+                  void addFiles(images);
                 }
               }}
+              onKeyDown={(e) => {
+                if (
+                  !e.nativeEvent.isComposing &&
+                  (e.ctrlKey || e.metaKey) &&
+                  !e.altKey &&
+                  ['b', 'i'].includes(e.key.toLowerCase())
+                ) {
+                  e.preventDefault();
+                  format(e.key.toLowerCase() === 'b' ? 'bold' : 'italic');
+                  return;
+                }
+                if (tagToken && !e.nativeEvent.isComposing && !e.ctrlKey && !e.metaKey) {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTagToken(null);
+                    return;
+                  }
+                  if (suggestions.length && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+                    e.preventDefault();
+                    if (e.key === 'Enter') acceptSuggestion((suggestions[tagIndex] || suggestions[0]).id);
+                    else
+                      setTagIndex(
+                        (i) =>
+                          (i + (e.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length,
+                      );
+                    return;
+                  }
+                }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  void save();
+                }
+              }}
+              spellCheck
+              lang="de"
             />
+          )}
+          {!preview &&
+            tagToken &&
+            tagPosition &&
+            (suggestions.length > 0 || tagToken.kind === 'note') &&
+            createPortal(
+              <div
+                className="tag-suggestions"
+                style={tagPosition}
+                id="tag-suggestions"
+                role="listbox"
+                aria-label={tagToken.kind === 'note' ? 'Notiz auswählen' : 'Vorhandene Tags'}
+              >
+                {suggestions.map((suggestion, i) => (
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={i === tagIndex}
+                    id={`tag-option-${i}`}
+                    key={suggestion.id}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => acceptSuggestion(suggestion.id)}
+                  >
+                    {suggestion.label}
+                  </button>
+                ))}
+                {!suggestions.length && <p className="suggestions-empty">Keine passende Notiz</p>}
+              </div>,
+              document.body,
+            )}
+        </div>
+        {!preview && attachmentIds(content).some((id) => id.endsWith('.pdf')) && (
+          <div className="editor-attachments" aria-label="PDF-Anhänge">
+            {attachmentIds(content)
+              .filter((id) => id.endsWith('.pdf'))
+              .map((id) => {
+                return (
+                  <PdfAttachment key={id} scope={scope} id={id}>
+                    <AttachmentTitle content={content} scope={scope} id={id} />
+                  </PdfAttachment>
+                );
+              })}
           </div>
-        </Modal>
-      )}
+        )}
+        {tagsOf(content).length > 0 && (
+          <div className="editor-tags">
+            {tagsOf(content).map((tag) => (
+              <span className="tag" key={tag}>
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+        {!compact && (
+          <div className="note-collections">
+            <button
+              type="button"
+              className="text-button"
+              aria-expanded={collectionsOpen}
+              onClick={() => setCollectionsOpen(!collectionsOpen)}
+            >
+              <FolderOpen size={15} /> Sammlungen{collections.length ? ` · ${collections.length}` : ''}
+            </button>
+            {collections.map((name) => (
+              <span className="collection-chip" key={name}>
+                {name}
+                <button
+                  type="button"
+                  aria-label={`${name} aus dieser Notiz entfernen`}
+                  disabled={!ready || saving}
+                  onClick={() => updateCollections(collections.filter((c) => c !== name))}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            {collectionsOpen && (
+              <div className="collection-picker">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    addCollection(collectionInput);
+                  }}
+                >
+                  <input
+                    aria-label="Sammlung"
+                    placeholder="Sammlung suchen oder anlegen …"
+                    maxLength={60}
+                    value={collectionInput}
+                    onChange={(e) => setCollectionInput(e.target.value)}
+                    disabled={!ready || saving}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!ready || saving || !collectionInput.trim() || collections.length >= 30}
+                  >
+                    Hinzufügen
+                  </button>
+                </form>
+                {knownCollections
+                  .filter(
+                    (c) =>
+                      !collections.includes(c) &&
+                      c.toLocaleLowerCase('de').includes(collectionInput.toLocaleLowerCase('de')),
+                  )
+                  .sort((a, b) => a.localeCompare(b, 'de'))
+                  .slice(0, 8)
+                  .map((c) => (
+                    <button
+                      className="collection-choice"
+                      type="button"
+                      key={c}
+                      disabled={!ready || saving || collections.length >= 30}
+                      onClick={() => addCollection(c)}
+                    >
+                      <FolderOpen size={14} />
+                      {c}
+                    </button>
+                  ))}
+                <small>
+                  Eine Notiz kann in mehreren Sammlungen liegen. Änderungen werden mit der Notiz gespeichert.
+                </small>
+              </div>
+            )}
+          </div>
+        )}
+        {(outgoing.length > 0 || incoming.length > 0) && (
+          <div className="note-connections">
+            {outgoing.length > 0 && (
+              <details>
+                <summary>Verlinkt · {outgoing.length}</summary>
+                <ul>
+                  {outgoing.map((n) => (
+                    <li key={n.id}>
+                      <NoteReferenceLink id={n.id} scope={scope} />
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {incoming.length > 0 && (
+              <details>
+                <summary>Erwähnt in · {incoming.length}</summary>
+                <ul>
+                  {incoming.map((n) => (
+                    <li key={n.id}>
+                      <NoteReferenceLink id={n.id} scope={scope} />
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+        {error && (
+          <div className="inline-error" role="alert">
+            {error}
+            {note && (
+              <button className="text-button" onClick={() => void save(true)}>
+                Als neue Notiz sichern
+              </button>
+            )}
+          </div>
+        )}
+        <div className="editor-footer">
+          <div className="editor-tools">
+            <Dictation
+              scope={scope}
+              onInsert={(text) => {
+                const position = input.current?.selectionStart ?? textRef.current.length;
+                change(textRef.current.slice(0, position) + text + textRef.current.slice(position));
+              }}
+            />
+            <Action
+              label="Bild oder PDF hinzufügen"
+              icon={<ImagePlus size={18} />}
+              isIconOnly
+              variant="ghost"
+              onClick={() => file.current?.click()}
+            />
+            <input
+              ref={file}
+              type="file"
+              hidden
+              multiple
+              accept="image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf,.pdf"
+              onChange={(e) => {
+                void addFiles(Array.from(e.target.files ?? []));
+                e.target.value = '';
+              }}
+            />
+            <span
+              className={`draft-state save-indicator ${error ? 'save-error' : addingImages || draftStatus.includes('wird') ? 'save-writing' : draftStatus ? 'save-saved' : ''}`}
+              role="status"
+              aria-label={
+                error
+                  ? 'Speicherfehler'
+                  : addingImages
+                    ? 'Anhang wird gespeichert'
+                    : draftStatus || 'Noch kein Entwurf'
+              }
+              title={error || draftStatus || 'Noch kein Entwurf'}
+            >
+              <Save size={17} />
+            </span>
+          </div>
+          <Action
+            label={note && !dirty ? 'Gespeichert' : 'Festhalten'}
+            variant="primary"
+            icon={note && !dirty ? <Check size={16} /> : <Save size={16} />}
+            isDisabled={!ready || addingImages > 0 || !content.trim() || Boolean(note && !dirty)}
+            isLoading={saving}
+            onClick={() => void save()}
+          />
+        </div>
+        {!compact && (
+          <div className="editor-hint">
+            <span>Bilder und PDFs hereinziehen</span>
+            <span className="save-shortcut-hint">Strg + Enter zum Speichern</span>
+          </div>
+        )}
+        {history && note && (
+          <Modal
+            title="Versionshistorie"
+            onClose={() => {
+              setHistory(false);
+              setOldRevision(null);
+            }}
+            width={720}
+          >
+            <p className="muted">
+              Eine Wiederherstellung wird als neue Version gespeichert. Frühere Fassungen bleiben erhalten.
+            </p>
+            <div className="history-layout">
+              <div className="history-list">
+                {[...note.history].reverse().map((r, i) => (
+                  <button
+                    key={r.revision}
+                    className={`history-item ${oldRevision?.revision === r.revision ? 'selected' : ''}`}
+                    onClick={() => setOldRevision(r)}
+                  >
+                    {readableDate(r.savedAt)}
+                    <span>{i === 0 ? 'Aktuelle Textversion' : `Version ${note.history.length - i}`}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="history-preview">
+                <NoteMarkdown
+                  content={(oldRevision ?? note.history[note.history.length - 1]).content}
+                  scope={scope}
+                />
+              </div>
+            </div>
+            <div className="modal-actions">
+              <Action label="Schließen" onClick={() => setHistory(false)} />
+              <Action
+                label="Als Entwurf übernehmen"
+                variant="primary"
+                isDisabled={!oldRevision}
+                onClick={() => {
+                  if (oldRevision) {
+                    change(oldRevision.content);
+                    setHistory(false);
+                    setPreview(false);
+                  }
+                }}
+              />
+            </div>
+          </Modal>
+        )}
+      </div>
     </section>
   );
 }

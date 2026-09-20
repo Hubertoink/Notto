@@ -160,25 +160,41 @@
 @container note-detail (min-width: 1000px) {
   .editor.editor-with-annotations {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) clamp(380px, 38cqi, 460px);
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto 1fr;
     column-gap: 28px;
     align-content: start;
     max-width: 1440px;
     width: 100%;
     flex: 1 0 auto;
   }
-  .editor-with-annotations > * {
+  .editor-with-annotations > .editor-heading {
     grid-column: 1;
+    grid-row: 1;
     min-width: 0;
+  }
+  .editor-with-annotations > .editor-body {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-width: 0;
+  }
+  .editor.editor-with-annotations:has(> .annotation-open) {
+    grid-template-columns: minmax(0, 1fr) clamp(380px, 38cqi, 460px);
+  }
+  .editor-with-annotations:has(> .annotation-open) > .editor-body {
+    grid-column: 1;
   }
   .editor-with-annotations > .note-annotations {
     grid-column: 2;
-    grid-row: 1 / span 30;
+    grid-row: 1;
     align-self: start;
     position: sticky;
     top: 20px;
     margin: 0;
     width: 100% !important;
+  }
+  .editor-with-annotations > .annotation-open {
+    grid-row: 1 / span 2;
   }
   .editor-with-annotations .annotation-panel {
     max-height: calc(100dvh - 220px);

@@ -134,6 +134,7 @@ export function NoteAnnotations({
   const records = useKnowledgeRecords(note.scope);
   const [open, setOpen] = useState(false);
   const [docked, setDocked] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('notto-ai-sidebar') !== 'closed');
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const trigger = useRef<HTMLButtonElement>(null);
@@ -144,7 +145,13 @@ export function NoteAnnotations({
     observer.observe(panel);
     return () => observer.disconnect();
   }, []);
-  const expanded = open || docked;
+  const expanded = docked ? sidebarOpen : open;
+  const toggle = (next: boolean) => {
+    if (docked) {
+      setSidebarOpen(next);
+      localStorage.setItem('notto-ai-sidebar', next ? 'open' : 'closed');
+    } else setOpen(next);
+  };
   const reduced = useReducedMotion();
   const refresh = async () => {
     if (updating || hasUnsavedChanges) return;
@@ -173,7 +180,7 @@ export function NoteAnnotations({
   });
   return (
     <motion.div
-      layout={!reduced}
+      layout={!reduced && !docked}
       transition={{ type: 'spring', stiffness: 360, damping: 34 }}
       className={`note-annotations annotation-shell ${expanded ? 'annotation-open' : ''}`}
       style={{ width: expanded ? '100%' : 'fit-content' }}
@@ -184,7 +191,7 @@ export function NoteAnnotations({
           className={`annotation-toggle ${items.length || research.length ? 'has-annotations' : ''}`}
           aria-expanded={expanded}
           onClick={() => {
-            if (!docked) setOpen(!open);
+            toggle(!expanded);
           }}
           title="KI-Anmerkungen direkt in der Notiz anzeigen"
         >
@@ -192,12 +199,12 @@ export function NoteAnnotations({
           <span>KI-Anmerkungen</span>
           <span>{items.length + uniqueResearch.length || ''}</span>
         </button>
-        {open && !docked && (
+        {expanded && (
           <button
             className="annotation-close icon-button"
             aria-label="Anmerkungen schließen"
             onClick={() => {
-              setOpen(false);
+              toggle(false);
               trigger.current?.focus();
             }}
           >

@@ -565,9 +565,25 @@ textarea:focus-visible {
   flex: 1 0 auto;
   min-width: 0;
 }
+.editor-heading {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.editor-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  min-width: 0;
+}
+.editor-body > :not(.editor-content) {
+  flex-shrink: 0;
+}
+.editor-reading .editor-body {
+  height: max-content;
+}
 .editor-content.is-preview {
   display: block;
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   min-width: 0;
 }
 .editor-attachments {

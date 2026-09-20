@@ -1843,3 +1843,120 @@ button.tags-heading {
     min-height: 48px;
   }
 }
+
+.sidebar-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-disclosure[aria-expanded='true'] > svg {
+  transform: rotate(90deg);
+}
+.sidebar-disclosure > svg {
+  flex-shrink: 0;
+}
+.tag-navigation[hidden],
+.collection-navigation[hidden],
+.settings-section[hidden] {
+  display: none;
+}
+.collection-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.collection-toggle {
+  align-self: stretch;
+  padding: 0 3px;
+}
+.collection-row > .nav-item {
+  flex: 1;
+  min-width: 0;
+  padding-left: 4px;
+}
+.collection-notes {
+  margin-left: 20px;
+  border-left: 1px solid var(--nt-line);
+  padding-left: 4px;
+}
+.collection-notes .nav-item {
+  font-size: 12px;
+}
+.collection-notes .nav-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-trash {
+  border-top: 1px solid var(--nt-line);
+  padding-top: 8px;
+}
+.settings-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.settings-navigation {
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: 6px;
+}
+.settings-navigation button {
+  padding: 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--nt-text);
+  text-align: left;
+  cursor: pointer;
+}
+.settings-navigation button[aria-current='page'] {
+  background: var(--nt-paper);
+  outline: 1px solid var(--nt-line);
+}
+.settings-content {
+  min-width: 0;
+}
+.settings-dialog .modal-body {
+  min-height: min(560px, 65dvh);
+}
+.settings-content .settings-section {
+  margin-bottom: 16px;
+}
+@media (max-width: 600px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .settings-navigation {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .settings-navigation button {
+    padding: 10px;
+  }
+  .settings-dialog .modal-body {
+    padding: 16px;
+  }
+}
+@media (pointer: coarse) {
+  .collection-toggle {
+    min-width: 32px;
+    justify-content: center;
+  }
+  .tags-heading .sidebar-disclosure {
+    min-height: 40px;
+  }
+}

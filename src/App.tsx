@@ -1,5 +1,6 @@
 import { collectionNames, createCollection, addNoteToCollection, NOTE_DRAG_TYPE } from './collections';
 import { flushSync } from 'react-dom';
+import { useSidebarDisclosure } from './sidebar-disclosure';
 import { FloatingSearch } from './FloatingSearch';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -7,6 +8,7 @@ import {
   Archive,
   ArrowLeft,
   Check,
+  ChevronRight,
   Cloud,
   CloudOff,
   FileText,
@@ -118,6 +120,7 @@ function Notebook({
         )
       : [];
   const [settings, setSettings] = useState(false);
+  const [isExpanded, toggleExpanded] = useSidebarDisclosure(scope);
   const [allTags, setAllTags] = useState(false);
   const toggleTags = (open: boolean) => {
     if (document.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -375,16 +378,24 @@ function Notebook({
               notes.filter((n) => n.archived && !n.deleted).length,
             )}
           </nav>
-          <button
-            className="tags-heading"
-            style={{ viewTransitionName: allTags ? undefined : 'tags-popout' }}
-            onClick={() => toggleTags(true)}
-            aria-label="Alle Tags anzeigen"
-          >
-            <span>DEINE TAGS</span>
-            <Hash size={13} />
-          </button>
-          <nav className="tag-navigation" aria-label="Tags">
+          <div className="tags-heading">
+            <button
+              className="sidebar-disclosure"
+              aria-expanded={isExpanded('tags', true)}
+              onClick={() => toggleExpanded('tags', true)}
+            >
+              <ChevronRight size={14} />
+              <span>DEINE TAGS</span>
+            </button>
+            <button
+              className="collection-add"
+              onClick={() => toggleTags(true)}
+              aria-label="Alle Tags anzeigen"
+            >
+              <Hash size={14} />
+            </button>
+          </div>
+          <nav className="tag-navigation" aria-label="Tags" hidden={!isExpanded('tags', true)}>
             {tagCounts.length === 0 ? (
               <p className="empty-tags">Schreibe #thema in eine Notiz. Deine Tags erscheinen hier.</p>
             ) : (
@@ -411,7 +422,14 @@ function Notebook({
             )}
           </nav>
           <div className="tags-heading">
-            <span>SAMMLUNGEN</span>
+            <button
+              className="sidebar-disclosure"
+              aria-expanded={isExpanded('collections', true)}
+              onClick={() => toggleExpanded('collections', true)}
+            >
+              <ChevronRight size={14} />
+              <span>SAMMLUNGEN</span>
+            </button>
             <button
               className="collection-add"
               type="button"
@@ -426,58 +444,99 @@ function Notebook({
               <Plus size={15} />
             </button>
           </div>
-          <nav className="collection-navigation" aria-label="Sammlungen">
+          <nav
+            className="collection-navigation"
+            aria-label="Sammlungen"
+            hidden={!isExpanded('collections', true)}
+          >
             {collectionCounts.map(([name, count]) => (
-              <button
-                key={name}
-                className={`nav-item ${collection === name && !knowledgeOpen && !tasksOpen ? 'active' : ''} ${dragCollection === name ? 'collection-drop-target' : ''}`}
-                onDragOver={(e) => {
-                  if (!e.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = 'copy';
-                  setDragCollection(name);
-                }}
-                onDragLeave={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragCollection(null);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragCollection(null);
-                  let payload: { id?: string; scope?: string };
-                  try {
-                    payload = JSON.parse(e.dataTransfer.getData(NOTE_DRAG_TYPE));
-                  } catch {
-                    return;
-                  }
-                  if (
-                    payload.scope !== scope ||
-                    !notes.some((n) => n.id === payload.id && n.scope === scope && !n.deleted)
-                  )
-                    return;
-                  void addNoteToCollection(scope, payload.id!, name)
-                    .then(() => notify(`Zu „${name}“ hinzugefügt`))
-                    .catch((error) => notify(String(error)));
-                }}
-                onClick={() => {
-                  setCollection(name);
-                  setTag(null);
-                  setView('all');
-                  setKnowledgeOpen(false);
-                  setTasksOpen(false);
-                  setCreating(false);
-                  setSelected(null);
-                  setSidebar(false);
-                }}
-              >
-                <FolderOpen size={15} />
-                <span>{name}</span>
-                <span className="nav-count">{count}</span>
-              </button>
+              <div key={name} className="collection-branch">
+                <div className="collection-row">
+                  <button
+                    className="collection-toggle sidebar-disclosure"
+                    aria-label={`Sammlung ${name} ${isExpanded('collection:' + name) ? 'einklappen' : 'ausklappen'}`}
+                    aria-expanded={isExpanded('collection:' + name)}
+                    onClick={() => toggleExpanded('collection:' + name)}
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                  <button
+                    className={`nav-item ${collection === name && !knowledgeOpen && !tasksOpen ? 'active' : ''} ${dragCollection === name ? 'collection-drop-target' : ''}`}
+                    onDragOver={(e) => {
+                      if (!e.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'copy';
+                      setDragCollection(name);
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragCollection(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragCollection(null);
+                      let payload: { id?: string; scope?: string };
+                      try {
+                        payload = JSON.parse(e.dataTransfer.getData(NOTE_DRAG_TYPE));
+                      } catch {
+                        return;
+                      }
+                      if (
+                        payload.scope !== scope ||
+                        !notes.some((n) => n.id === payload.id && n.scope === scope && !n.deleted)
+                      )
+                        return;
+                      void addNoteToCollection(scope, payload.id!, name)
+                        .then(() => notify(`Zu „${name}“ hinzugefügt`))
+                        .catch((error) => notify(String(error)));
+                    }}
+                    onClick={() => {
+                      setCollection(name);
+                      setTag(null);
+                      setView('all');
+                      setKnowledgeOpen(false);
+                      setTasksOpen(false);
+                      setCreating(false);
+                      setSelected(null);
+                      setSidebar(false);
+                    }}
+                  >
+                    <FolderOpen size={15} />
+                    <span>{name}</span>
+                    <span className="nav-count">{count}</span>
+                  </button>
+                </div>
+                {isExpanded('collection:' + name) && (
+                  <div className="collection-notes">
+                    {active
+                      .filter((note) => note.scope === scope && note.collections?.includes(name))
+                      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+                      .map((note) => (
+                        <button
+                          key={note.id}
+                          className={`nav-item ${selected === note.id ? 'active' : ''}`}
+                          title={titleOf(note.content)}
+                          onClick={() => {
+                            setCollection(name);
+                            setTag(null);
+                            setView('all');
+                            openTaskNote(note.id);
+                          }}
+                        >
+                          <FileText size={14} />
+                          <span>{titleOf(note.content)}</span>
+                        </button>
+                      ))}
+                    {count === 0 && <p className="empty-tags">Noch keine Notizen</p>}
+                  </div>
+                )}
+              </div>
             ))}
             {!collectionCounts.length && (
               <p className="empty-tags">Mit + anlegen, dann Notizen hierher ziehen.</p>
             )}
           </nav>
+        </div>
+        <div className="sidebar-trash">
           {nav('trash', 'Papierkorb', <Trash2 size={17} />, notes.filter((n) => n.deleted).length)}
         </div>
         <div className="sidebar-bottom">

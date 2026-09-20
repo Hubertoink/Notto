@@ -35,6 +35,16 @@ it('uses the selected mode without memory or tools and rejects excluded draft te
   await expect(rewriteNote('local', 'ein gedanke')).resolves.toBe('Ein Gedanke.');
   expect(vi.mocked(request).mock.calls[0][2]).toMatchObject({ memory: false, store: false });
   expect(vi.mocked(request).mock.calls[0][2].tools).toBeUndefined();
-  await expect(rewriteNote('local', 'Gedanke #privat')).rejects.toThrow('ausgeschlossen');
+  await expect(rewriteNote('local', 'Gedanke #privat')).rejects.toThrow('Tag #privat');
   expect(request).toHaveBeenCalledTimes(1);
+});
+
+it('passes the user-confirmed editing request separately from the note', async () => {
+  vi.mocked(request).mockResolvedValue({ content: '| Name | Zutaten |\n| --- | --- |\n| Gin | 4 cl |' });
+  await rewriteNote('local', 'Gin (4 cl)', undefined, 'Bitte als Tabelle gliedern.');
+  const body = vi.mocked(request).mock.calls[0][2];
+  expect(JSON.parse(String(body.input))).toEqual({
+    note: 'Gin (4 cl)',
+    editingRequest: 'Bitte als Tabelle gliedern.',
+  });
 });

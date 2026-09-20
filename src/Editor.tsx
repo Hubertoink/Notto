@@ -76,6 +76,8 @@ export function Editor({
   const [ready, setReady] = useState(false);
   const [preview, setPreview] = useState(Boolean(note) && !compact);
   const [rewriting, setRewriting] = useState(false);
+  const [rewriteRequest, setRewriteRequest] = useState<string | null>(null);
+  const [saveConflict, setSaveConflict] = useState(false);
   const [rewriteUndo, setRewriteUndo] = useState<{ before: string; after: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [addingImages, setAddingImages] = useState(0);
@@ -385,15 +387,19 @@ export function Editor({
     if (saving || imageOperations.current > 0 || !ready || !content.trim()) return;
     setSaving(true);
     setError('');
+    setSaveConflict(false);
     try {
       await queue.current;
       let saved: Note;
       if (note && !asCopy) {
         const current = await repo.get(scope, note.id);
-        if (!current || (!overwrite && current.revision !== base.current))
+        if (!current) throw new Error('Die ursprüngliche Notiz ist nicht mehr verfügbar.');
+        if (!overwrite && current.revision !== base.current) {
+          setSaveConflict(true);
           throw new Error(
-            'Es gibt eine neuere Fassung. Dein Text ist als Entwurf gesichert. Speichere ihn als neue Notiz, um beide zu behalten.',
+            'Es gibt eine neuere Fassung. Dein Entwurf ist gesichert. Übernimm deinen Text als aktuelle Version oder sichere ihn als neue Notiz.',
           );
+        }
         saved = reviseNote(current, { content, collections });
         await repo.put(saved, current.revision);
       } else {
@@ -442,14 +448,15 @@ export function Editor({
       if (alive.current) setAddingImages(imageOperations.current);
     }
   }
-  async function rewrite() {
+  async function rewrite(instruction = '') {
     if (rewriting || saving || !ready || !content.trim()) return;
     const before = textRef.current,
       generation = editGeneration.current;
     setRewriting(true);
     setError('');
+    setSaveConflict(false);
     try {
-      const after = await rewriteNote(scope, before, note);
+      const after = await rewriteNote(scope, before, note, instruction);
       if (!alive.current) return;
       if (editGeneration.current !== generation || textRef.current !== before)
         throw new Error('Der Text wurde inzwischen geändert. Bitte die Überarbeitung erneut starten.');
@@ -545,7 +552,37 @@ export function Editor({
           </div>
         )}
       </div>
-      {note && !compact && <NoteAnnotations key={note.id} note={note} hasUnsavedChanges={dirty} />}
+      {note && !compact && (
+        <NoteAnnotations key={note.id} note={note} hasUnsavedChanges={dirty} onRewrite={setRewriteRequest} />
+      )}
+      {rewriteRequest !== null && (
+        <Modal title="KI mit Überarbeitung beauftragen" onClose={() => setRewriteRequest(null)}>
+          <p>
+            Beschreibe, wie die KI diese Notiz strukturieren soll. Das Ergebnis wird ein prüfbarer Entwurf;
+            erst „Festhalten“ speichert es als aktuelle Version.
+          </p>
+          <label>
+            Dein Auftrag
+            <textarea
+              value={rewriteRequest}
+              maxLength={3000}
+              onChange={(event) => setRewriteRequest(event.target.value)}
+            />
+          </label>
+          <p className="muted small">
+            Überarbeitet wird der Notiztext. Text in Bildern und PDFs wird bei dieser Aktion nicht ausgelesen.
+          </p>
+          <Action
+            label="Überarbeitung starten"
+            isDisabled={rewriting || saving || !ready || !rewriteRequest.trim()}
+            onClick={() => {
+              const instruction = rewriteRequest;
+              setRewriteRequest(null);
+              void rewrite(instruction);
+            }}
+          />
+        </Modal>
+      )}
       <div className="editor-body">
         {!preview && (
           <div className="formatting-toolbar" role="toolbar" aria-label="Text formatieren">
@@ -820,7 +857,7 @@ export function Editor({
         {error && (
           <div className="inline-error" role="alert">
             {error}
-            {note && (
+            {note && saveConflict && error.startsWith('Es gibt eine neuere Fassung.') && (
               <div className="conflict-actions">
                 <button className="text-button" onClick={() => void save(false, true)}>
                   Als aktuelle Version übernehmen

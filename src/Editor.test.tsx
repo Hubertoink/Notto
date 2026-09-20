@@ -10,7 +10,7 @@ import { MemorySettings } from './Memory';
 import { memoryState } from './memory-policy';
 import { NottoProvider } from './state';
 import { db, repo } from './repository';
-import { newNote } from './domain';
+import { newNote, reviseNote } from './domain';
 import { knowledge } from './intelligence';
 import * as intelligence from './intelligence';
 import * as rewriting from './rewrite';
@@ -330,6 +330,56 @@ it('retains collections in drafts and saves several memberships with the note', 
   await user.click(screen.getByRole('button', { name: 'Festhalten' }));
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect(saved.mock.calls[0][0].collections).toEqual(['Jugendhaus', 'Medien']);
+});
+
+it('does not offer conflict actions for a failed AI rewrite', async () => {
+  const note = newNote('local', 'Ein Gedanke #privat');
+  await repo.put(note, null);
+  vi.spyOn(rewriting, 'rewriteNote').mockRejectedValue(
+    new Error('Der Tag #privat schließt diese Notiz von der KI aus.'),
+  );
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const user = userEvent.setup();
+  const button = screen.getByRole('button', { name: 'Mit KI überarbeiten' });
+  await waitFor(() => expect(button.getAttribute('disabled')).toBeNull());
+  await user.click(button);
+  await screen.findByRole('alert');
+  expect(screen.queryByRole('button', { name: 'Als aktuelle Version übernehmen' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Als neue Notiz sichern' })).toBeNull();
+  expect((await repo.get('local', note.id))?.content).toBe(note.content);
+});
+
+it('overwrites an actual conflicting revision while preserving note identity and history', async () => {
+  const note = newNote('local', 'Original');
+  await repo.put(note, null);
+  const saved = vi.fn();
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={saved} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, ' mit Entwurf');
+  const newer = reviseNote(note, { content: 'Andere Fassung' });
+  await repo.put(newer, note.revision);
+  await user.click(screen.getByRole('button', { name: 'Festhalten' }));
+  await user.click(await screen.findByRole('button', { name: 'Als aktuelle Version übernehmen' }));
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  const result = await repo.get('local', note.id);
+  expect(result?.content).toBe('Original mit Entwurf');
+  expect(result?.history.some((revision) => revision.content === 'Andere Fassung')).toBe(true);
+  expect(await repo.list('local')).toHaveLength(1);
 });
 
 it('keeps an unsaved text draft when a drop adds a collection to the open note', async () => {

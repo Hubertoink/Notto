@@ -27,15 +27,23 @@ export function noteAllowed(
   note: Pick<Note, 'id' | 'content' | 'deleted'>,
   settings: { excludedNotes: string[]; excludedTags: string },
 ) {
+  return !noteExclusionReason(note, settings);
+}
+export function noteExclusionReason(
+  note: Pick<Note, 'id' | 'content' | 'deleted'>,
+  settings: { excludedNotes: string[]; excludedTags: string },
+) {
   const excluded = settings.excludedTags
     .toLowerCase()
     .split(/[\s,]+/)
     .map((t) => t.replace(/^#/, ''));
-  return (
-    !note.deleted &&
-    !settings.excludedNotes.includes(note.id) &&
-    !tagsOf(note.content).some((t) => excluded.includes(t))
-  );
+  if (note.deleted) return 'Notizen im Papierkorb sind von der KI ausgeschlossen.';
+  if (settings.excludedNotes.includes(note.id))
+    return 'Diese Notiz wurde einzeln von der KI ausgeschlossen. Du kannst sie unter „Wissen & KI → Überblick“ wieder freigeben.';
+  const tag = tagsOf(note.content).find((t) => excluded.includes(t));
+  return tag
+    ? `Der Tag #${tag} schließt diese Notiz von der KI aus. Entferne den Tag aus dieser Notiz oder passe „Wissen & KI → KI einrichten → Ausgeschlossene Tags“ an. Danach die Notiz speichern und die KI-Aktion erneut starten.`
+    : null;
 }
 export function evidenceCurrent(
   source: z.infer<typeof evidenceSchema>,

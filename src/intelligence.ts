@@ -11,6 +11,7 @@ import {
   analysisSchema,
   analysisInstructions,
   noteAllowed,
+  noteExclusionReason,
   evidenceCurrent,
   groundedAnswerSchema,
   checkCitations,
@@ -270,7 +271,10 @@ export async function evidence(note: Note, records?: KnowledgeRecord[]): Promise
   return result;
 }
 export async function analyze(note: Note) {
-  if (!eligible(note)) throw new Error('Diese Notiz ist von der KI ausgeschlossen.');
+  if (!eligible(note))
+    throw new Error(
+      noteExclusionReason(note, config(note.scope)) || 'Diese Notiz ist von der KI ausgeschlossen.',
+    );
   const records = await knowledge.list(note.scope);
   for (const id of attachmentIds(note.content).filter((id) => id.endsWith('.pdf'))) {
     if (!records.some((r) => r.kind === 'extraction' && r.noteId === note.id && (r.data as any).id === id))

@@ -1,7 +1,15 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, useRef } from 'react';
 import { Sparkles, X } from 'lucide-react';
-import { analyze, knowledge, type Analysis, type KnowledgeRecord, type Research } from './intelligence';
+import {
+  analyze,
+  config,
+  knowledge,
+  type Analysis,
+  type KnowledgeRecord,
+  type Research,
+} from './intelligence';
+import { noteExclusionReason } from './evidence-policy';
 import { addTask, checkTask, newest, noteAnalysis, tasksFor, type Task } from './task-store';
 import { useNotto } from './state';
 import { Sources, NoteMarkdown } from './components';
@@ -127,11 +135,14 @@ export function TasksPage({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
 export function NoteAnnotations({
   note,
   hasUnsavedChanges = false,
+  onRewrite,
 }: {
   note: Note;
   hasUnsavedChanges?: boolean;
+  onRewrite?: (instruction: string) => void;
 }) {
   const records = useKnowledgeRecords(note.scope);
+  const excluded = noteExclusionReason(note, config(note.scope));
   const [open, setOpen] = useState(false);
   const [docked, setDocked] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -232,13 +243,30 @@ export function NoteAnnotations({
                 <Sparkles size={14} aria-hidden="true" />
                 <span>KI-Vorschläge · separat vom Original gespeichert.</span>
               </div>
+              {excluded && <p className="inline-error">{excluded}</p>}
+              <p className="muted small">
+                Aufgaben kannst du abhaken. Themen sind Vorschläge zur Einordnung. Mit „Als
+                Überarbeitungsauftrag nutzen“ lässt du die KI daraus einen neuen Textentwurf erstellen.
+              </p>
+              {onRewrite && (
+                <button
+                  className="annotation-refresh"
+                  onClick={() =>
+                    onRewrite(
+                      'Strukturiere diese Notiz übersichtlich. Bewahre alle Inhalte und Mengenangaben.',
+                    )
+                  }
+                >
+                  Eigenen KI-Auftrag formulieren
+                </button>
+              )}
               <p className="muted annotation-update">
                 {analysis && !currentContent(note, analysis.revision)
                   ? 'Die Anmerkungen beziehen sich auf eine frühere Textversion. '
                   : ''}
                 <button
                   className="annotation-refresh"
-                  disabled={updating || hasUnsavedChanges}
+                  disabled={updating || hasUnsavedChanges || !!excluded}
                   onClick={() => void refresh()}
                 >
                   {updating ? 'Wird aktualisiert …' : 'Aktualisieren'}
@@ -250,7 +278,7 @@ export function NoteAnnotations({
                   {updateError}
                 </p>
               )}
-              {!items.length && !research.length && (
+              {!excluded && !items.length && !research.length && (
                 <p>
                   Noch keine Anmerkungen. Die Analyse lässt sich unter „Wissen & KI“ starten oder automatisch
                   aktivieren.
@@ -266,6 +294,18 @@ export function NoteAnnotations({
                     <strong>{item.title}</strong>
                     <p>{item.detail}</p>
                     <blockquote>{item.quote}</blockquote>
+                    {onRewrite && (
+                      <button
+                        className="annotation-refresh"
+                        onClick={() =>
+                          onRewrite(
+                            `Überarbeite die aktuelle Notiz anhand dieses Vorschlags, soweit er zum aktuellen Text passt. Bewahre alle Fakten, Mengen und offenen Fragen.\n\n${item.title}\n${item.detail}`,
+                          )
+                        }
+                      >
+                        Als Überarbeitungsauftrag nutzen
+                      </button>
+                    )}
                   </article>
                 ))}
               {uniqueResearch.map((r) => (

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Button, type ButtonProps } from '@astryxdesign/core/Button';
 import { Dialog } from '@astryxdesign/core/Dialog';
-import { X, ImageOff } from 'lucide-react';
+import { X, ImageOff, Globe, ChevronDown } from 'lucide-react';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -65,10 +65,61 @@ export function WebLink({ href, children }: { href?: string; children: ReactNode
     </a>
   );
 }
-export function Sources({ sources }: { sources: { title: string; url: string }[] }) {
+function SourceIcon({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="source-circle" aria-hidden="true">
+      {failed ? (
+        <Globe size={18} />
+      ) : (
+        <img
+          src={`${new URL(url).origin}/favicon.ico`}
+          alt=""
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </span>
+  );
+}
+export function Sources({
+  sources,
+  compact = false,
+}: {
+  sources: { title: string; url: string }[];
+  compact?: boolean;
+}) {
+  const unique = uniqueSources(sources);
+  if (!unique.length) return null;
+  if (compact)
+    return (
+      <details className="source-disclosure">
+        <summary aria-label={`${unique.length} ${unique.length === 1 ? 'Quelle' : 'Quellen'} anzeigen`}>
+          <span className="source-circles">
+            <SourceIcon url={unique[0].url} />
+            {unique.length > 1 && <span className="source-circle source-more">+{unique.length - 1}</span>}
+          </span>
+          <span>{unique.length === 1 ? 'Quelle' : 'Quellen'}</span>
+          <ChevronDown size={14} className="source-chevron" />
+        </summary>
+        <ul className="source-cards">
+          {unique.map((source) => (
+            <li key={source.url}>
+              <SourceIcon url={source.url} />
+              <div>
+                <WebLink href={source.url}>{source.title || new URL(source.url).hostname}</WebLink>
+                <span className="source-domain">{new URL(source.url).hostname.replace(/^www\./, '')}</span>
+                <span className="source-url">{source.url}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </details>
+    );
   return (
     <ul className="research-sources">
-      {uniqueSources(sources).map((source) => (
+      {unique.map((source) => (
         <li key={source.url}>
           <WebLink href={source.url}>{source.title}</WebLink>
         </li>

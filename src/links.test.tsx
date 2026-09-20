@@ -42,6 +42,26 @@ it('handles inline research links identically and excludes non-web sources', () 
   ).toEqual([]);
 });
 
+it('keeps compact sources collapsed and reveals their original links on demand', () => {
+  const view = render(
+    <Sources
+      compact
+      sources={[
+        { title: 'Erste Quelle', url: 'https://example.com/one' },
+        { title: 'Zweite Quelle', url: 'https://example.org/two' },
+        { title: 'Duplikat', url: 'https://example.com/one' },
+      ]}
+    />,
+  );
+  expect(screen.getByText('+1')).toBeTruthy();
+  expect(view.container.querySelector('details')?.open).toBe(false);
+  fireEvent.click(screen.getByLabelText('2 Quellen anzeigen'));
+  expect(view.container.querySelector('details')?.open).toBe(true);
+  expect(screen.getAllByRole('link')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('link', { name: 'Zweite Quelle' }));
+  expect(invoke).toHaveBeenCalledWith('open_external', { url: 'https://example.org/two' });
+});
+
 it('opens internal links in the notebook and never exposes another account', () => {
   const target = newNote('local', 'Unsere Grundsätze');
   data.notes = [target];

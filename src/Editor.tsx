@@ -556,31 +556,54 @@ export function Editor({
         <NoteAnnotations key={note.id} note={note} hasUnsavedChanges={dirty} onRewrite={setRewriteRequest} />
       )}
       {rewriteRequest !== null && (
-        <Modal title="KI mit Überarbeitung beauftragen" onClose={() => setRewriteRequest(null)}>
-          <p>
-            Beschreibe, wie die KI diese Notiz strukturieren soll. Das Ergebnis wird ein prüfbarer Entwurf;
-            erst „Festhalten“ speichert es als aktuelle Version.
-          </p>
-          <label>
-            Dein Auftrag
+        <Modal title="Notiz überarbeiten" className="rewrite-dialog" onClose={() => setRewriteRequest(null)}>
+          <p className="rewrite-intro">Was möchtest du verbessern?</p>
+          <div className="rewrite-presets" aria-label="Vorschläge für deinen Auftrag">
+            {[
+              ['Strukturieren', 'Gliedere die Notiz mit passenden Überschriften und Listen.'],
+              ['Als Tabelle', 'Stelle die Einträge übersichtlich als Tabelle dar. Bewahre alle Angaben.'],
+              ['Lesbarer schreiben', 'Formuliere den Text klarer und flüssiger. Bewahre alle Inhalte.'],
+            ].map(([label, instruction]) => (
+              <button
+                type="button"
+                key={label}
+                aria-pressed={rewriteRequest === instruction}
+                onClick={() => setRewriteRequest(instruction)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="rewrite-field">
+            Deine Anweisung
             <textarea
+              rows={4}
+              placeholder="Zum Beispiel: Cocktails nach Basisspirituose gruppieren …"
               value={rewriteRequest}
               maxLength={3000}
               onChange={(event) => setRewriteRequest(event.target.value)}
             />
           </label>
-          <p className="muted small">
-            Überarbeitet wird der Notiztext. Text in Bildern und PDFs wird bei dieser Aktion nicht ausgelesen.
-          </p>
-          <Action
-            label="Überarbeitung starten"
-            isDisabled={rewriting || saving || !ready || !rewriteRequest.trim()}
-            onClick={() => {
-              const instruction = rewriteRequest;
-              setRewriteRequest(null);
-              void rewrite(instruction);
-            }}
-          />
+          <p className="muted small">Du prüfst den Entwurf vor dem Speichern.</p>
+          {attachmentIds(content).length > 0 && (
+            <p className="muted small">
+              Bilder und PDFs bleiben erhalten; ihr Inhalt wird hier nicht ausgelesen.
+            </p>
+          )}
+          <div className="rewrite-actions">
+            <Action label="Abbrechen" variant="ghost" onClick={() => setRewriteRequest(null)} />
+            <Action
+              label="Entwurf erstellen"
+              icon={<WandSparkles size={16} />}
+              variant="primary"
+              isDisabled={rewriting || saving || !ready || !rewriteRequest.trim()}
+              onClick={() => {
+                const instruction = rewriteRequest;
+                setRewriteRequest(null);
+                void rewrite(instruction);
+              }}
+            />
+          </div>
         </Modal>
       )}
       <div className="editor-body">

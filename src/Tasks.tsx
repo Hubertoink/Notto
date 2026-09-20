@@ -1,14 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, useRef } from 'react';
-import { Sparkles, X } from 'lucide-react';
-import {
-  analyze,
-  config,
-  knowledge,
-  type Analysis,
-  type KnowledgeRecord,
-  type Research,
-} from './intelligence';
+import { Sparkles, X, WandSparkles, RefreshCw } from 'lucide-react';
+import { analyze, config, knowledge, type KnowledgeRecord, type Research } from './intelligence';
 import { noteExclusionReason } from './evidence-policy';
 import { addTask, checkTask, newest, noteAnalysis, tasksFor, type Task } from './task-store';
 import { useNotto } from './state';
@@ -182,7 +175,6 @@ export function NoteAnnotations({
     }
   };
   const analysis = noteAnalysis(records, note);
-  const items = (analysis?.data as Analysis | undefined)?.suggestions ?? [];
   const tasks = tasksFor([note], records, note.scope).filter((t) => t.note);
   const research = newest(
     records.filter((r) => r.scope === note.scope && r.noteId === note.id && r.kind === 'research'),
@@ -204,7 +196,7 @@ export function NoteAnnotations({
       <div className="annotation-heading">
         <button
           ref={trigger}
-          className={`annotation-toggle ${items.length || research.length ? 'has-annotations' : ''}`}
+          className={`annotation-toggle ${tasks.length || uniqueResearch.length ? 'has-annotations' : ''}`}
           aria-expanded={expanded}
           onClick={() => {
             toggle(!expanded);
@@ -213,7 +205,7 @@ export function NoteAnnotations({
         >
           <Sparkles size={17} />
           <span>KI-Anmerkungen</span>
-          <span>{items.length + uniqueResearch.length || ''}</span>
+          <span>{tasks.length + uniqueResearch.length || ''}</span>
         </button>
         {expanded && (
           <button
@@ -239,80 +231,44 @@ export function NoteAnnotations({
             style={{ overflow: 'hidden' }}
           >
             <div className="annotation-panel">
-              <div className="annotation-label">
-                <Sparkles size={14} aria-hidden="true" />
-                <span>KI-Vorschläge · separat vom Original gespeichert.</span>
-              </div>
               {excluded && <p className="inline-error">{excluded}</p>}
-              <p className="muted small">
-                Aufgaben kannst du abhaken. Themen sind Vorschläge zur Einordnung. Mit „Als
-                Überarbeitungsauftrag nutzen“ lässt du die KI daraus einen neuen Textentwurf erstellen.
-              </p>
-              {onRewrite && (
+              <div className="annotation-actions">
+                {onRewrite && (
+                  <button className="annotation-command" disabled={!!excluded} onClick={() => onRewrite('')}>
+                    <WandSparkles size={16} /> Notiz überarbeiten
+                  </button>
+                )}
                 <button
-                  className="annotation-refresh"
-                  onClick={() =>
-                    onRewrite(
-                      'Strukturiere diese Notiz übersichtlich. Bewahre alle Inhalte und Mengenangaben.',
-                    )
-                  }
-                >
-                  Eigenen KI-Auftrag formulieren
-                </button>
-              )}
-              <p className="muted annotation-update">
-                {analysis && !currentContent(note, analysis.revision)
-                  ? 'Die Anmerkungen beziehen sich auf eine frühere Textversion. '
-                  : ''}
-                <button
-                  className="annotation-refresh"
+                  className="annotation-command annotation-command-secondary"
                   disabled={updating || hasUnsavedChanges || !!excluded}
                   onClick={() => void refresh()}
                 >
+                  <RefreshCw size={15} />
                   {updating ? 'Wird aktualisiert …' : 'Aktualisieren'}
                 </button>
-              </p>
+              </div>
+              {analysis && !currentContent(note, analysis.revision) && (
+                <p className="muted small">Anmerkungen zur früheren Textversion.</p>
+              )}
               {hasUnsavedChanges && <p className="muted">Änderungen zuerst speichern, dann aktualisieren.</p>}
               {updateError && (
                 <p role="alert" className="inline-error">
                   {updateError}
                 </p>
               )}
-              {!excluded && !items.length && !research.length && (
-                <p>
-                  Noch keine Anmerkungen. Die Analyse lässt sich unter „Wissen & KI“ starten oder automatisch
-                  aktivieren.
+              {!excluded && !tasks.length && !uniqueResearch.length && (
+                <p className="annotation-empty">
+                  Keine offenen Hinweise. Hier erscheinen Aufgaben und Rechercheergebnisse.
                 </p>
               )}
               {tasks.map((task) => (
                 <TaskRow key={task.id} task={task} />
               ))}
-              {items
-                .filter((i) => i.kind !== 'task')
-                .map((item, index) => (
-                  <article key={index}>
-                    <strong>{item.title}</strong>
-                    <p>{item.detail}</p>
-                    <blockquote>{item.quote}</blockquote>
-                    {onRewrite && (
-                      <button
-                        className="annotation-refresh"
-                        onClick={() =>
-                          onRewrite(
-                            `Überarbeite die aktuelle Notiz anhand dieses Vorschlags, soweit er zum aktuellen Text passt. Bewahre alle Fakten, Mengen und offenen Fragen.\n\n${item.title}\n${item.detail}`,
-                          )
-                        }
-                      >
-                        Als Überarbeitungsauftrag nutzen
-                      </button>
-                    )}
-                  </article>
-                ))}
               {uniqueResearch.map((r) => (
                 <article key={r.id}>
                   <strong>Recherche</strong>
                   <NoteMarkdown content={(r.data as Research).text} scope={note.scope} />
-                  <Sources sources={(r.data as Research).sources ?? []} />
+                  <Sources sources={(r.data as Research).sources ?? []} compact />
                 </article>
               ))}
             </div>

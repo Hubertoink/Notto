@@ -185,10 +185,10 @@ it('refreshes outdated annotations from the saved revision and closes through th
   );
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
-  await screen.findByText(/frühere Textversion/);
+  await screen.findByText(/früheren Textversion/);
   await user.click(screen.getByRole('button', { name: 'Aktualisieren' }));
   await waitFor(() => expect(analyze).toHaveBeenCalledWith(note));
-  await waitFor(() => expect(screen.queryByText(/frühere Textversion/)).toBeNull());
+  await waitFor(() => expect(screen.queryByText(/früheren Textversion/)).toBeNull());
   expect(await repo.get('local', note.id)).toEqual(note);
   await user.click(screen.getByRole('button', { name: 'Anmerkungen schließen' }));
   expect(screen.getByRole('button', { name: /KI-Anmerkungen/ }).getAttribute('aria-expanded')).toBe('false');

@@ -82,7 +82,9 @@ textarea:focus-visible {
 }
 .sidebar {
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   width: 228px;
   flex-shrink: 0;
   background: var(--nt-sidebar);
@@ -96,11 +98,11 @@ textarea:focus-visible {
   flex-shrink: 0;
 }
 .sidebar > .sidebar-scroll {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
 }
+.sidebar,
 .sidebar-scroll,
 .tag-navigation,
 .collection-navigation,
@@ -111,6 +113,7 @@ textarea:focus-visible {
   scrollbar-color: color-mix(in srgb, var(--nt-muted) 58%, transparent) transparent;
   scrollbar-width: thin;
 }
+.sidebar::-webkit-scrollbar,
 .sidebar-scroll::-webkit-scrollbar,
 .tag-navigation::-webkit-scrollbar,
 .collection-navigation::-webkit-scrollbar,
@@ -121,6 +124,7 @@ textarea:focus-visible {
   width: 8px;
   height: 8px;
 }
+.sidebar::-webkit-scrollbar-track,
 .sidebar-scroll::-webkit-scrollbar-track,
 .tag-navigation::-webkit-scrollbar-track,
 .collection-navigation::-webkit-scrollbar-track,
@@ -130,6 +134,7 @@ textarea:focus-visible {
 .markdown-table-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
+.sidebar::-webkit-scrollbar-thumb,
 .sidebar-scroll::-webkit-scrollbar-thumb,
 .tag-navigation::-webkit-scrollbar-thumb,
 .collection-navigation::-webkit-scrollbar-thumb,
@@ -142,6 +147,7 @@ textarea:focus-visible {
   background: color-mix(in srgb, var(--nt-muted) 58%, transparent);
   background-clip: padding-box;
 }
+.sidebar::-webkit-scrollbar-thumb:hover,
 .sidebar-scroll::-webkit-scrollbar-thumb:hover,
 .tag-navigation::-webkit-scrollbar-thumb:hover,
 .collection-navigation::-webkit-scrollbar-thumb:hover,
@@ -277,9 +283,9 @@ textarea:focus-visible {
   letter-spacing: 1.4px;
 }
 .tag-navigation {
-  overflow: auto;
-  min-height: 0;
-  max-height: 25dvh;
+  overflow: visible;
+  min-height: auto;
+  max-height: none;
 }
 .tag-navigation .nav-item {
   padding: 5px 11px;
@@ -302,7 +308,7 @@ textarea:focus-visible {
   padding: 0 11px;
 }
 .sidebar-bottom {
-  margin-top: auto;
+  margin-top: 16px;
   padding-top: 12px;
   display: flex;
   align-items: center;
@@ -1729,9 +1735,9 @@ button.tags-heading {
   color: var(--nt-muted);
 }
 .collection-navigation {
-  min-height: 0;
-  max-height: 20dvh;
-  overflow: auto;
+  min-height: auto;
+  max-height: none;
+  overflow: visible;
   flex-shrink: 0;
 }
 .collection-navigation .nav-item {

@@ -261,6 +261,12 @@ textarea:focus-visible {
   font-size: 14px;
   margin: 1px 0;
 }
+.sidebar-scroll > nav[aria-label='Notizbücher'] .nav-item {
+  padding-top: 7px;
+  padding-bottom: 7px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
 .nav-item > span:not(.nav-count) {
   overflow: hidden;
   text-overflow: ellipsis;

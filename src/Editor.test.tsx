@@ -70,6 +70,21 @@ it('edits and formats text after an inline image without changing its reference'
   expect(after.value).toBe('\n\n**Danach**');
   expect(screen.getByRole('button', { name: 'Foto bearbeiten' })).toBeTruthy();
 });
+it('saves image deletion from its visual control into the note text', async () => {
+  renderEditor();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  fireEvent.change(field, {
+    target: { value: 'Titel\n\n![Foto](attachments/abc.png "noto:width=50;mode=thumbnail")\n\nDanach' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Foto bearbeiten' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Bild aus Notiz entfernen' }));
+  expect((screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement).value).toBe(
+    'Titel\n\n\n\nDanach',
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Festhalten' }));
+  await waitFor(async () => expect((await repo.list('local'))[0]?.content).toBe('Titel\n\n\n\nDanach'));
+});
 it('applies a rewrite only to the draft and can restore the original wording', async () => {
   vi.spyOn(rewriting, 'rewriteNote').mockResolvedValue('Ein lesbarer Gedanke.');
   renderEditor();

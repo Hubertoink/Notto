@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { Button, type ButtonProps } from '@astryxdesign/core/Button';
 import { Dialog } from '@astryxdesign/core/Dialog';
-import { X, ImageOff, Globe, ChevronDown } from 'lucide-react';
+import { X, ImageOff, Globe, ChevronDown, Download, Trash2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { save } from '@tauri-apps/plugin-dialog';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -164,14 +166,16 @@ export function Modal({
     </Dialog>
   );
 }
-export function NoteImage({ src, alt, scope }: { src?: string; alt?: string; scope: string }) {
+function useImageAttachment(src: string | undefined, scope: string) {
   const [url, setUrl] = useState('');
   const [failed, setFailed] = useState(false);
+  const [attachment, setAttachment] = useState<Awaited<ReturnType<typeof fetchAttachment>>>();
   useEffect(() => {
     let active = true;
     let objectUrl = '';
     setUrl('');
     setFailed(false);
+    setAttachment(undefined);
     const id = src?.match(/^attachments\/([a-f0-9-]+\.(?:png|jpg|webp|gif|avif))$/)?.[1];
     if (!id) {
       setFailed(true);
@@ -181,8 +185,10 @@ export function NoteImage({ src, alt, scope }: { src?: string; alt?: string; sco
       .then((a) => {
         if (!a) throw new Error('Bild fehlt');
         objectUrl = URL.createObjectURL(new Blob([new Uint8Array(a.bytes)], { type: a.mime }));
-        if (active) setUrl(objectUrl);
-        else URL.revokeObjectURL(objectUrl);
+        if (active) {
+          setUrl(objectUrl);
+          setAttachment(a);
+        } else URL.revokeObjectURL(objectUrl);
       })
       .catch(() => active && setFailed(true));
     return () => {
@@ -190,6 +196,10 @@ export function NoteImage({ src, alt, scope }: { src?: string; alt?: string; sco
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [src, scope]);
+  return { url, failed, attachment };
+}
+export function NoteImage({ src, alt, scope }: { src?: string; alt?: string; scope: string }) {
+  const { url, failed } = useImageAttachment(src, scope);
   if (failed)
     return (
       <span className="image-fallback">
@@ -197,9 +207,93 @@ export function NoteImage({ src, alt, scope }: { src?: string; alt?: string; sco
       </span>
     );
   return url ? (
-    <img src={url} alt={alt || 'Bild in der Notiz'} loading="lazy" />
+    <img
+      src={url}
+      alt={alt || 'Bild in der Notiz'}
+      loading="lazy"
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
+    />
   ) : (
     <span className="image-fallback">Bild wird geladen …</span>
+  );
+}
+export function ImageLightbox({
+  src,
+  alt,
+  scope,
+  onClose,
+}: {
+  src?: string;
+  alt?: string;
+  scope: string;
+  onClose: () => void;
+}) {
+  const { url, failed, attachment } = useImageAttachment(src, scope);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const el = dialog.current!;
+    const previous = document.activeElement as HTMLElement | null;
+    el.showModal();
+    el.focus();
+    return () => {
+      el.close();
+      previous?.focus({ preventScroll: true });
+    };
+  }, []);
+  async function download() {
+    if (!attachment || !url) return;
+    try {
+      if (desktop) {
+        const path = await save({ defaultPath: attachment.name || alt || 'Bild.png' });
+        if (path) await invoke('write_export', { path, bytes: Array.from(attachment.bytes) });
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = attachment.name || alt || 'Bild.png';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+    } catch {
+      setError('Das Bild konnte nicht gespeichert werden. Bitte erneut versuchen.');
+    }
+  }
+  return createPortal(
+    <dialog
+      ref={dialog}
+      className="image-lightbox"
+      tabIndex={-1}
+      aria-label={alt || 'Bildansicht'}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="lightbox-surface">
+        {url ? (
+          <img src={url} alt={alt || 'Bild'} draggable={false} />
+        ) : (
+          <p>{failed ? 'Bild nicht verfügbar' : 'Bild wird geladen …'}</p>
+        )}
+        <button type="button" className="lightbox-close" aria-label="Bild schließen" onClick={onClose}>
+          <X size={22} />
+        </button>
+        <button type="button" className="lightbox-download" disabled={!url} onClick={() => void download()}>
+          <Download size={18} /> Herunterladen
+        </button>
+        {error && (
+          <p role="alert" className="lightbox-error">
+            {error}
+          </p>
+        )}
+      </div>
+    </dialog>,
+    document.body,
   );
 }
 export function InlineImage({
@@ -220,17 +314,21 @@ export function InlineImage({
   const host = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; width: number; container: number } | null>(null);
   const width = dragWidth ?? image.width;
+  const remove = () => {
+    if (!disabled) onChange(content.slice(0, image.start) + content.slice(image.start + image.raw.length));
+  };
   return (
     <div
       ref={host}
       className="inline-image-block"
+      style={{ width: image.thumbnail ? '120px' : `calc(${width}% - ${(1 - width / 100) * 12}px)` }}
+      onDragStart={(e) => e.preventDefault()}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setSelected(false);
       }}
     >
       <div
         className={`inline-image-frame ${selected ? 'selected' : ''} ${image.thumbnail ? 'is-thumbnail' : ''}`}
-        style={{ width: image.thumbnail ? '120px' : `${width}%` }}
       >
         <button
           type="button"
@@ -238,6 +336,13 @@ export function InlineImage({
           disabled={disabled}
           aria-label={`${image.alt || 'Bild'} bearbeiten`}
           onClick={() => setSelected(!selected)}
+          onKeyDown={(e) => {
+            if (selected && ['Delete', 'Backspace'].includes(e.key)) {
+              e.preventDefault();
+              e.stopPropagation();
+              remove();
+            }
+          }}
         >
           <NoteImage src={image.src} alt={image.alt} scope={scope} />
         </button>
@@ -255,6 +360,15 @@ export function InlineImage({
                 />{' '}
                 Als Thumbnail
               </label>
+              <button
+                type="button"
+                aria-label="Bild aus Notiz entfernen"
+                title="Bild aus Notiz entfernen"
+                disabled={disabled}
+                onClick={remove}
+              >
+                <Trash2 size={16} />
+              </button>
             </div>
             {!image.thumbnail && (
               <button
@@ -263,12 +377,13 @@ export function InlineImage({
                 aria-label="Bildgröße ändern"
                 disabled={disabled}
                 onPointerDown={(e) => {
+                  if (disabled || image.thumbnail || e.button !== 0) return;
                   e.preventDefault();
                   e.currentTarget.setPointerCapture(e.pointerId);
                   drag.current = {
                     x: e.clientX,
                     width: image.width,
-                    container: host.current?.clientWidth || 1,
+                    container: host.current?.parentElement?.clientWidth || 1,
                   };
                 }}
                 onPointerMove={(e) => {
@@ -395,14 +510,12 @@ function ImageGallery({ content, scope }: { content: string; scope: string }) {
         </button>
       )}
       {selected !== null && images[selected] && (
-        <Modal
-          title={images[selected].alt || 'Bild'}
-          width={1000}
-          className="image-lightbox"
+        <ImageLightbox
+          src={images[selected].src}
+          alt={images[selected].alt}
+          scope={scope}
           onClose={() => setSelected(null)}
-        >
-          <NoteImage src={images[selected].src} alt={images[selected].alt} scope={scope} />
-        </Modal>
+        />
       )}
     </div>
   );
@@ -427,17 +540,13 @@ function MarkdownImage({
       <button
         type="button"
         className="note-image-button"
-        style={{ width: `${layout.width}%` }}
+        style={{ width: `calc(${layout.width}% - ${(1 - layout.width / 100) * 12}px)` }}
         aria-label={`${alt || 'Bild'} vergrößern`}
         onClick={() => setOpen(true)}
       >
         <NoteImage src={src} alt={alt} scope={scope} />
       </button>
-      {open && (
-        <Modal title={alt || 'Bild'} width={1000} className="image-lightbox" onClose={() => setOpen(false)}>
-          <NoteImage src={src} alt={alt} scope={scope} />
-        </Modal>
-      )}
+      {open && <ImageLightbox src={src} alt={alt} scope={scope} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -449,6 +558,12 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
       .reverse()) {
       result = result.slice(0, image.start) + result.slice(image.start + image.raw.length);
     }
+    const inline = noteImages(result);
+    for (let i = inline.length - 1; i > 0; i--) {
+      const end = inline[i - 1].start + inline[i - 1].raw.length;
+      if (!result.slice(end, inline[i].start).trim())
+        result = result.slice(0, end) + ' ' + result.slice(inline[i].start);
+    }
     return result.replace(
       /(```|~~~)[\s\S]*?\1|^[ \t]*(?:#[\p{L}\p{N}][\p{L}\p{N}_/-]*[ \t]*)+$/gmu,
       (match) => (match.startsWith('```') || match.startsWith('~~~') ? match : ''),
@@ -457,6 +572,15 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
   // Stable component types keep loaded attachments mounted during save/status updates.
   const components = useMemo<Components>(
     () => ({
+      p: ({ node, children }) =>
+        node?.children.some((child) => child.type === 'element' && child.tagName === 'img') &&
+        node.children.every((child) =>
+          child.type === 'element' ? child.tagName === 'img' : child.type === 'text' && !child.value.trim(),
+        ) ? (
+          <div className="reading-image-row">{children}</div>
+        ) : (
+          <p>{children}</p>
+        ),
       table: ({ children }) => (
         <div
           className="markdown-table-scroll"

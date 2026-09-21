@@ -705,7 +705,9 @@ export function Editor({
                     onChange={change}
                     disabled={!ready || saving}
                   />
-                ) : (
+                ) : index > 0 &&
+                  index < segments.length - 1 &&
+                  !content.slice(segment.start, segment.end).trim() ? null : (
                   <textarea
                     key={`text-${index}`}
                     data-start={segment.start}

@@ -91,6 +91,8 @@ export function Editor({
   const [error, setError] = useState('');
   const [history, setHistory] = useState(false);
   const [oldRevision, setOldRevision] = useState<Revision | null>(null);
+  const undoStack = useRef<string[]>([]);
+  const lastHistory = useRef<{ mode: 'typing' | 'step'; at: number } | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const textFields = useRef(new Map<number, HTMLTextAreaElement>());
   const offsetOf = (el: HTMLTextAreaElement | null) => Number(el?.dataset.start || 0);
@@ -134,6 +136,7 @@ export function Editor({
     end: number;
     query: string;
     kind: 'tag' | 'note';
+    label?: string;
   } | null>(null);
   const [tagIndex, setTagIndex] = useState(0);
   const [tagPosition, setTagPosition] = useState<{ left: number; top: number; maxHeight: number } | null>(
@@ -266,7 +269,8 @@ export function Editor({
     const tail = content
       .slice(tagToken.end)
       .replace(tagToken.kind === 'note' ? /^\]\]/ : /^[\p{L}\p{N}_/-]*/u, '');
-    const next = content.slice(0, tagToken.start) + (target ? noteLink(target) : '#' + id) + ' ';
+    const next =
+      content.slice(0, tagToken.start) + (target ? noteLink(target, tagToken.label) : '#' + id) + ' ';
     acceptedTagCaret.current = { start: next.length, end: next.length };
     change(next + tail);
     setTagToken(null);
@@ -285,11 +289,14 @@ export function Editor({
     setTagToken(null);
   };
   const insertReference = () => {
+    const el = input.current;
     const start = selectionStart();
-    const end = input.current ? input.current.selectionEnd + offsetOf(input.current) : start;
+    const end = el ? el.selectionEnd + offsetOf(el) : start;
+    const label =
+      el?.value.slice(el.selectionStart, el.selectionEnd).replace(/\s+/g, ' ').trim() || undefined;
     acceptedTagCaret.current = { start: start + 2, end: start + 2 };
     change(content.slice(0, start) + '[[' + content.slice(end));
-    setTagToken({ start, end: start + 2, query: '', kind: 'note' });
+    setTagToken({ start, end: start + 2, query: '', kind: 'note', label });
     setTagIndex(0);
   };
   const updateCollections = (names: string[]) => {
@@ -337,6 +344,8 @@ export function Editor({
       .draft(scope, draftId)
       .then((d) => {
         if (cancelled) return;
+        undoStack.current = [];
+        lastHistory.current = null;
         const restored = d?.content ?? note?.content ?? '';
         setContent(restored);
         const restoredCollections = d?.collections || note?.collections || initialCollections;
@@ -365,7 +374,19 @@ export function Editor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, draftId]);
   const change = useCallback(
-    (value: string) => {
+    (value: string, options: { record?: boolean; group?: 'typing' | 'step' } = {}) => {
+      const previous = textRef.current;
+      const record = options.record !== false;
+      const mode = options.group || 'step';
+      if (record && value !== previous) {
+        const now = Date.now();
+        const grouped =
+          mode === 'typing' && lastHistory.current?.mode === 'typing' && now - lastHistory.current.at < 800;
+        if (!grouped) undoStack.current = [...undoStack.current.slice(-49), previous];
+        lastHistory.current = { mode, at: now };
+      } else if (!record) {
+        lastHistory.current = null;
+      }
       setContent(value);
       const generation = ++editGeneration.current;
       textRef.current = value;
@@ -396,6 +417,16 @@ export function Editor({
     },
     [scope, draftId],
   );
+  const undo = () => {
+    const previous = undoStack.current.pop();
+    if (previous === undefined) return;
+    const current = input.current;
+    const caret = current ? offsetOf(current) + current.selectionStart : previous.length;
+    const nextCaret = Math.min(caret, previous.length);
+    acceptedTagCaret.current = { start: nextCaret, end: nextCaret };
+    setTagToken(null);
+    change(previous, { record: false });
+  };
   const observedRevision = useRef(note?.revision);
   useEffect(() => {
     const previous = observedRevision.current;
@@ -739,7 +770,9 @@ export function Editor({
                           : 'Ein Gedanke, eine Idee, etwas für später …\n\nMit #Hashtags behältst du den Überblick.'
                     }
                     onChange={(e) => {
-                      change(content.slice(0, segment.start) + e.target.value + content.slice(segment.end));
+                      change(content.slice(0, segment.start) + e.target.value + content.slice(segment.end), {
+                        group: 'typing',
+                      });
                       inspectTag(e.target);
                     }}
                     onClick={(e) => inspectTag(e.currentTarget)}
@@ -762,6 +795,17 @@ export function Editor({
                       }
                     }}
                     onKeyDown={(e) => {
+                      if (
+                        !e.nativeEvent.isComposing &&
+                        (e.ctrlKey || e.metaKey) &&
+                        !e.shiftKey &&
+                        !e.altKey &&
+                        e.key.toLowerCase() === 'z'
+                      ) {
+                        e.preventDefault();
+                        undo();
+                        return;
+                      }
                       if (
                         !e.nativeEvent.isComposing &&
                         (e.ctrlKey || e.metaKey) &&

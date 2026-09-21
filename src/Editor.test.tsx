@@ -338,6 +338,31 @@ it('inserts a note reference with keyboard selection and shows current titles af
   await screen.findAllByRole('link', { name: '↗ Neue Grundsätze' });
 });
 
+it('uses selected text as the label when linking a note', async () => {
+  const target = newNote('local', 'Unsere Grundsätze');
+  await repo.put(target, null);
+  renderEditor();
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, 'Zum Islam');
+  field.setSelectionRange(4, 9);
+  fireEvent.click(screen.getByRole('button', { name: 'Notiz verlinken' }));
+  await screen.findByRole('option', { name: 'Unsere Grundsätze' });
+  await user.keyboard('{Enter}');
+  expect(field.value).toBe(`Zum [Islam](notes/${target.id}) `);
+});
+
+it('undoes the latest editor change with Ctrl+Z', async () => {
+  renderEditor();
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, 'Rückgängig');
+  fireEvent.keyDown(field, { key: 'z', code: 'KeyZ', ctrlKey: true });
+  expect(field.value).toBe('');
+});
+
 it('retains collections in drafts and saves several memberships with the note', async () => {
   const saved = vi.fn();
   const view = renderEditor(saved);

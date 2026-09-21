@@ -1,8 +1,8 @@
 import { titleOf, type Note } from './domain';
 
-export function noteLink(note: Note): string {
-  const title = titleOf(note.content).replace(/[\\[\]]/g, '\\$&');
-  return `[${title}](notes/${note.id})`;
+export function noteLink(note: Note, label = titleOf(note.content)): string {
+  const linkLabel = label.replace(/[\\[\]]/g, '\\$&');
+  return `[${linkLabel}](notes/${note.id})`;
 }
 
 export function noteReferenceIds(content: string): string[] {

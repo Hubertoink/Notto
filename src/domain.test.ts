@@ -9,6 +9,7 @@ import {
   reviseNote,
   tagsOf,
   titleOf,
+  excerptOf,
 } from './domain';
 describe('original notes', () => {
   it('preserves third-party Markdown frontmatter', () => {
@@ -57,5 +58,17 @@ describe('original notes', () => {
     const n = newNote('local', '#medien\nSteam einrichten\n![Bild](attachments/abc-123.png)');
     expect(titleOf(n.content)).toBe('Steam einrichten');
     expect(attachmentIds(n.content)).toEqual(['abc-123.png']);
+  });
+  it('turns Markdown tables into compact readable list previews', () => {
+    expect(
+      excerptOf(
+        '## Cocktails\n\n| Nr. | Name | Zutaten |\n| --- | --- | --- |\n| 1. | Gin Mule | 4 cl Gin |',
+      ),
+    ).toContain('Nr. · Name · Zutaten');
+    expect(
+      excerptOf(
+        '## Cocktails\n\n| Nr. | Name | Zutaten |\n| --- | --- | --- |\n| 1. | Gin Mule | 4 cl Gin |',
+      ),
+    ).not.toContain('| --- |');
   });
 });

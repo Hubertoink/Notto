@@ -88,6 +88,9 @@ export function titleOf(content: string): string {
 }
 export function excerptOf(content: string): string {
   return content
+    .replace(/^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/gm, '')
+    .replace(/^\s*\|\s*/gm, '')
+    .replace(/\s*\|\s*/g, ' · ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '[Bild]')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[#*_`>]/g, '')

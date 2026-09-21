@@ -2214,148 +2214,134 @@ button.tags-heading {
     min-height: 44px;
   }
 }
-.image-editor {
-  margin: 12px 0 20px;
+/* Image cards remain mounted while the stack fans over the reading surface. */
+.image-fan {
+  position: relative;
+  height: 100px;
+  margin: 0 0 16px;
+  z-index: 4;
+}
+.image-fan-cards {
+  position: absolute;
+  inset: 8px 0 auto;
+}
+.image-fan-card {
+  position: absolute;
+  top: 0;
+  padding: 3px;
   border: 1px solid var(--nt-line);
-  border-radius: 10px;
-  padding: 12px;
-}
-.image-editor summary {
-  cursor: pointer;
-  color: var(--nt-muted);
-  font-size: 13px;
-}
-.image-editor-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
-  gap: 12px;
-  margin-top: 12px;
-}
-.image-editor-card {
-  min-width: 0;
-  border: 1px solid var(--nt-line);
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 12px;
-}
-.image-editor-card legend {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 4px;
-}
-.image-editor-preview {
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  margin-bottom: 10px;
-}
-.image-editor-preview img {
-  display: block;
-  max-width: 100%;
-  max-height: 120px;
-  margin: auto;
-  object-fit: contain;
-  border-radius: 5px;
-}
-.image-editor-card label {
-  display: block;
-}
-.image-editor-card output {
-  float: right;
-}
-.image-editor-card input[type='range'] {
-  width: 100%;
-  accent-color: var(--nt-accent);
-  margin: 8px 0;
-}
-.image-editor-card .image-mode {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.image-mode input {
-  accent-color: var(--nt-accent);
-}
-.image-remove {
-  background: none;
-  border: none;
-  color: var(--nt-muted);
-  font: inherit;
-  padding: 10px 0 0;
-  cursor: pointer;
-}
-.image-gallery {
-  margin-bottom: 18px;
-}
-.image-gallery-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 0;
-  background: transparent;
-  color: var(--nt-muted);
-  cursor: pointer;
-  padding: 6px 0;
-  font: inherit;
-  font-size: 13px;
-}
-.image-stack {
-  display: flex;
-  width: 132px;
-  height: 76px;
-  align-items: center;
-  padding-left: 5px;
-}
-.image-stack > span {
-  display: block;
-  width: 65px;
-  height: 65px;
-  flex-shrink: 0;
-  margin-right: -30px;
-  border: 2px solid var(--nt-line);
-  border-radius: 8px;
-  overflow: hidden;
-  transform: rotate(-8deg);
+  border-radius: 9px;
   background: var(--nt-paper);
-}
-.image-stack > span:nth-child(2) {
-  transform: rotate(2deg);
-}
-.image-stack > span:nth-child(3) {
-  transform: rotate(10deg);
-}
-.markdown .image-stack img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  margin: 0;
-  border-radius: 0;
-}
-.image-gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 10px;
-  margin-top: 8px;
-}
-.image-gallery-grid button {
-  height: 120px;
-  padding: 0;
-  border: 1px solid var(--nt-line);
-  border-radius: 8px;
+  box-shadow: 0 5px 16px var(--nt-shadow);
   overflow: hidden;
-  background: transparent;
-  cursor: zoom-in;
+  transform-origin: center;
+  transition:
+    left 300ms ease,
+    transform 350ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 300ms ease,
+    height 300ms ease,
+    opacity 200ms;
 }
-.markdown .image-gallery-grid img {
+.markdown .image-fan-card img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   margin: 0;
-  border-radius: 0;
+  border-radius: 6px;
+}
+.image-fan.expanded .image-fan-card:hover {
+  box-shadow: 0 8px 24px var(--nt-shadow);
+}
+.image-fan-close {
+  position: absolute;
+  right: 0;
+  top: -20px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--nt-line);
+  border-radius: 50%;
+  background: var(--nt-paper);
+  z-index: 100;
+  display: grid;
+  place-items: center;
+}
+.inline-note-editor {
+  width: 100%;
+  min-width: 0;
+}
+.editor-content .inline-note-editor textarea {
+  display: block;
+  min-height: 30px;
+  overflow: hidden;
+  margin: 0;
+  padding: 2px 0;
+}
+.inline-image-block {
+  width: 100%;
+  margin: 10px 0;
+}
+.inline-image-frame {
+  position: relative;
+  max-width: 100%;
+  border-radius: 8px;
+}
+.inline-image-frame.selected {
+  outline: 2px solid var(--nt-accent);
+}
+.inline-image-select {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.inline-image-select img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.inline-image-frame.is-thumbnail img {
+  height: 90px;
+  object-fit: cover;
+}
+.inline-image-options {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--nt-line);
+  background: var(--nt-paper);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px var(--nt-shadow);
+  z-index: 5;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.inline-image-options label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.inline-image-options input {
+  accent-color: var(--nt-accent);
+}
+.image-resize-handle {
+  position: absolute;
+  bottom: -9px;
+  right: -9px;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--nt-paper);
+  border-radius: 6px;
+  background: var(--nt-accent);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .image-fan-card {
+    transition: none;
+  }
 }
 .note-image-button {
   display: inline-block;

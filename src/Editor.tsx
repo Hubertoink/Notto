@@ -1,3 +1,4 @@
+import { noteImages } from './image-layout';
 import {
   backlinks,
   linkedNotes,
@@ -32,7 +33,7 @@ import {
   Save,
   X,
 } from 'lucide-react';
-import { Action, Modal, NoteMarkdown, NoteReferenceLink, readableDate, ImageEditor } from './components';
+import { Action, Modal, NoteMarkdown, NoteReferenceLink, readableDate, InlineImage } from './components';
 import { newNote, reviseNote, tagsOf, attachmentIds, titleOf, type Note, type Revision } from './domain';
 import { PdfAttachment } from './PdfAttachment';
 import { repo } from './repository';
@@ -89,11 +90,41 @@ export function Editor({
   const [history, setHistory] = useState(false);
   const [oldRevision, setOldRevision] = useState<Revision | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const textFields = useRef(new Map<number, HTMLTextAreaElement>());
+  const offsetOf = (el: HTMLTextAreaElement | null) => Number(el?.dataset.start || 0);
+  const selectionStart = () =>
+    input.current ? offsetOf(input.current) + input.current.selectionStart : content.length;
+  const images = noteImages(content);
+  const segments: { start: number; end: number; image?: (typeof images)[number] }[] = [];
+  let cursor = 0;
+  for (const image of images) {
+    segments.push({ start: cursor, end: image.start });
+    segments.push({ start: image.start, end: image.start + image.raw.length, image });
+    cursor = image.start + image.raw.length;
+  }
+  segments.push({ start: cursor, end: content.length });
+  useLayoutEffect(() => {
+    const resize = () =>
+      textFields.current.forEach((el) => {
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+      });
+    resize();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize);
+    const parent = input.current?.parentElement;
+    if (parent) observer?.observe(parent);
+    return () => observer?.disconnect();
+  }, [content, preview]);
   const acceptedTagCaret = useRef<{ start: number; end: number } | null>(null);
   useLayoutEffect(() => {
     if (acceptedTagCaret.current === null) return;
-    input.current?.focus();
-    input.current?.setSelectionRange(acceptedTagCaret.current.start, acceptedTagCaret.current.end);
+    const caret = acceptedTagCaret.current;
+    const el =
+      [...textFields.current.values()].find(
+        (field) => caret.start >= offsetOf(field) && caret.start <= offsetOf(field) + field.value.length,
+      ) || input.current;
+    el?.focus();
+    el?.setSelectionRange(caret.start - offsetOf(el), caret.end - offsetOf(el));
     acceptedTagCaret.current = null;
   }, [content, collections]);
   const [tagToken, setTagToken] = useState<{
@@ -153,11 +184,11 @@ export function Editor({
         border: '0',
       });
       const marker = document.createElement('span');
-      marker.textContent = el.value.slice(tagToken.start, tagToken.end) || '#';
+      marker.textContent = el.value.slice(tagToken.start - offsetOf(el), tagToken.end - offsetOf(el)) || '#';
       mirror.replaceChildren(
-        document.createTextNode(el.value.slice(0, tagToken.start)),
+        document.createTextNode(el.value.slice(0, tagToken.start - offsetOf(el))),
         marker,
-        document.createTextNode(el.value.slice(tagToken.end)),
+        document.createTextNode(el.value.slice(tagToken.end - offsetOf(el))),
       );
       const bounds = marker.getClientRects()[0] || marker.getBoundingClientRect();
       const left = rect.left + el.clientLeft + bounds.left - el.scrollLeft;
@@ -211,8 +242,8 @@ export function Editor({
       ? noteOptions.map((n) => ({ id: n.id, label: titleOf(n.content) }))
       : tagOptions.map((t) => ({ id: t, label: '#' + t }));
   const inspectTag = (el: HTMLTextAreaElement) => {
-    const end = el.selectionStart;
-    const before = el.value.slice(0, end);
+    const end = el.selectionStart + offsetOf(el);
+    const before = el.value.slice(0, el.selectionStart);
     const reference = before.match(/\[\[([^\]\n]*)$/);
     const match = before.match(/(?:^|\s)#([\p{L}\p{N}_/-]*)$/u);
     setTagToken(
@@ -241,14 +272,19 @@ export function Editor({
   const format = (kind: Format) => {
     const el = input.current;
     if (!el) return;
-    const result = formatText(content, el.selectionStart, el.selectionEnd, kind);
+    const result = formatText(
+      content,
+      el.selectionStart + offsetOf(el),
+      el.selectionEnd + offsetOf(el),
+      kind,
+    );
     acceptedTagCaret.current = { start: result.start, end: result.end };
     change(result.text);
     setTagToken(null);
   };
   const insertReference = () => {
-    const start = input.current?.selectionStart ?? content.length;
-    const end = input.current?.selectionEnd ?? start;
+    const start = selectionStart();
+    const end = input.current ? input.current.selectionEnd + offsetOf(input.current) : start;
     acceptedTagCaret.current = { start: start + 2, end: start + 2 };
     change(content.slice(0, start) + '[[' + content.slice(end));
     setTagToken({ start, end: start + 2, query: '', kind: 'note' });
@@ -435,7 +471,7 @@ export function Editor({
             : repo.addImage(scope, f)),
         );
       const el = input.current;
-      const position = el?.selectionStart ?? textRef.current.length;
+      const position = el ? el.selectionStart + offsetOf(el) : textRef.current.length;
       const current = textRef.current;
       const insert = '\n\n' + markdown.join('\n\n') + '\n';
       change(current.slice(0, position) + insert + current.slice(position));
@@ -647,9 +683,6 @@ export function Editor({
             </button>
           </div>
         )}
-        {!preview && (
-          <ImageEditor content={content} scope={scope} onChange={change} disabled={!ready || saving} />
-        )}
         <div
           className={`editor-content ${preview ? 'is-preview' : ''}`}
           onDragOver={(e) => e.preventDefault()}
@@ -661,71 +694,105 @@ export function Editor({
           {preview ? (
             <NoteMarkdown content={content || '*Noch kein Text.*'} scope={scope} />
           ) : (
-            <textarea
-              ref={input}
-              aria-label="Notiztext"
-              value={content}
-              disabled={!ready || saving}
-              placeholder={
-                compact
-                  ? 'Ein Gedanke, eine Idee, etwas für später …\n\n#thema'
-                  : 'Ein Gedanke, eine Idee, etwas für später …\n\nMit #Hashtags behältst du den Überblick.'
-              }
-              onChange={(e) => {
-                change(e.target.value);
-                inspectTag(e.target);
-              }}
-              onClick={(e) => inspectTag(e.currentTarget)}
-              onBlur={() => setTagToken(null)}
-              onKeyUp={(e) => {
-                if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) inspectTag(e.currentTarget);
-              }}
-              aria-controls={tagToken && suggestions.length ? 'tag-suggestions' : undefined}
-              aria-activedescendant={tagToken && suggestions.length ? `tag-option-${tagIndex}` : undefined}
-              onPaste={(e) => {
-                const images = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
-                if (images.length) {
-                  e.preventDefault();
-                  void addFiles(images);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (
-                  !e.nativeEvent.isComposing &&
-                  (e.ctrlKey || e.metaKey) &&
-                  !e.altKey &&
-                  ['b', 'i'].includes(e.key.toLowerCase())
-                ) {
-                  e.preventDefault();
-                  format(e.key.toLowerCase() === 'b' ? 'bold' : 'italic');
-                  return;
-                }
-                if (tagToken && !e.nativeEvent.isComposing && !e.ctrlKey && !e.metaKey) {
-                  if (e.key === 'Escape') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setTagToken(null);
-                    return;
-                  }
-                  if (suggestions.length && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
-                    e.preventDefault();
-                    if (e.key === 'Enter') acceptSuggestion((suggestions[tagIndex] || suggestions[0]).id);
-                    else
-                      setTagIndex(
-                        (i) =>
-                          (i + (e.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length,
+            <div className="inline-note-editor">
+              {segments.map((segment, index) =>
+                segment.image ? (
+                  <InlineImage
+                    key={`image-${index}`}
+                    content={content}
+                    scope={scope}
+                    image={segment.image}
+                    onChange={change}
+                    disabled={!ready || saving}
+                  />
+                ) : (
+                  <textarea
+                    key={`text-${index}`}
+                    data-start={segment.start}
+                    ref={(el) => {
+                      if (el) {
+                        textFields.current.set(index, el);
+                        if (!input.current || !input.current.isConnected) input.current = el;
+                      } else textFields.current.delete(index);
+                    }}
+                    onFocus={(e) => {
+                      input.current = e.currentTarget;
+                    }}
+                    aria-label="Notiztext"
+                    value={content.slice(segment.start, segment.end)}
+                    disabled={!ready || saving}
+                    placeholder={
+                      images.length
+                        ? ''
+                        : compact
+                          ? 'Ein Gedanke, eine Idee, etwas für später …\n\n#thema'
+                          : 'Ein Gedanke, eine Idee, etwas für später …\n\nMit #Hashtags behältst du den Überblick.'
+                    }
+                    onChange={(e) => {
+                      change(content.slice(0, segment.start) + e.target.value + content.slice(segment.end));
+                      inspectTag(e.target);
+                    }}
+                    onClick={(e) => inspectTag(e.currentTarget)}
+                    onBlur={() => setTagToken(null)}
+                    onKeyUp={(e) => {
+                      if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key))
+                        inspectTag(e.currentTarget);
+                    }}
+                    aria-controls={tagToken && suggestions.length ? 'tag-suggestions' : undefined}
+                    aria-activedescendant={
+                      tagToken && suggestions.length ? `tag-option-${tagIndex}` : undefined
+                    }
+                    onPaste={(e) => {
+                      const images = Array.from(e.clipboardData.files).filter((f) =>
+                        f.type.startsWith('image/'),
                       );
-                    return;
-                  }
-                }
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                  e.preventDefault();
-                  void save();
-                }
-              }}
-              spellCheck
-              lang="de"
-            />
+                      if (images.length) {
+                        e.preventDefault();
+                        void addFiles(images);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (
+                        !e.nativeEvent.isComposing &&
+                        (e.ctrlKey || e.metaKey) &&
+                        !e.altKey &&
+                        ['b', 'i'].includes(e.key.toLowerCase())
+                      ) {
+                        e.preventDefault();
+                        format(e.key.toLowerCase() === 'b' ? 'bold' : 'italic');
+                        return;
+                      }
+                      if (tagToken && !e.nativeEvent.isComposing && !e.ctrlKey && !e.metaKey) {
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTagToken(null);
+                          return;
+                        }
+                        if (suggestions.length && ['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+                          e.preventDefault();
+                          if (e.key === 'Enter')
+                            acceptSuggestion((suggestions[tagIndex] || suggestions[0]).id);
+                          else
+                            setTagIndex(
+                              (i) =>
+                                (i + (e.key === 'ArrowDown' ? 1 : -1) + suggestions.length) %
+                                suggestions.length,
+                            );
+                          return;
+                        }
+                      }
+                      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                        e.preventDefault();
+                        void save();
+                      }
+                    }}
+                    spellCheck
+                    lang="de"
+                  />
+                ),
+              )}
+            </div>
           )}
           {!preview &&
             tagToken &&
@@ -900,7 +967,7 @@ export function Editor({
             <Dictation
               scope={scope}
               onInsert={(text) => {
-                const position = input.current?.selectionStart ?? textRef.current.length;
+                const position = selectionStart();
                 change(textRef.current.slice(0, position) + text + textRef.current.slice(position));
               }}
             />

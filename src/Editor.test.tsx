@@ -56,6 +56,20 @@ function renderEditor(saved = vi.fn()) {
     </Theme>,
   );
 }
+it('edits and formats text after an inline image without changing its reference', async () => {
+  renderEditor();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  fireEvent.change(field, { target: { value: 'Titel\n\n![Foto](attachments/abc.png)\n\nDanach' } });
+  const fields = screen.getAllByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement[];
+  expect(fields).toHaveLength(2);
+  const after = fields[1];
+  fireEvent.focus(after);
+  after.setSelectionRange(2, 8);
+  fireEvent.click(screen.getByRole('button', { name: 'Fett (Strg B)' }));
+  expect(after.value).toBe('\n\n**Danach**');
+  expect(screen.getByRole('button', { name: 'Foto bearbeiten' })).toBeTruthy();
+});
 it('applies a rewrite only to the draft and can restore the original wording', async () => {
   vi.spyOn(rewriting, 'rewriteNote').mockResolvedValue('Ein lesbarer Gedanke.');
   renderEditor();

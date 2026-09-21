@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { Button, type ButtonProps } from '@astryxdesign/core/Button';
 import { Dialog } from '@astryxdesign/core/Dialog';
 import { X, ImageOff, Globe, ChevronDown } from 'lucide-react';
@@ -202,69 +202,128 @@ export function NoteImage({ src, alt, scope }: { src?: string; alt?: string; sco
     <span className="image-fallback">Bild wird geladen …</span>
   );
 }
-export function ImageEditor({
+export function InlineImage({
   content,
   scope,
+  image,
   onChange,
   disabled,
 }: {
   content: string;
   scope: string;
+  image: ReturnType<typeof noteImages>[number];
   onChange: (content: string) => void;
   disabled: boolean;
 }) {
-  const images = noteImages(content);
-  if (!images.length) return null;
+  const [selected, setSelected] = useState(false);
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const host = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; width: number; container: number } | null>(null);
+  const width = dragWidth ?? image.width;
   return (
-    <details className="image-editor" open>
-      <summary>Bilder · {images.length}</summary>
-      <div className="image-editor-grid">
-        {images.map((image, index) => (
-          <fieldset key={`${image.src}-${index}`} disabled={disabled} className="image-editor-card">
-            <legend>{image.alt || `Bild ${index + 1}`}</legend>
-            <div className="image-editor-preview">
-              <div style={{ width: `${image.width}%` }}>
-                <NoteImage src={image.src} alt={image.alt} scope={scope} />
-              </div>
+    <div
+      ref={host}
+      className="inline-image-block"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setSelected(false);
+      }}
+    >
+      <div
+        className={`inline-image-frame ${selected ? 'selected' : ''} ${image.thumbnail ? 'is-thumbnail' : ''}`}
+        style={{ width: image.thumbnail ? '120px' : `${width}%` }}
+      >
+        <button
+          type="button"
+          className="inline-image-select"
+          disabled={disabled}
+          aria-label={`${image.alt || 'Bild'} bearbeiten`}
+          onClick={() => setSelected(!selected)}
+        >
+          <NoteImage src={image.src} alt={image.alt} scope={scope} />
+        </button>
+        {selected && (
+          <>
+            <div className="inline-image-options">
+              <label>
+                <input
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={image.thumbnail}
+                  onChange={(e) =>
+                    onChange(updateImageLayout(content, image.start, image.width, e.target.checked))
+                  }
+                />{' '}
+                Als Thumbnail
+              </label>
             </div>
-            <label>
-              Breite <output>{image.width}%</output>
-              <input
-                aria-label={`Breite Bild ${index + 1}`}
-                type="range"
-                min="20"
-                max="100"
-                step="5"
-                value={image.width}
-                disabled={image.thumbnail}
-                onChange={(e) =>
-                  onChange(updateImageLayout(content, image.start, Number(e.target.value), image.thumbnail))
-                }
+            {!image.thumbnail && (
+              <button
+                type="button"
+                className="image-resize-handle"
+                aria-label="Bildgröße ändern"
+                disabled={disabled}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  drag.current = {
+                    x: e.clientX,
+                    width: image.width,
+                    container: host.current?.clientWidth || 1,
+                  };
+                }}
+                onPointerMove={(e) => {
+                  if (drag.current)
+                    setDragWidth(
+                      Math.round(
+                        Math.max(
+                          20,
+                          Math.min(
+                            100,
+                            drag.current.width +
+                              ((e.clientX - drag.current.x) / drag.current.container) * 100,
+                          ),
+                        ),
+                      ),
+                    );
+                }}
+                onPointerUp={(e) => {
+                  if (!drag.current) return;
+                  const next = Math.round(
+                    Math.max(
+                      20,
+                      Math.min(
+                        100,
+                        drag.current.width + ((e.clientX - drag.current.x) / drag.current.container) * 100,
+                      ),
+                    ),
+                  );
+                  drag.current = null;
+                  setDragWidth(null);
+                  onChange(updateImageLayout(content, image.start, next, false));
+                }}
+                onPointerCancel={() => {
+                  drag.current = null;
+                  setDragWidth(null);
+                }}
+                onKeyDown={(e) => {
+                  if (['ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    e.preventDefault();
+                    onChange(
+                      updateImageLayout(
+                        content,
+                        image.start,
+                        image.width + (e.key === 'ArrowRight' ? 5 : -5),
+                        false,
+                      ),
+                    );
+                  }
+                }}
               />
-            </label>
-            <label className="image-mode">
-              <input
-                type="checkbox"
-                checked={image.thumbnail}
-                onChange={(e) =>
-                  onChange(updateImageLayout(content, image.start, image.width, e.target.checked))
-                }
-              />{' '}
-              Als Thumbnail oben
-            </label>
-            <button
-              type="button"
-              className="image-remove"
-              onClick={() =>
-                onChange(content.slice(0, image.start) + content.slice(image.start + image.raw.length))
-              }
-            >
-              Aus Notiz entfernen
-            </button>
-          </fieldset>
-        ))}
+            )}
+          </>
+        )}
       </div>
-    </details>
+    </div>
   );
 }
 
@@ -272,42 +331,68 @@ function ImageGallery({ content, scope }: { content: string; scope: string }) {
   const images = noteImages(content).filter((image) => image.thumbnail);
   const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
+  const [columns, setColumns] = useState(3);
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    const measure = () => setColumns(Math.max(1, Math.floor(el.clientWidth / 145)));
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(el);
+    const close = (e: PointerEvent) => {
+      if (!el.contains(e.target as Node) && selected === null) setExpanded(false);
+    };
+    document.addEventListener('pointerdown', close);
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener('pointerdown', close);
+    };
+  }, [images.length, selected]);
   if (!images.length) return null;
   return (
-    <div className="image-gallery">
-      <button
-        type="button"
-        className="image-gallery-toggle"
-        aria-expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
-      >
-        {!expanded && (
-          <span className="image-stack" aria-hidden="true">
-            {images.slice(0, 3).map((image, i) => (
-              <span key={i}>
-                <NoteImage src={image.src} alt="" scope={scope} />
-              </span>
-            ))}
-          </span>
-        )}
-        <span>
-          {images.length} {images.length === 1 ? 'Bild' : 'Bilder'} · {expanded ? 'Einklappen' : 'Anzeigen'}
-        </span>
-        <ChevronDown size={16} />
-      </button>
+    <div
+      ref={host}
+      className={`image-fan ${expanded ? 'expanded' : ''}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') setExpanded(false);
+      }}
+    >
+      <div className="image-fan-cards">
+        {images.map((image, i) => (
+          <button
+            type="button"
+            key={`${image.src}-${i}`}
+            className="image-fan-card"
+            aria-label={expanded ? `${image.alt || `Bild ${i + 1}`} vergrößern` : 'Bilder auffächern'}
+            aria-expanded={expanded}
+            tabIndex={expanded || i === 0 ? 0 : -1}
+            style={{
+              width: expanded ? `calc(${100 / columns}% - 10px)` : '70px',
+              height: expanded ? '130px' : '80px',
+              left: expanded ? `${((i % columns) * 100) / columns}%` : `${Math.min(i, 3) * 24}px`,
+              transform: expanded
+                ? `translateY(${Math.floor(i / columns) * 142}px) rotate(${i % 2 ? 2 : -2}deg)`
+                : `rotate(${Math.min(i, 3) * 7 - 10}deg)`,
+              opacity: expanded || i < 4 ? 1 : 0,
+              pointerEvents: expanded || i < 4 ? 'auto' : 'none',
+              zIndex: i + 1,
+            }}
+            onClick={() => (expanded ? setSelected(i) : setExpanded(true))}
+          >
+            <NoteImage src={image.src} alt={image.alt} scope={scope} />
+          </button>
+        ))}
+      </div>
       {expanded && (
-        <div className="image-gallery-grid">
-          {images.map((image, i) => (
-            <button
-              type="button"
-              key={`${image.src}-${i}`}
-              aria-label={`${image.alt || `Bild ${i + 1}`} vergrößern`}
-              onClick={() => setSelected(i)}
-            >
-              <NoteImage src={image.src} alt={image.alt} scope={scope} />
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          className="image-fan-close"
+          aria-label="Bilder einklappen"
+          onClick={() => setExpanded(false)}
+        >
+          <X size={16} />
+        </button>
       )}
       {selected !== null && images[selected] && (
         <Modal
@@ -364,7 +449,10 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
       .reverse()) {
       result = result.slice(0, image.start) + result.slice(image.start + image.raw.length);
     }
-    return result;
+    return result.replace(
+      /(```|~~~)[\s\S]*?\1|^[ \t]*(?:#[\p{L}\p{N}][\p{L}\p{N}_/-]*[ \t]*)+$/gmu,
+      (match) => (match.startsWith('```') || match.startsWith('~~~') ? match : ''),
+    );
   }, [content]);
   // Stable component types keep loaded attachments mounted during save/status updates.
   const components = useMemo<Components>(

@@ -9,6 +9,7 @@ import { Sources, NoteMarkdown } from './components';
 import type { Note } from './domain';
 import { currentContent } from './domain';
 import { aiAnnotationBackgrounds } from './note-backgrounds';
+import { compactParenthesizedLines } from './annotation-markdown';
 import './tasks.css';
 
 export function useKnowledgeRecords(scope: string) {
@@ -287,7 +288,10 @@ export function NoteAnnotations({
               {uniqueResearch.map((r) => (
                 <article key={r.id}>
                   <strong>Recherche</strong>
-                  <NoteMarkdown content={(r.data as Research).text} scope={note.scope} />
+                  <NoteMarkdown
+                    content={compactParenthesizedLines((r.data as Research).text)}
+                    scope={note.scope}
+                  />
                   <Sources sources={(r.data as Research).sources ?? []} compact />
                 </article>
               ))}

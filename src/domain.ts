@@ -87,7 +87,12 @@ export function titleOf(content: string): string {
   );
 }
 export function excerptOf(content: string): string {
-  return content
+  const lines = content.split('\n');
+  const title = titleOf(content);
+  const titleIndex = lines.findIndex((line) => line.trim() && titleOf(line) === title);
+  if (titleIndex >= 0) lines.splice(titleIndex, 1);
+  return lines
+    .join('\n')
     .replace(/^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/gm, '')
     .replace(/^\s*\|\s*/gm, '')
     .replace(/\s*\|\s*/g, ' · ')

@@ -32,7 +32,7 @@ import {
   Save,
   X,
 } from 'lucide-react';
-import { Action, Modal, NoteMarkdown, NoteReferenceLink, readableDate } from './components';
+import { Action, Modal, NoteMarkdown, NoteReferenceLink, readableDate, ImageEditor } from './components';
 import { newNote, reviseNote, tagsOf, attachmentIds, titleOf, type Note, type Revision } from './domain';
 import { PdfAttachment } from './PdfAttachment';
 import { repo } from './repository';
@@ -646,6 +646,9 @@ export function Editor({
               <FileSymlink size={17} />
             </button>
           </div>
+        )}
+        {!preview && (
+          <ImageEditor content={content} scope={scope} onChange={change} disabled={!ready || saving} />
         )}
         <div
           className={`editor-content ${preview ? 'is-preview' : ''}`}

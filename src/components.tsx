@@ -12,6 +12,7 @@ import { useNotto } from './state';
 import { PdfAttachment } from './PdfAttachment';
 import { uniqueSources } from './knowledge-policy';
 import { titleOf } from './domain';
+import { imageLayout, noteImages, updateImageLayout } from './image-layout';
 
 export function NoteReferenceLink({
   id,
@@ -163,7 +164,7 @@ export function Modal({
     </Dialog>
   );
 }
-function NoteImage({ src, alt, scope }: { src?: string; alt?: string; scope: string }) {
+export function NoteImage({ src, alt, scope }: { src?: string; alt?: string; scope: string }) {
   const [url, setUrl] = useState('');
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -201,7 +202,170 @@ function NoteImage({ src, alt, scope }: { src?: string; alt?: string; scope: str
     <span className="image-fallback">Bild wird geladen …</span>
   );
 }
+export function ImageEditor({
+  content,
+  scope,
+  onChange,
+  disabled,
+}: {
+  content: string;
+  scope: string;
+  onChange: (content: string) => void;
+  disabled: boolean;
+}) {
+  const images = noteImages(content);
+  if (!images.length) return null;
+  return (
+    <details className="image-editor" open>
+      <summary>Bilder · {images.length}</summary>
+      <div className="image-editor-grid">
+        {images.map((image, index) => (
+          <fieldset key={`${image.src}-${index}`} disabled={disabled} className="image-editor-card">
+            <legend>{image.alt || `Bild ${index + 1}`}</legend>
+            <div className="image-editor-preview">
+              <div style={{ width: `${image.width}%` }}>
+                <NoteImage src={image.src} alt={image.alt} scope={scope} />
+              </div>
+            </div>
+            <label>
+              Breite <output>{image.width}%</output>
+              <input
+                aria-label={`Breite Bild ${index + 1}`}
+                type="range"
+                min="20"
+                max="100"
+                step="5"
+                value={image.width}
+                disabled={image.thumbnail}
+                onChange={(e) =>
+                  onChange(updateImageLayout(content, image.start, Number(e.target.value), image.thumbnail))
+                }
+              />
+            </label>
+            <label className="image-mode">
+              <input
+                type="checkbox"
+                checked={image.thumbnail}
+                onChange={(e) =>
+                  onChange(updateImageLayout(content, image.start, image.width, e.target.checked))
+                }
+              />{' '}
+              Als Thumbnail oben
+            </label>
+            <button
+              type="button"
+              className="image-remove"
+              onClick={() =>
+                onChange(content.slice(0, image.start) + content.slice(image.start + image.raw.length))
+              }
+            >
+              Aus Notiz entfernen
+            </button>
+          </fieldset>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function ImageGallery({ content, scope }: { content: string; scope: string }) {
+  const images = noteImages(content).filter((image) => image.thumbnail);
+  const [expanded, setExpanded] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
+  if (!images.length) return null;
+  return (
+    <div className="image-gallery">
+      <button
+        type="button"
+        className="image-gallery-toggle"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {!expanded && (
+          <span className="image-stack" aria-hidden="true">
+            {images.slice(0, 3).map((image, i) => (
+              <span key={i}>
+                <NoteImage src={image.src} alt="" scope={scope} />
+              </span>
+            ))}
+          </span>
+        )}
+        <span>
+          {images.length} {images.length === 1 ? 'Bild' : 'Bilder'} · {expanded ? 'Einklappen' : 'Anzeigen'}
+        </span>
+        <ChevronDown size={16} />
+      </button>
+      {expanded && (
+        <div className="image-gallery-grid">
+          {images.map((image, i) => (
+            <button
+              type="button"
+              key={`${image.src}-${i}`}
+              aria-label={`${image.alt || `Bild ${i + 1}`} vergrößern`}
+              onClick={() => setSelected(i)}
+            >
+              <NoteImage src={image.src} alt={image.alt} scope={scope} />
+            </button>
+          ))}
+        </div>
+      )}
+      {selected !== null && images[selected] && (
+        <Modal
+          title={images[selected].alt || 'Bild'}
+          width={1000}
+          className="image-lightbox"
+          onClose={() => setSelected(null)}
+        >
+          <NoteImage src={images[selected].src} alt={images[selected].alt} scope={scope} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function MarkdownImage({
+  src,
+  alt,
+  title,
+  scope,
+}: {
+  src?: string;
+  alt?: string;
+  title?: string;
+  scope: string;
+}) {
+  const layout = imageLayout(title);
+  const [open, setOpen] = useState(false);
+  if (layout.thumbnail) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className="note-image-button"
+        style={{ width: `${layout.width}%` }}
+        aria-label={`${alt || 'Bild'} vergrößern`}
+        onClick={() => setOpen(true)}
+      >
+        <NoteImage src={src} alt={alt} scope={scope} />
+      </button>
+      {open && (
+        <Modal title={alt || 'Bild'} width={1000} className="image-lightbox" onClose={() => setOpen(false)}>
+          <NoteImage src={src} alt={alt} scope={scope} />
+        </Modal>
+      )}
+    </>
+  );
+}
 export function NoteMarkdown({ content, scope }: { content: string; scope: string }) {
+  const readingContent = useMemo(() => {
+    let result = content;
+    for (const image of noteImages(content)
+      .filter((image) => image.thumbnail)
+      .reverse()) {
+      result = result.slice(0, image.start) + result.slice(image.start + image.raw.length);
+    }
+    return result;
+  }, [content]);
   // Stable component types keep loaded attachments mounted during save/status updates.
   const components = useMemo<Components>(
     () => ({
@@ -215,7 +379,7 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
           <table>{children}</table>
         </div>
       ),
-      img: ({ src, alt }) => <NoteImage src={src} alt={alt} scope={scope} />,
+      img: ({ src, alt, title }) => <MarkdownImage src={src} alt={alt} title={title} scope={scope} />,
       a: ({ href, children }) =>
         /^notes\/[a-f0-9-]{36}$/.test(href || '') ? (
           <NoteReferenceLink scope={scope} id={href!.slice(6)} fallback={children} />
@@ -231,8 +395,9 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
   );
   return (
     <div className="markdown">
+      <ImageGallery content={content} scope={scope} />
       <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
-        {content}
+        {readingContent}
       </Markdown>
     </div>
   );

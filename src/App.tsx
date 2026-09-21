@@ -42,6 +42,22 @@ import { excerptOf, importedMarkdown, newNote, reviseNote, tagsOf, titleOf, type
 import { noteBackground, readNoteBackground, type NoteBackgroundId } from './note-backgrounds';
 
 type View = 'all' | 'pinned' | 'archive' | 'trash';
+function navigationFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const candidate = params.get('view');
+  return {
+    view:
+      candidate === 'pinned' || candidate === 'archive' || candidate === 'trash'
+        ? candidate
+        : ('all' as View),
+    tag: params.get('tag'),
+    collection: params.get('collection'),
+    selected: params.get('note'),
+    creating: params.get('new') === '1',
+    knowledge: params.get('knowledge') === '1',
+    tasks: params.get('tasks') === '1',
+  };
+}
 export default function App() {
   const [mode, setModeState] = useState<'system' | 'light' | 'dark'>(() => {
     const m = localStorage.getItem('notto-theme');
@@ -99,17 +115,18 @@ function Notebook({
   setNoteBackground: (id: NoteBackgroundId) => void;
 }) {
   const { notes, scope, user, loading, notify, notice, sync, syncState, syncError } = useNotto();
-  const [view, setView] = useState<View>('all');
-  const [tag, setTag] = useState<string | null>(null);
-  const [collection, setCollection] = useState<string | null>(null);
+  const initialNavigation = navigationFromUrl();
+  const [view, setView] = useState<View>(initialNavigation.view);
+  const [tag, setTag] = useState<string | null>(initialNavigation.tag);
+  const [collection, setCollection] = useState<string | null>(initialNavigation.collection);
   const [collectionDialog, setCollectionDialog] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [collectionBusy, setCollectionBusy] = useState(false);
   const [collectionError, setCollectionError] = useState('');
   const [dragCollection, setDragCollection] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [selected, setSelected] = useState<string | null>(initialNavigation.selected);
+  const [creating, setCreating] = useState(initialNavigation.creating);
   const [draftSource, setDraftSource] = useState<'widget' | undefined>();
   const drafts = useNewDrafts(scope);
   const visibleDrafts =
@@ -127,8 +144,8 @@ function Notebook({
       document.startViewTransition(() => flushSync(() => setAllTags(open)));
     } else setAllTags(open);
   };
-  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
-  const [tasksOpen, setTasksOpen] = useState(false);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(initialNavigation.knowledge);
+  const [tasksOpen, setTasksOpen] = useState(initialNavigation.tasks);
   const records = useKnowledgeRecords(scope);
   const tasks = tasksFor(notes, records, scope);
   const openTaskNote = (id: string) => {
@@ -141,17 +158,34 @@ function Notebook({
   const [sidebar, setSidebar] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    setSelected(null);
-    setKnowledgeOpen(false);
-    setTasksOpen(false);
-    setCreating(false);
+    const navigation = navigationFromUrl();
+    setSelected(navigation.selected);
+    setKnowledgeOpen(navigation.knowledge);
+    setTasksOpen(navigation.tasks);
+    setCreating(navigation.creating);
     setSearchOpen(false);
     setAllTags(false);
     setCollectionDialog(false);
-    setTag(null);
-    setCollection(null);
-    setView('all');
+    setTag(navigation.tag);
+    setCollection(navigation.collection);
+    setView(navigation.view);
   }, [scope]);
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (view !== 'all') params.set('view', view);
+    if (tag) params.set('tag', tag);
+    if (collection) params.set('collection', collection);
+    if (selected) params.set('note', selected);
+    if (creating) params.set('new', '1');
+    if (knowledgeOpen) params.set('knowledge', '1');
+    if (tasksOpen) params.set('tasks', '1');
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
+    );
+  }, [view, tag, collection, selected, creating, knowledgeOpen, tasksOpen]);
   const active = notes.filter((n) => !n.deleted && !n.archived);
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>();

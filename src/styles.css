@@ -101,6 +101,57 @@ textarea:focus-visible {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+.sidebar-scroll,
+.tag-navigation,
+.collection-navigation,
+.collection-notes,
+.modal-body,
+.knowledge-table-wrap,
+.markdown-table-scroll {
+  scrollbar-color: color-mix(in srgb, var(--nt-muted) 58%, transparent) transparent;
+  scrollbar-width: thin;
+}
+.sidebar-scroll::-webkit-scrollbar,
+.tag-navigation::-webkit-scrollbar,
+.collection-navigation::-webkit-scrollbar,
+.collection-notes::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar,
+.knowledge-table-wrap::-webkit-scrollbar,
+.markdown-table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.sidebar-scroll::-webkit-scrollbar-track,
+.tag-navigation::-webkit-scrollbar-track,
+.collection-navigation::-webkit-scrollbar-track,
+.collection-notes::-webkit-scrollbar-track,
+.modal-body::-webkit-scrollbar-track,
+.knowledge-table-wrap::-webkit-scrollbar-track,
+.markdown-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.tag-navigation::-webkit-scrollbar-thumb,
+.collection-navigation::-webkit-scrollbar-thumb,
+.collection-notes::-webkit-scrollbar-thumb,
+.modal-body::-webkit-scrollbar-thumb,
+.knowledge-table-wrap::-webkit-scrollbar-thumb,
+.markdown-table-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nt-muted) 58%, transparent);
+  background-clip: padding-box;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.tag-navigation::-webkit-scrollbar-thumb:hover,
+.collection-navigation::-webkit-scrollbar-thumb:hover,
+.collection-notes::-webkit-scrollbar-thumb:hover,
+.modal-body::-webkit-scrollbar-thumb:hover,
+.knowledge-table-wrap::-webkit-scrollbar-thumb:hover,
+.markdown-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--nt-muted);
+  background-clip: padding-box;
+}
 .brand {
   display: flex;
   align-items: center;

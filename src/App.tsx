@@ -357,24 +357,26 @@ function Notebook({
         />
       )}
       <aside className="sidebar">
-        <div className="brand">
-          <img className="brand-logo" src="/noto.png" alt="" />
-          <span>noto</span>
-        </div>
-        <div className="sidebar-new">
-          <Action
-            label="Neue Notiz"
-            endContent={
-              <kbd className="note-shortcut" aria-label={newNoteLabel}>
-                {desktop ? newNoteLabel : 'Strg ⇧ ␣'}
-              </kbd>
-            }
-            tooltip={`Neue Notiz · ${newNoteLabel}`}
-            icon={<Plus size={18} />}
-            variant="primary"
-            width="100%"
-            onClick={openNew}
-          />
+        <div className="sidebar-fixed">
+          <div className="brand">
+            <img className="brand-logo" src="/noto.png" alt="" />
+            <span>noto</span>
+          </div>
+          <div className="sidebar-new">
+            <Action
+              label="Neue Notiz"
+              endContent={
+                <kbd className="note-shortcut" aria-label={newNoteLabel}>
+                  {desktop ? newNoteLabel : 'Strg ⇧ ␣'}
+                </kbd>
+              }
+              tooltip={`Neue Notiz · ${newNoteLabel}`}
+              icon={<Plus size={18} />}
+              variant="primary"
+              width="100%"
+              onClick={openNew}
+            />
+          </div>
         </div>
         <div className="sidebar-scroll">
           <nav aria-label="Notizbücher">

@@ -51,6 +51,7 @@ export function Editor({
   onSaved,
   onBack,
   onClose,
+  aiBackgroundEnabled = false,
 }: {
   note?: Note;
   compact?: boolean;
@@ -59,6 +60,7 @@ export function Editor({
   onSaved: (note: Note) => void;
   onBack?: () => void;
   onClose?: () => void;
+  aiBackgroundEnabled?: boolean;
 }) {
   const { scope, notify, notes } = useNotto();
   const collectionRecords = useKnowledgeRecords(scope);
@@ -589,7 +591,13 @@ export function Editor({
         )}
       </div>
       {note && !compact && (
-        <NoteAnnotations key={note.id} note={note} hasUnsavedChanges={dirty} onRewrite={setRewriteRequest} />
+        <NoteAnnotations
+          key={note.id}
+          note={note}
+          hasUnsavedChanges={dirty}
+          onRewrite={setRewriteRequest}
+          aiBackgroundEnabled={aiBackgroundEnabled}
+        />
       )}
       {rewriteRequest !== null && (
         <Modal title="Notiz überarbeiten" className="rewrite-dialog" onClose={() => setRewriteRequest(null)}>

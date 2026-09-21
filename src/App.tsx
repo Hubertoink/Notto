@@ -828,6 +828,7 @@ function Notebook({
                   setSelected(n.id);
                   setCreating(false);
                 }}
+                aiBackgroundEnabled={noteBackgroundId !== 'none'}
               />
             ) : (
               <div className="welcome">

@@ -15,6 +15,13 @@ export const noteBackgrounds: NoteBackground[] = [
   { id: 'city', label: 'Stadt · Lichter', src: '/backgrounds/city.jpg' },
 ];
 
+/** Decorative backgrounds used only inside the KI-Anmerkungen panel. */
+export const aiAnnotationBackgrounds = [
+  '/ai-backgrounds/designer-10.png',
+  '/ai-backgrounds/designer-11.png',
+  '/ai-backgrounds/designer-13.png',
+] as const;
+
 export function readNoteBackground(): NoteBackgroundId {
   const id = localStorage.getItem('notto-note-background');
   return noteBackgrounds.some((item) => item.id === id) ? (id as NoteBackgroundId) : 'none';

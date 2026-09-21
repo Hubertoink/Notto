@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, type CSSProperties } from 'react';
 import { Sparkles, X, WandSparkles, RefreshCw } from 'lucide-react';
 import { analyze, config, knowledge, type KnowledgeRecord, type Research } from './intelligence';
 import { noteExclusionReason } from './evidence-policy';
@@ -8,6 +8,7 @@ import { useNotto } from './state';
 import { Sources, NoteMarkdown } from './components';
 import type { Note } from './domain';
 import { currentContent } from './domain';
+import { aiAnnotationBackgrounds } from './note-backgrounds';
 import './tasks.css';
 
 export function useKnowledgeRecords(scope: string) {
@@ -129,10 +130,12 @@ export function NoteAnnotations({
   note,
   hasUnsavedChanges = false,
   onRewrite,
+  aiBackgroundEnabled = false,
 }: {
   note: Note;
   hasUnsavedChanges?: boolean;
   onRewrite?: (instruction: string) => void;
+  aiBackgroundEnabled?: boolean;
 }) {
   const records = useKnowledgeRecords(note.scope);
   const excluded = noteExclusionReason(note, config(note.scope));
@@ -142,6 +145,18 @@ export function NoteAnnotations({
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('notto-ai-sidebar') !== 'closed');
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
+  const [aiBackground, setAiBackground] = useState<string | null>(() =>
+    aiBackgroundEnabled
+      ? aiAnnotationBackgrounds[Math.floor(Math.random() * aiAnnotationBackgrounds.length)]
+      : null,
+  );
+  useEffect(() => {
+    setAiBackground(
+      aiBackgroundEnabled
+        ? aiAnnotationBackgrounds[Math.floor(Math.random() * aiAnnotationBackgrounds.length)]
+        : null,
+    );
+  }, [aiBackgroundEnabled]);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const panel = trigger.current?.closest('.detail-panel');
@@ -190,8 +205,13 @@ export function NoteAnnotations({
     <motion.div
       layout={!reduced && !docked}
       transition={{ type: 'spring', stiffness: 360, damping: 34 }}
-      className={`note-annotations annotation-shell ${layoutExpanded ? 'annotation-open' : ''}`}
-      style={{ width: layoutExpanded ? '100%' : 'fit-content' }}
+      className={`note-annotations annotation-shell ${layoutExpanded ? 'annotation-open' : ''} ${aiBackground && expanded ? 'has-ai-background' : ''}`}
+      style={
+        {
+          width: layoutExpanded ? '100%' : 'fit-content',
+          ...(aiBackground ? { '--ai-annotation-background': `url("${aiBackground}")` } : {}),
+        } as CSSProperties
+      }
     >
       <div className="annotation-heading">
         <button

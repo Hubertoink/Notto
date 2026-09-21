@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeEach } from 'vitest';
-import { noteBackground, noteBackgrounds, readNoteBackground } from './note-backgrounds';
+import {
+  aiAnnotationBackgrounds,
+  noteBackground,
+  noteBackgrounds,
+  readNoteBackground,
+} from './note-backgrounds';
 
 describe('note backgrounds', () => {
   beforeEach(() => localStorage.clear());
@@ -17,5 +22,11 @@ describe('note backgrounds', () => {
     expect(readNoteBackground()).toBe('none');
     localStorage.setItem('notto-note-background', 'night');
     expect(readNoteBackground()).toBe('night');
+  });
+
+  it('keeps the AI annotation backgrounds separate from note backgrounds', () => {
+    expect(aiAnnotationBackgrounds).toHaveLength(3);
+    expect(aiAnnotationBackgrounds.every((src) => src.startsWith('/ai-backgrounds/'))).toBe(true);
+    expect(noteBackgrounds.some((item) => aiAnnotationBackgrounds.includes(item.src as never))).toBe(false);
   });
 });

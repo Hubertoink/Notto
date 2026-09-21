@@ -92,6 +92,14 @@
   background: light-dark(#eef2f8, #2a2d3c);
   border-color: var(--nt-accent);
 }
+.annotation-shell.has-ai-background {
+  background-color: light-dark(#eef2f8, #2a2d3c);
+  background-image:
+    linear-gradient(light-dark(#eef2f8e8, #2a2d3ce8), light-dark(#eef2f8f4, #2a2d3cf4)),
+    var(--ai-annotation-background);
+  background-position: center;
+  background-size: cover;
+}
 .annotation-heading {
   display: flex;
   align-items: center;

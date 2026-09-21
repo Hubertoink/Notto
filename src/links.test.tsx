@@ -62,6 +62,21 @@ it('keeps compact sources collapsed and reveals their original links on demand',
   expect(invoke).toHaveBeenCalledWith('open_external', { url: 'https://example.org/two' });
 });
 
+it('preserves a custom table link label after target renaming and opens the target', () => {
+  const target = newNote('local', 'Unsere Grundsätze');
+  data.notes = [target];
+  const content = `| Cocktail |\n| --- |\n| **${noteLink(target, 'Paloma')}** |`;
+  const open = vi.fn();
+  window.addEventListener('notto-open-note', open);
+  const view = render(<NoteMarkdown scope="local" content={content} />);
+  expect(screen.getByRole('link', { name: '↗ Paloma' }).closest('strong')).toBeTruthy();
+  data.notes = [{ ...target, content: 'Neuer Titel' }];
+  view.rerender(<NoteMarkdown scope="local" content={content} />);
+  fireEvent.click(screen.getByRole('link', { name: '↗ Paloma' }));
+  expect(open.mock.calls[0][0].detail).toEqual({ id: target.id, scope: 'local' });
+  window.removeEventListener('notto-open-note', open);
+});
+
 it('opens internal links in the notebook and never exposes another account', () => {
   const target = newNote('local', 'Unsere Grundsätze');
   data.notes = [target];

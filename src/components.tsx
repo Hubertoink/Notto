@@ -44,7 +44,7 @@ export function NoteReferenceLink({
         } else window.dispatchEvent(new CustomEvent('notto-open-note', { detail: { id, scope } }));
       }}
     >
-      ↗ {titleOf(note.content)}
+      ↗ {fallback || titleOf(note.content)}
     </a>
   );
 }

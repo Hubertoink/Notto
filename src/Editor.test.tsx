@@ -321,7 +321,7 @@ it('formats selected text through icons and keeps editing at the selection', asy
   expect(field.value).toBe('Hallo Welt');
 });
 
-it('inserts a note reference with keyboard selection and shows current titles after renaming', async () => {
+it('inserts a note reference and retains its saved label after renaming', async () => {
   const target = newNote('local', 'Unsere Grundsätze');
   await repo.put(target, null);
   renderEditor();
@@ -335,7 +335,7 @@ it('inserts a note reference with keyboard selection and shows current titles af
   expect(field.value).toBe(`Siehe [Unsere Grundsätze](notes/${target.id}) `);
   await repo.put({ ...target, revision: crypto.randomUUID(), content: 'Neue Grundsätze' }, target.revision);
   await user.click(screen.getByRole('button', { name: 'Vorschau' }));
-  await screen.findAllByRole('link', { name: '↗ Neue Grundsätze' });
+  await screen.findAllByRole('link', { name: '↗ Unsere Grundsätze' });
 });
 
 it('uses selected text as the label when linking a note', async () => {

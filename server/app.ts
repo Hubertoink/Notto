@@ -106,7 +106,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '0.13.19' };
+    return { ok: true, version: '0.13.20' };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (
@@ -293,6 +293,8 @@ export async function buildApp(db: Database, env: Environment) {
           id: uuid,
           scope: uuid,
           kind: z.enum([
+            'note-relations',
+            'relation-decision',
             'analysis',
             'decision',
             'extraction',
@@ -316,6 +318,8 @@ export async function buildApp(db: Database, env: Environment) {
     for (const r of records) {
       if (r.scope !== req.nottoUser!.id) fail('Falsches Notizbuch.', 403);
       if (r.kind === 'memory') memorySchema.parse(r.data);
+      if (r.kind === 'note-relations') relationBatchSchema.parse(r.data);
+      if (r.kind === 'relation-decision') relationDecisionSchema.parse(r.data);
       if (r.kind === 'organization') organizationRecordSchema.parse(r.data);
       if (r.kind === 'organization-decision') organizationDecisionSchema.parse(r.data);
       if (r.kind === 'collection') z.object({ name: z.string().trim().min(1).max(60) }).parse(r.data);
@@ -386,3 +390,4 @@ export async function buildApp(db: Database, env: Environment) {
   }
   return app;
 }
+import { relationBatchSchema, relationDecisionSchema } from '../src/note-relations.js';

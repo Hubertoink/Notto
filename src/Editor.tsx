@@ -42,6 +42,8 @@ import { Dictation } from './Dictation';
 import { NoteAnnotations, useKnowledgeRecords } from './Tasks';
 import { collectionNames, createCollection } from './collections';
 import { rewriteNote } from './rewrite';
+import { applyRelation, type Relation } from './note-relations';
+import { eligible } from './intelligence';
 
 export function Editor({
   note,
@@ -627,6 +629,38 @@ export function Editor({
           note={note}
           hasUnsavedChanges={dirty}
           onRewrite={setRewriteRequest}
+          onAcceptRelation={async (relation: Relation) => {
+            if (dirty || saving || imageOperations.current > 0 || !note)
+              throw new Error('Bitte Änderungen zuerst speichern.');
+            const generation = editGeneration.current;
+            setSaving(true);
+            try {
+              await queue.current;
+              const source = await repo.get(scope, note.id);
+              const target = await repo.get(scope, relation.targetId);
+              if (!source || !target || !eligible(source) || !eligible(target))
+                throw new Error('Die Verknüpfung ist nicht mehr verfügbar.');
+              if (editGeneration.current !== generation || textRef.current !== source.content)
+                throw new Error('Der Text hat sich geändert. Bitte zuerst speichern und erneut prüfen.');
+              const next = applyRelation(source, target, relation);
+              const updated = reviseNote(source, { content: next });
+              await repo.put(updated, source.revision);
+              undoStack.current.push(textRef.current);
+              lastHistory.current = null;
+              setContent(next);
+              textRef.current = next;
+              initial.current = next;
+              base.current = updated.revision;
+              setCollections(updated.collections || []);
+              collectionRef.current = updated.collections || [];
+              initialCollectionRef.current = updated.collections || [];
+              await repo.removeDraft(scope, draftId);
+              setDraftStatus('Gespeichert');
+              onSaved(updated);
+            } finally {
+              setSaving(false);
+            }
+          }}
           aiBackgroundEnabled={aiBackgroundEnabled}
         />
       )}
@@ -989,7 +1023,15 @@ export function Editor({
             )}
             {incoming.length > 0 && (
               <details>
-                <summary>Erwähnt in · {incoming.length}</summary>
+                <summary className="backlink-summary">
+                  <span className="source-circles" aria-hidden="true">
+                    <span className="source-circle">↩</span>
+                    {incoming.length > 1 && (
+                      <span className="source-circle source-more">+{incoming.length - 1}</span>
+                    )}
+                  </span>
+                  Rückverweise · {incoming.length}
+                </summary>
                 <ul>
                   {incoming.map((n) => (
                     <li key={n.id}>

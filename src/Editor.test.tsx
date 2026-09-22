@@ -10,7 +10,7 @@ import { MemorySettings } from './Memory';
 import { memoryState } from './memory-policy';
 import { NottoProvider } from './state';
 import { db, repo } from './repository';
-import { newNote, reviseNote } from './domain';
+import { newNote, reviseNote, contentRevision } from './domain';
 import { knowledge } from './intelligence';
 import * as intelligence from './intelligence';
 import * as rewriting from './rewrite';
@@ -195,6 +195,53 @@ it('opens inline AI annotations and completes a task without changing the note',
   await user.click(checkbox);
   await waitFor(() => expect((checkbox as HTMLInputElement).checked).toBe(true));
   expect(await repo.get('local', note.id)).toEqual(note);
+});
+it('accepts a supported theory link and exposes a backlink on the target note', async () => {
+  const source = newNote('local', 'Unser Konzept braucht ein gemeinsames Leitbild.');
+  const target = newNote('local', 'Leitbildentwicklung: gemeinsame Werte und Beteiligung.');
+  await repo.put(source, null);
+  await repo.put(target, null);
+  await knowledge.append(source, 'note-relations', {
+    checked: [],
+    suggestions: [
+      {
+        sourceId: source.id,
+        targetId: target.id,
+        sourceRevision: contentRevision(source),
+        targetRevision: contentRevision(target),
+        relation: 'theory',
+        reason: 'Das Kapitel liefert eine theoretische Grundlage.',
+        sourceQuote: source.content,
+        targetQuote: target.content,
+        anchor: 'gemeinsames Leitbild',
+      },
+    ],
+  });
+  const saved = vi.fn();
+  const view = render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={source} onSaved={saved} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
+  await user.click(await screen.findByRole('button', { name: 'Verknüpfung übernehmen' }));
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect((await repo.get('local', source.id))?.content).toBe(
+    `Unser Konzept braucht ein [gemeinsames Leitbild](notes/${target.id}).`,
+  );
+  view.unmount();
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={target} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  await user.click(await screen.findByText('Rückverweise · 1'));
+  expect(await screen.findByRole('link', { name: /Unser Konzept braucht/ })).toBeTruthy();
 });
 it('refreshes outdated annotations from the saved revision and closes through the icon', async () => {
   const note = newNote('local', 'Aktuelle Fassung');

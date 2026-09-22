@@ -36,6 +36,8 @@ export interface KnowledgeRecord {
   scope: string;
   at: string;
   kind:
+    | 'note-relations'
+    | 'relation-decision'
     | 'analysis'
     | 'decision'
     | 'extraction'
@@ -284,6 +286,7 @@ export async function analyze(note: Note) {
   const current = await repo.get(note.scope, note.id);
   if (!current || !eligible(current) || !currentContent(current, contentRevision(note))) return;
   await knowledge.append({ ...note, revision: contentRevision(note) }, 'analysis', result);
+  await (await import('./relation-client')).findNoteRelations(note);
 }
 export async function extract(note: Note, id: string, ocr = false) {
   if (!eligible(note)) throw new Error('Notiz ist ausgeschlossen.');

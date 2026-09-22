@@ -1,4 +1,6 @@
 import { AttachmentTitle } from './AttachmentTitle';
+import { findNoteRelations } from './relation-client';
+import { pairKey, linkedTo, type RelationBatch } from './note-relations';
 import { AIActivity, type BackgroundJob } from './AIActivity';
 import { Topics } from './Topics';
 import { Organization } from './Organization';
@@ -108,6 +110,32 @@ export function IntelligenceWorker() {
         );
         if (cancelled) return;
         if (!note) {
+          const checkedPairs = new Set(
+            records
+              .filter((r) => r.kind === 'note-relations')
+              .flatMap((r) => (r.data as RelationBatch).checked),
+          );
+          const allowed = notes.filter((n) => eligible(n) && n.content.length <= 60000);
+          const pendingRelations = allowed.find(
+            (n) =>
+              !failed.current.has(`relations:${n.revision}`) &&
+              allowed.some(
+                (other) =>
+                  n.id !== other.id &&
+                  !linkedTo(n, other.id) &&
+                  !linkedTo(other, n.id) &&
+                  !checkedPairs.has(pairKey(n, other)),
+              ),
+          );
+          if (pendingRelations) {
+            try {
+              await findNoteRelations(pendingRelations);
+            } catch (e) {
+              failed.current.add(`relations:${pendingRelations.revision}`);
+              notify(`Notizverbindungen konnten nicht geprüft werden: ${String(e)}`);
+            }
+            return;
+          }
           if (c.autoResearch) {
             const candidates = notes
               .filter(eligible)

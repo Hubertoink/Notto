@@ -11,6 +11,9 @@ import { currentContent } from './domain';
 import { aiAnnotationBackgrounds } from './note-backgrounds';
 import { compactParenthesizedLines } from './annotation-markdown';
 import './tasks.css';
+import { RelationSuggestions } from './RelationSuggestions';
+import { visibleRelations, type Relation } from './note-relations';
+import { eligible } from './intelligence';
 
 export function useKnowledgeRecords(scope: string) {
   const [state, setState] = useState<{ scope: string; records: KnowledgeRecord[] }>({ scope, records: [] });
@@ -132,12 +135,15 @@ export function NoteAnnotations({
   hasUnsavedChanges = false,
   onRewrite,
   aiBackgroundEnabled = false,
+  onAcceptRelation,
 }: {
   note: Note;
   hasUnsavedChanges?: boolean;
   onRewrite?: (instruction: string) => void;
   aiBackgroundEnabled?: boolean;
+  onAcceptRelation?: (r: Relation) => Promise<void>;
 }) {
+  const { notes = [] } = useNotto();
   const records = useKnowledgeRecords(note.scope);
   const excluded = noteExclusionReason(note, config(note.scope));
   const [open, setOpen] = useState(false);
@@ -191,6 +197,7 @@ export function NoteAnnotations({
     }
   };
   const analysis = noteAnalysis(records, note);
+  const relations = visibleRelations(note, notes.filter(eligible), records);
   const tasks = tasksFor([note], records, note.scope).filter((t) => t.note);
   const research = newest(
     records.filter((r) => r.scope === note.scope && r.noteId === note.id && r.kind === 'research'),
@@ -217,7 +224,7 @@ export function NoteAnnotations({
       <div className="annotation-heading">
         <button
           ref={trigger}
-          className={`annotation-toggle ${tasks.length || uniqueResearch.length ? 'has-annotations' : ''}`}
+          className={`annotation-toggle ${tasks.length || uniqueResearch.length || relations.length ? 'has-annotations' : ''}`}
           aria-expanded={expanded}
           onClick={() => {
             toggle(!expanded);
@@ -226,7 +233,7 @@ export function NoteAnnotations({
         >
           <Sparkles size={17} />
           <span>KI-Anmerkungen</span>
-          <span>{tasks.length + uniqueResearch.length || ''}</span>
+          <span>{tasks.length + uniqueResearch.length + relations.length || ''}</span>
         </button>
         {expanded && (
           <button
@@ -277,14 +284,23 @@ export function NoteAnnotations({
                   {updateError}
                 </p>
               )}
-              {!excluded && !tasks.length && !uniqueResearch.length && (
+              {!excluded && !tasks.length && !uniqueResearch.length && !relations.length && (
                 <p className="annotation-empty">
-                  Keine offenen Hinweise. Hier erscheinen Aufgaben und Rechercheergebnisse.
+                  Keine offenen Hinweise. Hier erscheinen passende Notizen, Aufgaben und Rechercheergebnisse.
                 </p>
               )}
               {tasks.map((task) => (
                 <TaskRow key={task.id} task={task} />
               ))}
+              {!excluded && (
+                <RelationSuggestions
+                  note={note}
+                  notes={notes}
+                  records={records}
+                  disabled={hasUnsavedChanges}
+                  onAccept={onAcceptRelation}
+                />
+              )}
               {uniqueResearch.map((r) => (
                 <article key={r.id}>
                   <strong>Recherche</strong>

@@ -32,11 +32,13 @@ export function AIActivity({
   const failures = jobs.filter((job) => job.status === 'failed');
   const working = !!busy || running.length > 0;
   const label = (job: BackgroundJob) =>
-    job.kind.startsWith('research:')
-      ? 'Quellen recherchieren'
-      : job.kind.startsWith('index:')
-        ? 'Notiz für die KI-Suche aufbereiten'
-        : 'Notiz analysieren';
+    job.kind.startsWith('relations')
+      ? 'Inhaltliche Notizverbindungen prüfen'
+      : job.kind.startsWith('research:')
+        ? 'Quellen recherchieren'
+        : job.kind.startsWith('index:')
+          ? 'Notiz für die KI-Suche aufbereiten'
+          : 'Notiz analysieren';
   const detail = (job: BackgroundJob) => {
     if (job.error?.includes('Keine belegten Webquellen'))
       return 'Keine überprüfbaren Quellen gefunden. Es wurde kein Rechercheergebnis gespeichert; die Notizanalyse kann trotzdem aktuell sein.';

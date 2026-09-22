@@ -5,6 +5,7 @@ import { contentRevision, currentContent } from '../src/domain.js';
 import { analysisSchema, analysisInstructions, noteAllowed } from '../src/evidence-policy.js';
 import { splitEvidence } from '../src/retrieval.js';
 import { sourceTexts } from './sources.js';
+import { findServerRelations } from './note-relations.js';
 import type { Database } from './database.js';
 import { openai, type AIEnvironment } from './openai.js';
 const analysis = analysisSchema;
@@ -49,6 +50,16 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         job.note_id,
       ])
     ).rows.map((r) => r.document);
+    if (job.kind.startsWith('relations')) {
+      await findServerRelations(db, env, job.user_id, n, c);
+      await db.query("UPDATE jobs SET status='done',lease_until=NULL,error=NULL WHERE id=$1", [job.id]);
+      return true;
+    }
+    if (job.kind === 'analysis')
+      await db.query(
+        'INSERT INTO jobs(id,user_id,note_id,revision,kind) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
+        [randomUUID(), job.user_id, job.note_id, contentRevision(n), 'relations'],
+      );
     if (
       job.kind === 'analysis' &&
       records.some((r) => r.kind === 'analysis' && currentContent(n, r.revision))

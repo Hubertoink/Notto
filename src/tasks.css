@@ -163,6 +163,32 @@
 .research-text {
   white-space: pre-wrap;
 }
+.relation-suggestions {
+  margin: 18px 0;
+  padding: 12px;
+  border: 1px solid var(--nt-line);
+  border-radius: 12px;
+}
+.relation-suggestions h3,
+.backlink-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.relation-suggestions blockquote {
+  margin: 8px 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--nt-accent);
+}
+.relation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.backlink-summary {
+  cursor: pointer;
+}
 
 /* Base this on the room left for the note, not the whole window. */
 @container note-detail (min-width: 1000px) {

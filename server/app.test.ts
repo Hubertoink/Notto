@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, expect, it, vi } from 'vitest';
 import { workOnce } from './worker';
+import { findServerRelations } from './note-relations';
 import { openai } from './openai';
 import { PGlite } from '@electric-sql/pglite';
 import { readFile, mkdtemp, rm } from 'node:fs/promises';
@@ -24,6 +25,100 @@ const headers = (secret?: string) => ({
   origin,
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
+});
+it('checks theory links in two stages without sending private notes and rejects revoked targets', async () => {
+  const source = newNote(alice, 'Die Jugendhauskonzeption braucht ein Leitbild.');
+  const target = newNote(alice, 'Leitbildentwicklung verbindet Werte und Handlungsziele.');
+  const privateNote = newNote(alice, 'GEHEIMER-INHALT #privat');
+  const settings = {
+    enabled: true,
+    auto: true,
+    autoResearch: false,
+    model: 'gpt-4.1-mini',
+    excludedNotes: [],
+    excludedTags: 'privat',
+  };
+  await pg.query(
+    'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
+    [alice, JSON.stringify(settings)],
+  );
+  for (const note of [source, target, privateNote])
+    await app.inject({
+      method: 'POST',
+      url: '/api/notes/push',
+      headers: headers(aToken),
+      payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
+    });
+  let revoke = false;
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    expect(body.input).not.toContain('GEHEIMER-INHALT');
+    const input = JSON.parse(body.input);
+    if (input.notes && revoke)
+      await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+        alice,
+        JSON.stringify({ ...settings, excludedNotes: [target.id] }),
+      ]);
+    return new Response(
+      JSON.stringify({
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify(
+                  input.candidates
+                    ? { ids: [target.id] }
+                    : {
+                        suggestions: [
+                          {
+                            sourceId: source.id,
+                            targetId: target.id,
+                            relation: 'theory',
+                            reason: 'Theoretische Grundlage für die Konzeption.',
+                            sourceQuote: source.content,
+                            targetQuote: target.content,
+                            anchor: 'Leitbild',
+                          },
+                        ],
+                      },
+                ),
+              },
+            ],
+          },
+        ],
+      }),
+    );
+  });
+  try {
+    const env = { openaiKey: 'test-only', models: ['gpt-4.1-mini'] };
+    await findServerRelations(adapter, env, alice, source, settings);
+    let rows = (
+      await pg.query(
+        "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'noteId'=$2 AND document->>'kind'='note-relations'",
+        [alice, source.id],
+      )
+    ).rows as any[];
+    expect(rows[0].document.data.suggestions).toHaveLength(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    await pg.query(
+      "DELETE FROM knowledge WHERE user_id=$1 AND document->>'noteId'=$2 AND document->>'kind'='note-relations'",
+      [alice, source.id],
+    );
+    revoke = true;
+    await findServerRelations(adapter, env, alice, source, settings);
+    rows = (
+      await pg.query(
+        "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'noteId'=$2 AND document->>'kind'='note-relations'",
+        [alice, source.id],
+      )
+    ).rows as any[];
+    expect(rows[0].document.data.suggestions).toEqual([]);
+  } finally {
+    fetch.mockRestore();
+    await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+  }
 });
 it('ignores legacy daily quotas and preserves notebook tools', async () => {
   await pg.query('DELETE FROM rate_limits WHERE key=$1', [`ai:${alice}`]);

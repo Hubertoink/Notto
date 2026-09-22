@@ -9,6 +9,8 @@
     "core:window:allow-set-focus",
     "core:window:allow-show",
     "core:window:allow-hide",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    "updater:default",
+    "process:default"
   ]
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Noto",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "identifier": "app.notto.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -28,6 +28,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.ico"],
     "windows": {
@@ -35,6 +36,15 @@
         "displayLanguageSelector": false,
         "languages": ["German"],
         "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYwRUNGQjlGQUQ4NDJGREIKUldUYkw0U3RuL3ZzWUdhOXNscTNpR3VmOXdtNDZwL3E5OTVwaDgxS0Yyc3RleFhLUkFhM3BFREUK",
+      "endpoints": ["https://github.com/Hubertoink/Notto/releases/latest/download/latest.json"],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

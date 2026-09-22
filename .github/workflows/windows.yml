@@ -26,10 +26,15 @@ jobs:
       - run: npm test
       - run: cargo +stable test --locked --manifest-path src-tauri/Cargo.toml --lib
       - run: npm run desktop:build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Noto-Windows-${{ github.sha }}
-          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          path: |
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/nsis/*-setup.exe.sig
           if-no-files-found: error
           retention-days: 14
 
@@ -64,10 +69,15 @@ jobs:
       - run: npm test
       - run: cargo +stable test --locked --manifest-path src-tauri/Cargo.toml --lib
       - run: npm run desktop:build -- --bundles appimage
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Noto-Linux-${{ github.sha }}
-          path: src-tauri/target/release/bundle/appimage/*.AppImage
+          path: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/appimage/*.AppImage.sig
           if-no-files-found: error
           retention-days: 14
 
@@ -78,10 +88,15 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: release-assets
           merge-multiple: true
+      - name: Create signed updater manifest
+        run: node scripts/create-update-manifest.mjs release-assets
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

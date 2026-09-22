@@ -1056,6 +1056,19 @@ textarea:focus-visible {
 .update-available p {
   margin-top: 4px;
 }
+.update-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--nt-muted);
+  font-size: 12px;
+}
+.update-progress progress {
+  width: 150px;
+  height: 7px;
+  accent-color: var(--nt-accent);
+}
 .inline-error {
   background: light-dark(#fff0f0, #40292d);
   color: var(--nt-error);
@@ -1078,13 +1091,6 @@ textarea:focus-visible {
   border-radius: 8px;
   font-size: 13px;
   line-height: 1.7;
-}
-.settings-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--nt-muted);
-  font-size: 12px;
 }
 .storage-path {
   margin-top: 12px;

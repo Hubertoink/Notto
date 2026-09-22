@@ -24,8 +24,9 @@ import {
   automaticUpdateChecksEnabled,
   checkForUpdate,
   currentVersion,
-  openRelease,
+  installUpdate,
   setAutomaticUpdateChecks,
+  type UpdateProgress,
   type UpdateResult,
 } from './updates';
 
@@ -70,6 +71,7 @@ export function Settings({
   const [path, setPath] = useState('');
   const [autoUpdates, setAutoUpdates] = useState(automaticUpdateChecksEnabled);
   const [updateResult, setUpdateResult] = useState<UpdateResult | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
   useEffect(() => {
     if (desktop)
       void invoke<string>('storage_path')
@@ -495,13 +497,50 @@ export function Settings({
                 <div className="update-available">
                   <div>
                     <strong>Noto {updateResult.latestVersion} ist bereit.</strong>
-                    <p className="muted small">Auf GitHub findest du die Downloads für dein System.</p>
+                    <p className="muted small">
+                      Das passende Paket wird geprüft, installiert und Noto anschließend neu gestartet.
+                    </p>
+                    {updateProgress && (
+                      <div className="update-progress" role="status" aria-live="polite">
+                        <progress
+                          max={100}
+                          value={
+                            updateProgress.totalBytes
+                              ? Math.min(
+                                  100,
+                                  Math.round(
+                                    (updateProgress.downloadedBytes / updateProgress.totalBytes) * 100,
+                                  ),
+                                )
+                              : undefined
+                          }
+                        />
+                        <span>
+                          {updateProgress.phase === 'installing'
+                            ? 'Update wird installiert …'
+                            : updateProgress.totalBytes
+                              ? `${Math.min(100, Math.round((updateProgress.downloadedBytes / updateProgress.totalBytes) * 100))} % geladen`
+                              : 'Update wird geladen …'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <Action
-                    label="Release öffnen"
+                    label="Update installieren"
                     icon={<Download size={16} />}
                     variant="primary"
-                    onClick={() => void run(() => openRelease(updateResult.releaseUrl))}
+                    isLoading={busy}
+                    isDisabled={busy}
+                    onClick={() =>
+                      void run(async () => {
+                        setUpdateProgress({
+                          phase: 'downloading',
+                          downloadedBytes: 0,
+                          totalBytes: null,
+                        });
+                        await installUpdate(setUpdateProgress);
+                      })
+                    }
                   />
                 </div>
               )}
@@ -517,10 +556,6 @@ export function Settings({
               {error}
             </p>
           )}
-          <div className="settings-footer">
-            <span>Deine Originale bleiben deine.</span>
-            <span>KI konfigurieren: Seitenleiste → Wissen & KI.</span>
-          </div>
         </div>
       </div>
     </Modal>

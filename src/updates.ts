@@ -1,11 +1,12 @@
-import { invoke } from '@tauri-apps/api/core';
+import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 import { desktop } from './repository';
 import { version } from '../package.json';
 
-const RELEASE_API = 'https://api.github.com/repos/Hubertoink/Notto/releases/latest';
 const AUTO_CHECK_KEY = 'notto-auto-update-check';
 const LAST_CHECK_KEY = 'notto-last-update-check';
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+const UPDATE_TIMEOUT = 5 * 60 * 1000;
 
 export const currentVersion = version;
 
@@ -13,9 +14,16 @@ export type UpdateResult = {
   available: boolean;
   currentVersion: string;
   latestVersion: string;
-  releaseUrl: string;
   publishedAt: string | null;
 };
+
+export type UpdateProgress = {
+  phase: 'downloading' | 'installing';
+  downloadedBytes: number;
+  totalBytes: number | null;
+};
+
+let pendingUpdate: Update | null = null;
 
 function versionParts(value: string) {
   const match = value
@@ -49,36 +57,50 @@ export function setAutomaticUpdateChecks(enabled: boolean) {
 }
 
 export async function checkForUpdate(options: { force?: boolean } = {}): Promise<UpdateResult | null> {
+  if (!desktop) return null;
   if (!options.force) {
     if (!automaticUpdateChecksEnabled()) return null;
     const lastCheck = Number(localStorage.getItem(LAST_CHECK_KEY));
     if (Number.isFinite(lastCheck) && Date.now() - lastCheck < CHECK_INTERVAL) return null;
   }
 
-  const response = await fetch(RELEASE_API, {
-    headers: { Accept: 'application/vnd.github+json' },
-  });
-  if (!response.ok) throw new Error('Die Update-Informationen konnten nicht geladen werden.');
-  const release = (await response.json()) as {
-    tag_name?: unknown;
-    html_url?: unknown;
-    published_at?: unknown;
-  };
-  if (typeof release.tag_name !== 'string' || typeof release.html_url !== 'string')
-    throw new Error('Die Update-Informationen sind unvollständig.');
-
+  const update = await check({ timeout: 30_000 });
   localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
-  const latestVersion = release.tag_name.replace(/^v/i, '');
+  if (pendingUpdate && pendingUpdate !== update) await pendingUpdate.close();
+  pendingUpdate = update;
+
   return {
-    available: isNewerVersion(latestVersion, currentVersion),
+    available: update !== null,
     currentVersion,
-    latestVersion,
-    releaseUrl: release.html_url,
-    publishedAt: typeof release.published_at === 'string' ? release.published_at : null,
+    latestVersion: update?.version ?? currentVersion,
+    publishedAt: update?.date ?? null,
   };
 }
 
-export async function openRelease(url: string) {
-  if (desktop) await invoke('open_external', { url });
-  else window.open(url, '_blank', 'noopener,noreferrer');
+export async function installUpdate(onProgress: (progress: UpdateProgress) => void) {
+  if (!desktop) throw new Error('Updates können nur in der Desktop-App installiert werden.');
+  const update = pendingUpdate ?? (await check({ timeout: 30_000 }));
+  if (!update) throw new Error('Es ist kein neues Update verfügbar.');
+  pendingUpdate = update;
+
+  let downloadedBytes = 0;
+  let totalBytes: number | null = null;
+  const progress = (event: DownloadEvent) => {
+    if (event.event === 'Started') {
+      totalBytes = event.data.contentLength ?? null;
+      onProgress({ phase: 'downloading', downloadedBytes, totalBytes });
+    } else if (event.event === 'Progress') {
+      downloadedBytes += event.data.chunkLength;
+      onProgress({ phase: 'downloading', downloadedBytes, totalBytes });
+    } else {
+      onProgress({ phase: 'installing', downloadedBytes, totalBytes });
+    }
+  };
+
+  await update.downloadAndInstall(progress, {
+    timeout: UPDATE_TIMEOUT,
+    restartAfterInstall: true,
+  });
+  pendingUpdate = null;
+  await relaunch();
 }

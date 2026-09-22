@@ -1,8 +1,8 @@
 # Noto
 
-**Aktueller Betrieb (0.4): [noto-app.de](https://noto-app.de), eigenes Docker-Backend auf Mittwald.** Die Website beginnt mit Login und Kontoeinrichtung. Windows erlaubt weiterhin lokale Notizen und Konto-Synchronisation. Das eigene Logo und die automatische OpenAI-Modellauswahl sind integriert. Supabase wird für diesen Betrieb nicht benötigt. Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
+**Aktueller Betrieb (1.0): [noto-app.de](https://noto-app.de), eigenes Docker-Backend auf Mittwald.** Die Website beginnt mit Login und Kontoeinrichtung. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Das eigene Logo und die automatische OpenAI-Modellauswahl sind integriert. Supabase wird für diesen Betrieb nicht benötigt. Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
-Eine lokale Windows- und Linux-Notizapp mit Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 0.2 ergänzt PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
+Eine lokale Windows- und Linux-Notizapp mit Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 1.0 enthält PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
 
 ## Starten
 

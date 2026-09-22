@@ -40,6 +40,7 @@ import { desktop, repo } from './repository';
 import { noteShortcut, newNoteLabel } from './shortcuts';
 import { excerptOf, importedMarkdown, newNote, reviseNote, tagsOf, titleOf, type Note } from './domain';
 import { noteBackground, readNoteBackground, type NoteBackgroundId } from './note-backgrounds';
+import { checkForUpdate } from './updates';
 
 type View = 'all' | 'pinned' | 'archive' | 'trash';
 function navigationFromUrl() {
@@ -157,6 +158,21 @@ function Notebook({
   };
   const [sidebar, setSidebar] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!desktop) return;
+    let active = true;
+    void checkForUpdate()
+      .then((update) => {
+        if (active && update?.available)
+          notify(
+            `Noto ${update.latestVersion} ist verfügbar. Du findest das Update unter Einstellungen → Updates.`,
+          );
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [notify]);
   useEffect(() => {
     const navigation = navigationFromUrl();
     setSelected(navigation.selected);

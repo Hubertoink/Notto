@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Cloud, Download, FolderOpen, LogOut, Monitor, Moon, Sun, Upload } from 'lucide-react';
+import {
+  Cloud,
+  Download,
+  FolderOpen,
+  Info,
+  LogOut,
+  Monitor,
+  Moon,
+  RefreshCw,
+  Sun,
+  Upload,
+} from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Action, Modal, readableDate } from './components';
 import { cloud, configured, readCloudConfig, saveCloudConfig, ownBackend } from './cloud';
@@ -9,6 +20,14 @@ import { exportNotebook } from './export';
 import { useNotto } from './state';
 import { useCaptureShortcut, shortcutOptions, shortcutLabel } from './shortcuts';
 import { noteBackgrounds, type NoteBackgroundId } from './note-backgrounds';
+import {
+  automaticUpdateChecksEnabled,
+  checkForUpdate,
+  currentVersion,
+  openRelease,
+  setAutomaticUpdateChecks,
+  type UpdateResult,
+} from './updates';
 
 export function Settings({
   onImport,
@@ -32,6 +51,7 @@ export function Settings({
     ['account', 'Konto & Sync'],
     ['data', 'Deine Daten'],
     ...(desktop ? [['shortcuts', 'Tastenkürzel & Widget']] : []),
+    ...(desktop ? [['updates', 'Updates']] : []),
   ];
   const shortcut = useCaptureShortcut();
   const [selectedShortcut, setSelectedShortcut] = useState(shortcutOptions[0].value);
@@ -48,6 +68,8 @@ export function Settings({
   const [configuration, setConfiguration] = useState(readCloudConfig);
   const [configure, setConfigure] = useState(!configured());
   const [path, setPath] = useState('');
+  const [autoUpdates, setAutoUpdates] = useState(automaticUpdateChecksEnabled);
+  const [updateResult, setUpdateResult] = useState<UpdateResult | null>(null);
   useEffect(() => {
     if (desktop)
       void invoke<string>('storage_path')
@@ -425,6 +447,64 @@ export function Settings({
                   }
                 />
               </div>
+            </section>
+          )}
+          {desktop && (
+            <section className="settings-section" hidden={page !== 'updates'}>
+              <h3>
+                <Info size={18} /> Updates
+              </h3>
+              <div className="account-row">
+                <div>
+                  <strong>Noto {currentVersion}</strong>
+                  <p className="muted">Installierte Version</p>
+                </div>
+                <Action
+                  label="Nach Updates suchen"
+                  icon={<RefreshCw size={16} />}
+                  isLoading={busy}
+                  isDisabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const result = await checkForUpdate({ force: true });
+                      setUpdateResult(result);
+                      setMessage(
+                        result?.available
+                          ? `Noto ${result.latestVersion} ist verfügbar.`
+                          : 'Noto ist auf dem neuesten Stand.',
+                      );
+                    })
+                  }
+                />
+              </div>
+              <label className="update-toggle">
+                <input
+                  type="checkbox"
+                  checked={autoUpdates}
+                  onChange={(event) => {
+                    setAutoUpdates(event.target.checked);
+                    setAutomaticUpdateChecks(event.target.checked);
+                  }}
+                />
+                <span>
+                  <strong>Automatisch nach Updates suchen</strong>
+                  <small>Beim Start, höchstens einmal pro Tag. Es wird nichts automatisch installiert.</small>
+                </span>
+              </label>
+              {updateResult?.available && (
+                <div className="update-available">
+                  <div>
+                    <strong>Noto {updateResult.latestVersion} ist bereit.</strong>
+                    <p className="muted small">Auf GitHub findest du den neuen Windows-Installer.</p>
+                  </div>
+                  <Action
+                    label="Release öffnen"
+                    icon={<Download size={16} />}
+                    variant="primary"
+                    onClick={() => void run(() => openRelease(updateResult.releaseUrl))}
+                  />
+                </div>
+              )}
             </section>
           )}
           {message && (

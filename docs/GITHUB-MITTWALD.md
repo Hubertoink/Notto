@@ -5,7 +5,7 @@ Repository: https://github.com/Hubertoink/Notto
 ## Bereits vorbereitet
 
 - `Notto checks`: Tests und Web-Build bei Änderungen auf main und bei Pull Requests auf einem kurzlebigen GitHub-Runner.
-- `Windows installer`: unter Actions manuell startbar. Erstellt nach TypeScript- und Rust-Tests einen Windows-Installer als herunterladbares Artefakt. Veröffentlicht noch kein Release und installiert nichts auf deinem PC.
+- `Desktop installers`: unter Actions manuell startbar. Erstellt nach TypeScript- und Rust-Tests einen Windows-Installer und ein Linux-AppImage als herunterladbare Artefakte. Bei einem `v*`-Tag veröffentlicht der Workflow beide Dateien zusammen als GitHub-Release.
 - `Mittwald runner checks`: manuell startbar, sobald der Mittwald-Runner registriert ist. Benötigte Labels: `self-hosted`, `Linux`, `X64`, `notto`. Dieser Workflow akzeptiert ausschließlich main. Ungeprüfte Pull Requests laufen auf GitHub-Runnern.
 
 ## Mittwald-Runner verbinden

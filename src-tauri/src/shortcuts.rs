@@ -38,7 +38,7 @@ pub fn setup(app: &tauri::AppHandle) -> Result<()> {
         .filter(|s| OPTIONS.contains(&s.as_str()))
         .unwrap_or_else(|| DEFAULT.into());
     let result = app.global_shortcut().register(shortcut.as_str());
-    let status = Status { shortcut, active: result.is_ok(), error: result.err().map(|_| "Tastenkürzel ist belegt oder Windows konnte es nicht registrieren. Wähle unter Einstellungen eine andere Kombination.".into()) };
+    let status = Status { shortcut, active: result.is_ok(), error: result.err().map(|_| "Tastenkürzel ist belegt oder das System konnte es nicht registrieren. Wähle unter Einstellungen eine andere Kombination.".into()) };
     app.manage(Shortcuts {
         status: Mutex::new(status),
         held: AtomicBool::new(false),

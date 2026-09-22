@@ -425,7 +425,7 @@ export function Settings({
                 }
               />
               <p className="muted small">
-                Windows prüft beim Registrieren, ob die Kombination bereits belegt ist. Bei einem Konflikt
+                Das System prüft beim Registrieren, ob die Kombination bereits belegt ist. Bei einem Konflikt
                 bleibt dein bisheriges Kürzel aktiv. Am Griff kannst du das Widget an den Bildschirmrand
                 verschieben.
               </p>
@@ -495,7 +495,7 @@ export function Settings({
                 <div className="update-available">
                   <div>
                     <strong>Noto {updateResult.latestVersion} ist bereit.</strong>
-                    <p className="muted small">Auf GitHub findest du den neuen Windows-Installer.</p>
+                    <p className="muted small">Auf GitHub findest du die Downloads für dein System.</p>
                   </div>
                   <Action
                     label="Release öffnen"

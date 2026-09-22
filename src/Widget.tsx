@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowUpRight, GripVertical, Plus, X, FileText } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, FileText, GripVertical, Plus, X } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -105,9 +105,9 @@ export function Widget() {
         className={`widget-surface widget-${mode}`}
         initial={false}
         animate={{
-          width: mode === 'idle' ? 48 : mode === 'peek' ? 344 : 464,
-          height: mode === 'idle' ? 102 : mode === 'peek' ? 324 : 414,
-          borderRadius: mode === 'idle' ? 24 : 22,
+          width: mode === 'idle' ? 48 : mode === 'peek' ? 352 : 464,
+          height: mode === 'idle' ? 102 : mode === 'peek' ? 352 : 414,
+          borderRadius: mode === 'idle' ? 24 : 20,
         }}
         transition={reduced ? { duration: 0 } : { duration: 0.29, ease: [0.22, 1, 0.36, 1] }}
         onPointerEnter={() => clearTimeout(close.current)}
@@ -156,11 +156,13 @@ export function Widget() {
             transition={{ delay: reduced ? 0 : 0.09, duration: 0.12 }}
           >
             <div className="widget-heading">
-              <strong>
+              <button className="widget-brand" onClick={() => openMain(null)}>
                 <img className="widget-heading-logo" src="/noto.png" alt="" />
-                noto<span>.</span>
-              </strong>
-              <div className="toolbar">
+                <span>
+                  noto<strong>.</strong>
+                </span>
+              </button>
+              <div className="toolbar widget-toolbar">
                 <Action
                   label="Notizbuch öffnen"
                   isIconOnly
@@ -180,13 +182,19 @@ export function Widget() {
                 />
               </div>
             </div>
-            <span className="eyebrow">ZULETZT FESTGEHALTEN</span>
+            <div className="widget-section-heading">
+              <span className="eyebrow">ZULETZT FESTGEHALTEN</span>
+              <span>{recent.length}</span>
+            </div>
             <div className="widget-notes">
               {recent.length ? (
                 recent.map((n) => (
                   <button key={n.id} onClick={() => openMain(n.id)}>
-                    <FileText size={16} />
+                    <span className="widget-note-icon">
+                      <FileText size={15} />
+                    </span>
                     <span>{titleOf(n.content)}</span>
+                    <ChevronRight className="widget-note-arrow" size={15} />
                   </button>
                 ))
               ) : (
@@ -197,10 +205,24 @@ export function Widget() {
                 </p>
               )}
             </div>
-            <Action
-              label="Neue Notiz"
-              endContent={
-                desktop && (
+            <div className="widget-footer">
+              <button
+                className="widget-new-note"
+                title={
+                  shortcut?.active
+                    ? `Systemweit: ${shortcutLabel(shortcut.shortcut)}`
+                    : shortcut?.error || undefined
+                }
+                onClick={() => {
+                  pinned.current = true;
+                  change('edit');
+                }}
+              >
+                <span>
+                  <Plus size={17} />
+                  Neue Notiz
+                </span>
+                {desktop && (
                   <kbd className="note-shortcut">
                     {shortcut?.active
                       ? shortcutLabel(shortcut.shortcut, true)
@@ -208,21 +230,9 @@ export function Widget() {
                         ? 'Kürzel prüfen'
                         : '…'}
                   </kbd>
-                )
-              }
-              tooltip={
-                shortcut?.active
-                  ? `Überall unter Windows: ${shortcutLabel(shortcut.shortcut)}`
-                  : shortcut?.error || undefined
-              }
-              icon={<Plus size={17} />}
-              variant="primary"
-              width="100%"
-              onClick={() => {
-                pinned.current = true;
-                change('edit');
-              }}
-            />
+                )}
+              </button>
+            </div>
             {desktop && shortcut && !shortcut.active && (
               <p className="shortcut-warning">
                 Tastenkürzel nicht aktiv. Unter Einstellungen → Tastenkürzel prüfen.

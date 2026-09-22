@@ -364,12 +364,24 @@ fn storage_path(store: State<Store>) -> String {
 }
 #[tauri::command]
 fn open_vault(store: State<Store>) -> Result<()> {
-    fs::create_dir_all(store.root.join("vault")).map_err(err)?;
-    std::process::Command::new("explorer.exe")
-        .arg(store.root.join("vault"))
-        .spawn()
-        .map_err(err)?;
-    Ok(())
+    let vault = store.root.join("vault");
+    fs::create_dir_all(&vault).map_err(err)?;
+    #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+    {
+        #[cfg(target_os = "windows")]
+        let opener = "explorer.exe";
+        #[cfg(target_os = "linux")]
+        let opener = "xdg-open";
+        #[cfg(target_os = "macos")]
+        let opener = "open";
+        std::process::Command::new(opener)
+            .arg(vault)
+            .spawn()
+            .map_err(err)?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    Err("Der Speicherordner kann auf diesem System nicht geöffnet werden".into())
 }
 #[tauri::command]
 fn open_external(url: String) -> Result<()> {
@@ -417,7 +429,19 @@ fn open_external(url: String) -> Result<()> {
         }
         Ok(())
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    {
+        #[cfg(target_os = "linux")]
+        let opener = "xdg-open";
+        #[cfg(target_os = "macos")]
+        let opener = "open";
+        std::process::Command::new(opener)
+            .arg(parsed.as_str())
+            .spawn()
+            .map_err(err)?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     Err("Weblinks werden auf diesem System noch nicht unterstützt".into())
 }
 fn show_main(app: &tauri::AppHandle) {
@@ -444,37 +468,71 @@ fn hide_widget(app: tauri::AppHandle) -> Result<()> {
 }
 fn position_widget(app: &tauri::AppHandle, side: Option<String>, save: bool) -> Result<String> {
     let w = app.get_webview_window("widget").ok_or("Widget fehlt")?;
-    let monitor = w
-        .current_monitor()
-        .map_err(err)?
-        .or(w.primary_monitor().map_err(err)?)
-        .ok_or("Kein Monitor gefunden")?;
-    let area = monitor.work_area();
-    let pos = w.outer_position().map_err(err)?;
-    let size = w.outer_size().map_err(err)?;
-    let left = side.map(|s| s == "left").unwrap_or(
-        pos.x + ((size.width / 2) as i32) < area.position.x + (area.size.width / 2) as i32,
-    );
-    let x = if left {
-        area.position.x
-    } else {
-        area.position.x + area.size.width as i32 - size.width as i32
+    let saved = app
+        .state::<Store>()
+        .connection
+        .lock()
+        .ok()
+        .and_then(|connection| {
+            connection
+                .query_row("SELECT value FROM settings WHERE key='widget'", [], |row| {
+                    row.get::<_, String>(0)
+                })
+                .optional()
+                .ok()
+                .flatten()
+        })
+        .and_then(|value| serde_json::from_str::<Value>(&value).ok());
+    let requested_side = side.filter(|value| matches!(value.as_str(), "left" | "right"));
+    let fallback_side = requested_side
+        .as_deref()
+        .or_else(|| saved.as_ref()?.get("side")?.as_str())
+        .unwrap_or("right");
+    let placement = (|| -> Result<(String, i32, i32)> {
+        let monitor = w
+            .current_monitor()
+            .map_err(err)?
+            .or(w.primary_monitor().map_err(err)?)
+            .ok_or("Kein Monitor gefunden")?;
+        let area = monitor.work_area();
+        let pos = w.outer_position().map_err(err)?;
+        let size = w.outer_size().map_err(err)?;
+        let left = requested_side
+            .as_deref()
+            .map(|value| value == "left")
+            .unwrap_or(
+                pos.x + ((size.width / 2) as i32) < area.position.x + (area.size.width / 2) as i32,
+            );
+        let x = if left {
+            area.position.x
+        } else {
+            area.position.x + area.size.width as i32 - size.width as i32
+        };
+        let y = pos.y.max(area.position.y).min(
+            (area.position.y + area.size.height as i32 - size.height as i32).max(area.position.y),
+        );
+        if pos.x != x || pos.y != y {
+            w.set_position(tauri::PhysicalPosition::new(x, y))
+                .map_err(err)?;
+        }
+        Ok((if left { "left" } else { "right" }.into(), x, y))
+    })();
+    let (side, position) = match placement {
+        Ok((side, x, y)) => (side, Some((x, y))),
+        Err(_) => (fallback_side.to_string(), None),
     };
-    let y = pos
-        .y
-        .max(area.position.y)
-        .min((area.position.y + area.size.height as i32 - size.height as i32).max(area.position.y));
-    if pos.x != x || pos.y != y {
-        w.set_position(tauri::PhysicalPosition::new(x, y))
-            .map_err(err)?;
-    }
-    let side = if left { "left" } else { "right" };
     if save {
         let store = app.state::<Store>();
-        store.connection.lock().map_err(err)?.execute("INSERT INTO settings(key,value) VALUES('widget',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[json!({"x":x,"y":y,"side":side}).to_string()]).map_err(err)?;
+        let mut value = saved.unwrap_or_else(|| json!({}));
+        value["side"] = json!(side);
+        if let Some((x, y)) = position {
+            value["x"] = json!(x);
+            value["y"] = json!(y);
+        }
+        store.connection.lock().map_err(err)?.execute("INSERT INTO settings(key,value) VALUES('widget',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[value.to_string()]).map_err(err)?;
     }
-    let _ = w.emit("dock-side", side);
-    Ok(side.into())
+    let _ = w.emit("dock-side", &side);
+    Ok(side)
 }
 #[tauri::command]
 fn snap_widget(app: tauri::AppHandle, side: Option<String>) -> Result<String> {
@@ -484,32 +542,25 @@ fn snap_widget(app: tauri::AppHandle, side: Option<String>) -> Result<String> {
 fn widget_mode(app: tauri::AppHandle, mode: String) -> Result<()> {
     let w = app.get_webview_window("widget").ok_or("Widget fehlt")?;
     let (width, height): (f64, f64) = match mode.as_str() {
-        "peek" => (360., 340.),
+        "peek" => (368., 368.),
         "edit" => (480., 430.),
         _ => (64., 118.),
     };
-    let pos = w.outer_position().map_err(err)?;
-    let old = w.outer_size().map_err(err)?;
     let scale = w.scale_factor().map_err(err)?;
-    let monitor = w.current_monitor().map_err(err)?.ok_or("Monitor fehlt")?;
-    let area = monitor.work_area();
-    let left = pos.x + ((old.width / 2) as i32) < area.position.x + (area.size.width / 2) as i32;
-    let width: f64 = width.min(area.size.width as f64 / scale);
-    let height: f64 = height.min(area.size.height as f64 / scale);
+    let monitor = w.current_monitor().ok().flatten();
+    let (width, height) = monitor
+        .as_ref()
+        .map(|monitor| {
+            let area = monitor.work_area();
+            (
+                width.min(area.size.width as f64 / scale),
+                height.min(area.size.height as f64 / scale),
+            )
+        })
+        .unwrap_or((width, height));
     w.set_size(tauri::LogicalSize::new(width, height))
         .map_err(err)?;
-    if !left {
-        w.set_position(tauri::PhysicalPosition::new(
-            pos.x + old.width as i32 - (width * scale).round() as i32,
-            pos.y,
-        ))
-        .map_err(err)?;
-    }
-    position_widget(
-        &app,
-        Some(if left { "left" } else { "right" }.into()),
-        false,
-    )?;
+    position_widget(&app, None, false)?;
     w.set_focusable(mode == "edit").map_err(err)?;
     if mode == "edit" {
         w.set_focus().map_err(err)?;
@@ -558,17 +609,17 @@ pub fn run() {
                 .optional()?;
             if let Some(saved) = saved {
                 if let Ok(v) = serde_json::from_str::<Value>(&saved) {
-                    widget.set_position(tauri::PhysicalPosition::new(
+                    let _ = widget.set_position(tauri::PhysicalPosition::new(
                         v["x"].as_i64().unwrap_or(100) as i32,
                         v["y"].as_i64().unwrap_or(200) as i32,
-                    ))?;
+                    ));
                 }
             } else if let Some(m) = widget.primary_monitor()? {
                 let a = m.work_area();
-                widget.set_position(tauri::PhysicalPosition::new(
+                let _ = widget.set_position(tauri::PhysicalPosition::new(
                     a.position.x + a.size.width as i32 - 64,
                     a.position.y + (a.size.height / 3) as i32,
-                ))?;
+                ));
             }
             let _ = position_widget(app.handle(), None, true);
             let open = MenuItem::with_id(app, "open", "Noto öffnen", true, None::<&str>)?;
@@ -668,7 +719,12 @@ pub fn run() {
 mod tests {
     #[test]
     fn external_links_reject_files_and_invalid_urls() {
-        for url in ["file:///C:/Windows", "javascript:alert(1)", "C:\\Windows", "https://example.com\0bad"] {
+        for url in [
+            "file:///C:/Windows",
+            "javascript:alert(1)",
+            "C:\\Windows",
+            "https://example.com\0bad",
+        ] {
             assert!(super::open_external(url.to_string()).is_err());
         }
     }

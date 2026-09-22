@@ -2,21 +2,47 @@
 
 **Aktueller Betrieb (0.4): [noto-app.de](https://noto-app.de), eigenes Docker-Backend auf Mittwald.** Die Website beginnt mit Login und Kontoeinrichtung. Windows erlaubt weiterhin lokale Notizen und Konto-Synchronisation. Das eigene Logo und die automatische OpenAI-Modellauswahl sind integriert. Supabase wird für diesen Betrieb nicht benötigt. Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
-Eine lokale Windows-Notizapp mit andockbarem Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 0.2 ergänzt PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
+Eine lokale Windows- und Linux-Notizapp mit Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 0.2 ergänzt PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
 
 ## Starten
 
-Der Windows-Installer wird unter `src-tauri/target/release/bundle/nsis/` erzeugt. Die ausführbare App liegt unter `src-tauri/target/release/notto.exe`.
+Der Windows-Installer wird unter `src-tauri/target/release/bundle/nsis/` erzeugt. Linux-Releases liegen als AppImage unter `src-tauri/target/release/bundle/appimage/` vor.
 
 ```sh
 npm ci
 npm run dev             # Browser: http://127.0.0.1:1420
-npm run desktop         # Windows-App im Entwicklungsmodus
-npm run desktop:build   # Windows-App und Installer
+npm run desktop         # Desktop-App im Entwicklungsmodus
+npm run desktop:build   # App und Paket für das aktuelle System
 npm test
 ```
 
 `npm run desktop` startet seinen eigenen Vite-Server; vorher einen separat gestarteten `npm run dev` beenden. Für Windows-Builds werden Rust (MSVC), die Visual Studio C++ Build Tools und WebView2 benötigt. Das Desktop-Skript ergänzt den üblichen Rust-Pfad selbst.
+
+### Omarchy / Arch Linux
+
+Im GitHub-Release das `x86_64.AppImage` herunterladen und ausführbar machen:
+
+```sh
+chmod +x Noto_*_amd64.AppImage
+./Noto_*_amd64.AppImage
+```
+
+Tauri verwendet unter Linux das installierte WebKitGTK. Falls eine Laufzeitbibliothek fehlt:
+
+```sh
+sudo pacman -S --needed webkit2gtk-4.1 libappindicator-gtk3 xdotool xdg-utils
+```
+
+Omarchy läuft unter Wayland/Hyprland. Fenster dürfen sich dort nicht selbst am Bildschirmrand
+positionieren. Damit die Schnellnotiz schwebt und auf allen Workspaces sichtbar bleibt, diese Regel in
+`~/.config/hypr/hyprland.conf` ergänzen:
+
+```ini
+windowrule = match:initial_title ^(Noto · Schnellnotiz)$, float on, pin on, move (monitor_w-window_w-16) ((monitor_h-window_h)/3)
+```
+
+Größe und Ein-/Ausklappen steuert Noto weiterhin selbst. Unter X11 funktioniert zusätzlich das
+automatische Andocken an den linken oder rechten Bildschirmrand.
 
 ## Kleine Fenster und gemeinsame Suche (0.8)
 
@@ -34,7 +60,7 @@ Das Anmerkungsfeld erweitert den KI-Button mit einer Morph-Animation und schlie�
 
 Strg + K öffnet die schwebende Notizsuche mit einer Morph-Animation. Sie durchsucht aktive und archivierte Notizen; der Papierkorb bleibt ausgeschlossen. Enter öffnet den ersten Treffer, Esc schließt die Suche. Die obere Navigationsleiste und dekorative Notizüberschriften entfallen. Die dunkle Palette orientiert sich an [Omarchy Kanagawa](https://github.com/basecamp/omarchy/blob/master/themes/kanagawa/colors.toml); das helle Farbschema bleibt erhalten.
 
-Quellenlinks werden dedupliziert und unter Windows über den Standardbrowser geöffnet. Noto recherchiert, fasst zusammen, verknüpft Wissen und schlägt Aufgaben für den Nutzer vor. Die KI führt keine Kontoaktionen, Käufe oder Installationen aus und fragt nicht nach Zugangsdaten dafür. Die Rollenbeschreibung gilt für neue Analysen und Recherchen; bestehende Texte können unter „Wissen & KI“ neu recherchiert werden.
+Quellenlinks werden dedupliziert und in der Desktop-App über den Standardbrowser geöffnet. Noto recherchiert, fasst zusammen, verknüpft Wissen und schlägt Aufgaben für den Nutzer vor. Die KI führt keine Kontoaktionen, Käufe oder Installationen aus und fragt nicht nach Zugangsdaten dafür. Die Rollenbeschreibung gilt für neue Analysen und Recherchen; bestehende Texte können unter „Wissen & KI“ neu recherchiert werden.
 
 ## Aufgaben und Anmerkungen (0.5)
 
@@ -45,7 +71,7 @@ Quellenlinks werden dedupliziert und unter Windows über den Standardbrowser ge�
 ## Bedienung
 
 - **Strg + Alt + Umschalt + N:** globale Schnellnotiz über das Randwidget (Standard ab 0.4.2, solange Noto läuft). Unter Einstellungen → Tastenkürzel & Randwidget änderbar; der Button zeigt die aktive Kombination.
-- **Strg + N:** neue Notiz im Windows-Hauptfenster. Im aktiven Website-Tab: **Strg + Umschalt + Leertaste**.
+- **Strg + N:** neue Notiz im Desktop-Hauptfenster. Im aktiven Website-Tab: **Strg + Umschalt + Leertaste**.
 - **Strg + K:** Suche fokussieren.
 - **Strg + Enter:** Notiz speichern.
 - **Escape:** Randwidget einklappen; der Entwurf bleibt erhalten.
@@ -59,7 +85,7 @@ Quellenlinks werden dedupliziert und unter Windows über den Standardbrowser ge�
 
 ## Speicherung und Originale
 
-Windows speichert im von Tauri ermittelten App-Datenverzeichnis (`app.notto.desktop`). Der exakte Pfad steht unter Einstellungen → Deine Daten. Dort liegen:
+Die Desktop-App speichert im von Tauri ermittelten App-Datenverzeichnis (`app.notto.desktop`). Der exakte Pfad steht unter Einstellungen → Deine Daten. Dort liegen:
 
 ```text
 notto.sqlite                  # transaktionales Journal, Versionen, Entwürfe, Suchindex
@@ -76,7 +102,7 @@ SQLite mit WAL und vollständiger Synchronisation ist das verbindliche Journal. 
 
 Externe Textänderungen an bestehenden Markdown-Dateien werden vor dem nächsten Überschreiben bzw. beim App-Start als separate Konfliktkopie erhalten. Ein dauerhaft laufender Ordner-Watcher und die automatische Aufnahme neuer externer Dateien sind noch nicht enthalten. Neue `.md`- und `.txt`-Dateien können über „Markdown importieren“ eingelesen werden. Dabei werden fremde Bilder nicht automatisch heruntergeladen.
 
-Der Browser verwendet IndexedDB. Windows und Browser haben **getrennte lokale Speicher**. Notizen werden erst mit angemeldetem Konto zwischen Geräten synchronisiert. Browserdaten können durch Löschen des Browserprofils verloren gehen; dafür gibt es den vollständigen ZIP-Export.
+Der Browser verwendet IndexedDB. Desktop-App und Browser haben **getrennte lokale Speicher**. Notizen werden erst mit angemeldetem Konto zwischen Geräten synchronisiert. Browserdaten können durch Löschen des Browserprofils verloren gehen; dafür gibt es den vollständigen ZIP-Export.
 
 Der Export enthält Markdown, alle referenzierten Bilder (auch aus früheren Versionen), Papierkorb, Entwürfe und `notto-backup.json` mit kompletter Historie und Zuständen. Markdown kann wieder importiert werden; der automatische Import der vollständigen JSON-Historie ist noch nicht implementiert.
 
@@ -126,7 +152,7 @@ Noch separat mit echten Geräten zu prüfen: Monitorwechsel, verschiedene DPI-Sk
 - `src/Editor.tsx`: Editor, Entwürfe, Bilder und Versionshistorie.
 - `src/Widget.tsx`: Zustände und Animationen des Randwidgets.
 - `src/App.tsx`: Notizbuch mit Suche, Tags, Archiv und Papierkorb.
-- `src-tauri/src/lib.rs`: Windows-Fenster, Tray, Shortcut, persistente Daten und Markdown-Dateien.
+- `src-tauri/src/lib.rs`: Desktop-Fenster, Tray, Shortcut, persistente Daten und Markdown-Dateien.
 - `supabase/migrations/`: Backend-Schema, Zugriffsregeln und atomare Sync-Funktion.
 
 Abhängigkeiten sind über `package-lock.json` und `src-tauri/Cargo.lock` festgeschrieben. Astryx ist als Version 0.6.2 eingebunden.
@@ -143,6 +169,7 @@ Unter **Wissen & KI → Mein Kontext** findest du die Übersicht **Projektwissen
 - Kontext wird bei Textanfragen einschließlich Hintergrundanalysen berücksichtigt, nicht beim Erstellen von Suchvektoren oder Transkriptionen. Je Anfrage werden höchstens 30 aktive Einträge mit insgesamt 10.000 Textzeichen ausgewählt; Anweisungen zuerst, sonst nach Wortüberschneidung.
 
 Das Gedächtnis ergänzt die Anfrage; es trainiert kein eigenes Modell und führt keine externen Aktionen aus. Originalnotizen bleiben unverändert. Die Antwortqualität mit echten Modellen sowie die Darstellung auf unterschiedlichen Geräten müssen weiterhin praktisch beurteilt werden.
+
 # Lokale Entwicklung mit Testkonto
 
 `npm run dev` startet die Oberfläche auf http://127.0.0.1:1420 und ein lokales Test-Backend auf Port 3001. Die API läuft über den Vite-Proxy. Docker oder eine PostgreSQL-Installation sind dafür nicht nötig.

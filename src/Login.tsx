@@ -201,7 +201,7 @@ export function Login() {
             </button>
           </div>
           <p className="login-footnote">
-            Mit demselben Konto kannst du dich auch in der Windows-App anmelden.
+            Mit demselben Konto kannst du dich auch in der Desktop-App anmelden.
           </p>
         </motion.div>
       </section>

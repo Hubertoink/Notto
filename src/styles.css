@@ -2602,17 +2602,19 @@ dialog.image-lightbox::backdrop {
   backdrop-filter: blur(8px);
   border-radius: 24px;
   padding: 10px 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms;
 }
 .lightbox-close {
   top: 10px;
   right: 10px;
   padding: 8px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 160ms;
 }
 .lightbox-surface:hover .lightbox-close,
-.lightbox-close:focus-visible {
+.lightbox-surface:hover .lightbox-download,
+.lightbox-close:focus-visible,
+.lightbox-download:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
@@ -2629,7 +2631,8 @@ dialog.image-lightbox::backdrop {
   background: #111d;
 }
 @media (hover: none), (pointer: coarse) {
-  .lightbox-close {
+  .lightbox-close,
+  .lightbox-download {
     opacity: 1;
     pointer-events: auto;
   }

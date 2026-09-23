@@ -481,7 +481,61 @@ textarea:focus-visible {
   margin: 0 0 4px;
   transition:
     background 0.15s,
-    border-color 0.15s;
+    border-color 0.15s,
+    transform 0.18s ease,
+    opacity 0.18s ease;
+}
+.note-card-dragging {
+  transform: scale(0.94);
+  transform-origin: center left;
+  opacity: 0.35;
+}
+.note-drag-flight,
+.note-drag-preview {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 184px;
+  height: 58px;
+  padding: 0 12px;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--nt-paper);
+  color: var(--nt-text);
+  border: 1px solid var(--nt-line);
+  border-left: 4px solid var(--bauhaus-red);
+  box-shadow: 0 8px 24px var(--nt-shadow);
+}
+.note-drag-flight span,
+.note-drag-preview span {
+  font-size: 11px;
+}
+.note-drag-flight strong,
+.note-drag-preview strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.note-drag-preview {
+  z-index: 1100;
+}
+.note-drag-transparent-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.note-card[draggable='true'] {
+  cursor: grab;
+}
+.note-card[draggable='true']:active {
+  cursor: grabbing;
 }
 .note-card:hover {
   background: var(--nt-hover);
@@ -1200,9 +1254,7 @@ textarea:focus-visible {
     linear-gradient(145deg, color-mix(in srgb, var(--nt-accent) 5%, transparent), transparent 38%),
     var(--nt-paper);
   border: 1px solid var(--nt-line);
-  box-shadow:
-    0 18px 48px color-mix(in srgb, var(--nt-shadow) 70%, transparent),
-    0 2px 8px var(--nt-shadow);
+  box-shadow: none;
   overflow: hidden;
   flex-shrink: 0;
   max-width: 100%;
@@ -1927,10 +1979,65 @@ button.tags-heading {
 .collection-add:hover {
   background: var(--nt-tint);
 }
-.collection-navigation .collection-drop-target {
+.collection-row.collection-drop-target {
   background: var(--nt-tint);
   outline: 2px solid var(--nt-accent);
   outline-offset: -2px;
+}
+.notebook
+  :is(
+    .sidebar-fixed,
+    .sidebar-scroll > nav[aria-label='Notizbücher'],
+    .sidebar-scroll > .tags-heading:not(.collections-heading),
+    .tag-navigation,
+    .sidebar-trash,
+    .sidebar-bottom,
+    .main
+  ) {
+  transition: opacity 160ms ease;
+}
+.notebook.note-drag-active
+  :is(
+    .sidebar-fixed,
+    .sidebar-scroll > nav[aria-label='Notizbücher'],
+    .sidebar-scroll > .tags-heading:not(.collections-heading),
+    .tag-navigation,
+    .sidebar-trash,
+    .sidebar-bottom,
+    .main
+  ) {
+  opacity: 0.25;
+}
+.notebook.note-drag-active .collections-heading {
+  color: var(--nt-accent);
+}
+.notebook.note-drag-active .collection-navigation .collection-row {
+  background: color-mix(in srgb, var(--nt-accent) 10%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--nt-accent) 60%, transparent);
+  outline-offset: -1px;
+}
+.notebook.note-drag-active .collection-navigation .collection-row.collection-drop-target {
+  background: var(--nt-tint);
+  outline: 2px solid var(--nt-accent);
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-card-dragging {
+    transform: none;
+    transition: none;
+  }
+  .notebook
+    :is(
+      .sidebar-fixed,
+      .sidebar-scroll > nav[aria-label='Notizbücher'],
+      .sidebar-scroll > .tags-heading:not(.collections-heading),
+      .tag-navigation,
+      .sidebar-trash,
+      .sidebar-bottom,
+      .main
+    ) {
+    transition: none;
+  }
 }
 .new-collection-form {
   display: grid;

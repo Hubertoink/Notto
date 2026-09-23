@@ -40,8 +40,19 @@ import { noteShortcut, newNoteLabel } from './shortcuts';
 import { excerptOf, importedMarkdown, newNote, reviseNote, tagsOf, titleOf, type Note } from './domain';
 import { noteBackground, readNoteBackground, type NoteBackgroundId } from './note-backgrounds';
 import { checkForUpdate } from './updates';
+import {
+  animateNoteIntoCollection,
+  createNoteDragPreview,
+  hideNativeDragImage,
+  positionNoteDragPreview,
+} from './note-drag';
 
 type View = 'all' | 'pinned' | 'archive' | 'trash';
+function noteDate(note: Note) {
+  return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(
+    new Date(note.updatedAt),
+  );
+}
 function FittingListTitle({ title }: { title: string }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useLayoutEffect(() => {
@@ -149,6 +160,16 @@ function Notebook({
   const [collectionBusy, setCollectionBusy] = useState(false);
   const [collectionError, setCollectionError] = useState('');
   const [dragCollection, setDragCollection] = useState<string | null>(null);
+  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
+  const draggedNote = useRef<{ id: string; scope: string; title: string; date: string } | null>(null);
+  const dragPreview = useRef<HTMLElement | null>(null);
+  const transparentDragImage = useRef<HTMLElement | null>(null);
+  const removeDragPreview = () => {
+    dragPreview.current?.remove();
+    transparentDragImage.current?.remove();
+    dragPreview.current = null;
+    transparentDragImage.current = null;
+  };
   const [searchOpen, setSearchOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(initialNavigation.selected);
   const [creating, setCreating] = useState(initialNavigation.creating);
@@ -387,7 +408,10 @@ function Notebook({
         } as CSSProperties
       }
       data-note-overview={!selected && !creating && !knowledgeOpen && !tasksOpen}
-      className={`notebook ${sidebar ? 'sidebar-open' : ''} ${selected || creating ? 'detail-open' : ''}`}
+      className={`notebook ${sidebar ? 'sidebar-open' : ''} ${selected || creating ? 'detail-open' : ''} ${draggingNoteId ? 'note-drag-active' : ''}`}
+      onDragOver={(e) => {
+        if (draggedNote.current) positionNoteDragPreview(dragPreview.current, { x: e.clientX, y: e.clientY });
+      }}
     >
       {sidebar && (
         <button
@@ -502,7 +526,7 @@ function Notebook({
               ))
             )}
           </nav>
-          <div className="tags-heading">
+          <div className="tags-heading collections-heading">
             <button
               className="sidebar-disclosure"
               aria-expanded={isExpanded('collections', true)}
@@ -532,7 +556,37 @@ function Notebook({
           >
             {collectionCounts.map(([name, count]) => (
               <div key={name} className="collection-branch">
-                <div className="collection-row">
+                <div
+                  className={`collection-row ${dragCollection === name ? 'collection-drop-target' : ''}`}
+                  onDragOver={(e) => {
+                    if (!draggedNote.current || draggedNote.current.scope !== scope) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                    setDragCollection(name);
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragCollection(null);
+                  }}
+                  onDrop={(e) => {
+                    const payload = draggedNote.current;
+                    if (!payload || payload.scope !== scope) return;
+                    e.preventDefault();
+                    removeDragPreview();
+                    animateNoteIntoCollection(
+                      payload.title,
+                      payload.date,
+                      { x: e.clientX, y: e.clientY },
+                      e.currentTarget,
+                    );
+                    draggedNote.current = null;
+                    setDraggingNoteId(null);
+                    setDragCollection(null);
+                    if (!notes.some((n) => n.id === payload.id && n.scope === scope && !n.deleted)) return;
+                    void addNoteToCollection(scope, payload.id, name)
+                      .then(() => notify(`Zu „${name}“ hinzugefügt`))
+                      .catch((error) => notify(String(error)));
+                  }}
+                >
                   <button
                     className="collection-toggle sidebar-disclosure"
                     aria-label={`Sammlung ${name} ${isExpanded('collection:' + name) ? 'einklappen' : 'ausklappen'}`}
@@ -542,34 +596,7 @@ function Notebook({
                     <ChevronRight size={14} />
                   </button>
                   <button
-                    className={`nav-item ${collection === name && !knowledgeOpen && !tasksOpen ? 'active' : ''} ${dragCollection === name ? 'collection-drop-target' : ''}`}
-                    onDragOver={(e) => {
-                      if (!e.dataTransfer.types.includes(NOTE_DRAG_TYPE)) return;
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = 'copy';
-                      setDragCollection(name);
-                    }}
-                    onDragLeave={(e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragCollection(null);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragCollection(null);
-                      let payload: { id?: string; scope?: string };
-                      try {
-                        payload = JSON.parse(e.dataTransfer.getData(NOTE_DRAG_TYPE));
-                      } catch {
-                        return;
-                      }
-                      if (
-                        payload.scope !== scope ||
-                        !notes.some((n) => n.id === payload.id && n.scope === scope && !n.deleted)
-                      )
-                        return;
-                      void addNoteToCollection(scope, payload.id!, name)
-                        .then(() => notify(`Zu „${name}“ hinzugefügt`))
-                        .catch((error) => notify(String(error)));
-                    }}
+                    className={`nav-item ${collection === name && !knowledgeOpen && !tasksOpen ? 'active' : ''}`}
                     onClick={() => {
                       setCollection(name);
                       setTag(null);
@@ -774,24 +801,39 @@ function Notebook({
                 filtered.map((n) => (
                   <button
                     key={n.id}
-                    className={`note-card ${selected === n.id && !creating ? 'selected' : ''}`}
+                    className={`note-card ${selected === n.id && !creating ? 'selected' : ''} ${draggingNoteId === n.id ? 'note-card-dragging' : ''}`}
                     draggable={!n.deleted}
                     onDragStart={(e) => {
+                      const title = titleOf(n.content);
+                      const date = noteDate(n);
+                      draggedNote.current = { id: n.id, scope, title, date };
+                      setDraggingNoteId(n.id);
+                      if (!isExpanded('collections', true)) toggleExpanded('collections', true);
                       e.dataTransfer.setData(NOTE_DRAG_TYPE, JSON.stringify({ id: n.id, scope }));
                       e.dataTransfer.effectAllowed = 'copy';
+                      removeDragPreview();
+                      dragPreview.current = createNoteDragPreview(title, date, e.currentTarget, {
+                        x: e.clientX,
+                        y: e.clientY,
+                      });
+                      transparentDragImage.current = hideNativeDragImage(e.dataTransfer, e.currentTarget);
                     }}
-                    onDragEnd={() => setDragCollection(null)}
+                    onDrag={(e) => {
+                      positionNoteDragPreview(dragPreview.current, { x: e.clientX, y: e.clientY });
+                    }}
+                    onDragEnd={() => {
+                      removeDragPreview();
+                      draggedNote.current = null;
+                      setDraggingNoteId(null);
+                      setDragCollection(null);
+                    }}
                     onClick={() => {
                       setSelected(n.id);
                       setCreating(false);
                     }}
                   >
                     <div className="note-card-meta">
-                      <span>
-                        {new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(
-                          new Date(n.updatedAt),
-                        )}
-                      </span>
+                      <span>{noteDate(n)}</span>
                       {n.pinned && <Pin size={13} />}
                     </div>
                     <h2>{titleOf(n.content)}</h2>

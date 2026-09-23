@@ -529,7 +529,7 @@
 .widget-surface {
   background: var(--nt-paper);
   border-color: var(--nt-text);
-  box-shadow: 0 5px 20px var(--nt-shadow);
+  box-shadow: none;
 }
 .widget-peek-content {
   grid-template-columns: minmax(0, 1fr);

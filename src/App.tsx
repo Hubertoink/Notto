@@ -2,7 +2,7 @@ import { collectionNames, createCollection, addNoteToCollection, NOTE_DRAG_TYPE 
 import { flushSync } from 'react-dom';
 import { useSidebarDisclosure } from './sidebar-disclosure';
 import { FloatingSearch } from './FloatingSearch';
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Archive,
@@ -42,6 +42,31 @@ import { noteBackground, readNoteBackground, type NoteBackgroundId } from './not
 import { checkForUpdate } from './updates';
 
 type View = 'all' | 'pinned' | 'archive' | 'trash';
+function FittingListTitle({ title }: { title: string }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useLayoutEffect(() => {
+    const element = heading.current;
+    const container = element?.parentElement;
+    if (!element || !container) return;
+    const fit = () => {
+      const base = parseFloat(getComputedStyle(element).getPropertyValue('--list-heading-base-size')) || 27;
+      element.style.fontSize = `${base}px`;
+      element.style.whiteSpace = 'nowrap';
+      const available = element.clientWidth;
+      if (!available) return;
+      const required = element.scrollWidth;
+      const size = Math.max(16, Math.min(base, (base * (available - 2)) / required));
+      element.style.fontSize = `${size}px`;
+      if (size === 16 && required * (16 / base) > available) element.style.whiteSpace = 'normal';
+    };
+    fit();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
+    observer?.observe(container);
+    void document.fonts?.ready.then(fit);
+    return () => observer?.disconnect();
+  }, [title]);
+  return <h1 ref={heading}>{title}</h1>;
+}
 function navigationFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const candidate = params.get('view');
@@ -688,7 +713,7 @@ function Notebook({
           <section className="note-list-panel">
             <div className="list-heading">
               <div>
-                <h1>{title}</h1>
+                <FittingListTitle title={title} />
                 <p>
                   {filtered.length} {filtered.length === 1 ? 'Notiz' : 'Notizen'}
                   {visibleDrafts.length > 0 &&

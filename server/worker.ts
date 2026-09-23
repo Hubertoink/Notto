@@ -73,7 +73,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
           .filter((r) => r.kind === 'analysis' && currentContent(n, r.revision))
           .sort((a, b) => b.at.localeCompare(a.at))[0];
         for (const [index, item] of existing.data.suggestions.entries())
-          if (item.kind !== 'topic')
+          if (item.kind === 'task' || item.kind === 'contact')
             await db.query(
               'INSERT INTO jobs(id,user_id,note_id,revision,kind) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
               [randomUUID(), job.user_id, job.note_id, job.revision, `research:${index}`],
@@ -190,7 +190,16 @@ export async function workOnce(db: Database, env: AIEnvironment) {
       );
       const result = analysis.parse(JSON.parse(text(response)));
       if (
-        result.suggestions.some((s) => !s.quote.trim() || !sources.some((source) => source.includes(s.quote)))
+        result.suggestions.some(
+          (s) =>
+            !s.quote.trim() ||
+            !evidence.some(
+              (source) =>
+                source.text.includes(s.quote) &&
+                (s.kind !== 'insight' ||
+                  (source.attachment?.endsWith('.pdf') && !source.text.startsWith('[Kein Text erkannt.'))),
+            ),
+        )
       )
         throw new Error('KI-Beleg stimmt nicht mit der Originalquelle überein.');
       data = result;
@@ -205,7 +214,8 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         .sort((a, b) => b.at.localeCompare(a.at))[0];
       const index = Number(job.kind.split(':')[1]),
         item = a?.data?.suggestions?.[index];
-      if (!item || item.kind === 'topic') throw new Error('Recherchevorschlag fehlt.');
+      if (!item || (item.kind !== 'task' && item.kind !== 'contact'))
+        throw new Error('Recherchevorschlag fehlt.');
       const key = `${job.note_id}:${item.kind}:${item.quote.trim().toLocaleLowerCase('de')}`;
       if (
         records.some((r) => r.kind === 'research' && r.data.key === key) ||
@@ -273,7 +283,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         );
       if (kind === 'analysis' && check.rows[0].settings.autoResearch)
         for (const [index, item] of (data as z.infer<typeof analysis>).suggestions.entries())
-          if (item.kind !== 'topic')
+          if (item.kind === 'task' || item.kind === 'contact')
             await db.query(
               'INSERT INTO jobs(id,user_id,note_id,revision,kind) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
               [randomUUID(), job.user_id, job.note_id, job.revision, `research:${index}`],

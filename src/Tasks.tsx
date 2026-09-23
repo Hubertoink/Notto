@@ -1,19 +1,28 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, useRef, type CSSProperties } from 'react';
 import { Sparkles, X, WandSparkles, RefreshCw } from 'lucide-react';
-import { analyze, config, knowledge, type KnowledgeRecord, type Research } from './intelligence';
+import {
+  analyze,
+  config,
+  knowledge,
+  type Analysis,
+  type Evidence,
+  type KnowledgeRecord,
+  type Research,
+} from './intelligence';
 import { noteExclusionReason } from './evidence-policy';
 import { addTask, checkTask, newest, noteAnalysis, tasksFor, type Task } from './task-store';
 import { useNotto } from './state';
 import { Sources, NoteMarkdown } from './components';
 import type { Note } from './domain';
-import { currentContent } from './domain';
+import { attachmentIds, currentContent } from './domain';
 import { aiAnnotationBackgrounds } from './note-backgrounds';
 import { compactParenthesizedLines } from './annotation-markdown';
 import './tasks.css';
 import { RelationSuggestions } from './RelationSuggestions';
 import { visibleRelations, type Relation } from './note-relations';
 import { eligible } from './intelligence';
+import { AttachmentTitle } from './AttachmentTitle';
 
 export function useKnowledgeRecords(scope: string) {
   const [state, setState] = useState<{ scope: string; records: KnowledgeRecord[] }>({ scope, records: [] });
@@ -197,6 +206,24 @@ export function NoteAnnotations({
     }
   };
   const analysis = noteAnalysis(records, note);
+  const insights =
+    analysis && currentContent(note, analysis.revision)
+      ? ((analysis.data as Analysis).suggestions || [])
+          .filter((item) => item.kind === 'insight')
+          .map((item) => ({
+            item,
+            source: records
+              .filter((record) => record.kind === 'extraction' && record.noteId === note.id)
+              .sort((a, b) => b.at.localeCompare(a.at))
+              .flatMap((record) => (record.data as { pages: Evidence[] }).pages || [])
+              .find(
+                (page) =>
+                  page.attachment?.endsWith('.pdf') &&
+                  attachmentIds(note.content).includes(page.attachment) &&
+                  page.text.includes(item.quote),
+              ),
+          }))
+      : [];
   const relations = visibleRelations(note, notes.filter(eligible), records);
   const tasks = tasksFor([note], records, note.scope).filter((t) => t.note);
   const research = newest(
@@ -224,7 +251,7 @@ export function NoteAnnotations({
       <div className="annotation-heading">
         <button
           ref={trigger}
-          className={`annotation-toggle ${tasks.length || uniqueResearch.length || relations.length ? 'has-annotations' : ''}`}
+          className={`annotation-toggle ${tasks.length || insights.length || uniqueResearch.length || relations.length ? 'has-annotations' : ''}`}
           aria-expanded={expanded}
           onClick={() => {
             toggle(!expanded);
@@ -233,7 +260,7 @@ export function NoteAnnotations({
         >
           <Sparkles size={17} />
           <span>KI-Anmerkungen</span>
-          <span>{tasks.length + uniqueResearch.length + relations.length || ''}</span>
+          <span>{tasks.length + insights.length + uniqueResearch.length + relations.length || ''}</span>
         </button>
         {expanded && (
           <button
@@ -284,14 +311,33 @@ export function NoteAnnotations({
                   {updateError}
                 </p>
               )}
-              {!excluded && !tasks.length && !uniqueResearch.length && !relations.length && (
-                <p className="annotation-empty">
-                  Keine offenen Hinweise. Hier erscheinen passende Notizen, Aufgaben und Rechercheergebnisse.
-                </p>
-              )}
+              {!excluded &&
+                !tasks.length &&
+                !insights.length &&
+                !uniqueResearch.length &&
+                !relations.length && (
+                  <p className="annotation-empty">
+                    Keine offenen Hinweise. Hier erscheinen passende Notizen, Aufgaben, PDF-Anmerkungen und
+                    Rechercheergebnisse.
+                  </p>
+                )}
               {tasks.map((task) => (
                 <TaskRow key={task.id} task={task} />
               ))}
+              {!excluded &&
+                insights.map(({ item, source }, index) => (
+                  <article className="pdf-insight" key={`${item.quote}:${index}`}>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                    <blockquote>{item.quote}</blockquote>
+                    {source?.attachment && (
+                      <small>
+                        <AttachmentTitle content={note.content} id={source.attachment} scope={note.scope} />
+                        {source.page ? ` · Seite ${source.page}` : ''}
+                      </small>
+                    )}
+                  </article>
+                ))}
               {!excluded && (
                 <RelationSuggestions
                   note={note}

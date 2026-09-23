@@ -71,4 +71,14 @@ describe('original notes', () => {
       ),
     ).not.toContain('| --- |');
   });
+  it('omits links and their labels from note previews', () => {
+    expect(
+      excerptOf(
+        '## KI-generierte Poster\n[AI_Posters_Dont_Have_To_Be_Terrible](https://example.org/article)\nInteressanter Blogpost über Poster.',
+      ),
+    ).toBe('Interessanter Blogpost über Poster.');
+    expect(excerptOf('Titel\nSiehe https://example.org/article und [Artikel](https://example.org).')).toBe(
+      'Siehe und .',
+    );
+  });
 });

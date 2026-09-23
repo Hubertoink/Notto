@@ -160,6 +160,15 @@
   color: inherit;
   text-decoration: underline;
 }
+.pdf-insight blockquote {
+  margin: 10px 0 6px;
+  padding-left: 10px;
+  border-left: 2px solid var(--nt-accent);
+  color: var(--nt-muted);
+}
+.pdf-insight small {
+  color: var(--nt-muted);
+}
 .research-text {
   white-space: pre-wrap;
 }

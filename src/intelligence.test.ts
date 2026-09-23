@@ -105,6 +105,37 @@ it('rejects invented evidence and does not write analysis', async () => {
   await expect(analyze(note)).rejects.toThrow('Beleg');
   expect(await knowledge.list('local')).toHaveLength(0);
 });
+it('accepts PDF reading notes only when the quote occurs on an extracted PDF page', async () => {
+  const id = `${crypto.randomUUID()}.pdf`;
+  const note = newNote('local', `Artikel für die Jugendarbeit\n[Artikel](attachments/${id})`);
+  await repo.put(note, null);
+  await knowledge.append(note, 'extraction', {
+    id,
+    pages: [
+      {
+        noteId: note.id,
+        revision: note.revision,
+        attachment: id,
+        page: 2,
+        text: 'Beteiligung stärkt Zugehörigkeit.',
+      },
+    ],
+    ocr: false,
+  });
+  const insight = {
+    kind: 'insight',
+    title: 'Beteiligung vertiefen',
+    detail: 'Wie lässt sich das in der Jugendarbeit erproben?',
+    quote: 'Beteiligung stärkt Zugehörigkeit.',
+  };
+  api.mockResolvedValue(response([insight]));
+  await analyze(note);
+  expect((await knowledge.list('local')).find((record) => record.kind === 'analysis')?.data).toEqual({
+    suggestions: [insight],
+  });
+  api.mockResolvedValue(response([{ ...insight, quote: 'Artikel für die Jugendarbeit' }]));
+  await expect(analyze(note)).rejects.toThrow('Beleg');
+});
 it('discards a response if the user changes the note during analysis', async () => {
   const note = newNote('local', item.quote);
   await repo.put(note, null);

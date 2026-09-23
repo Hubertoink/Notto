@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import type { z } from 'zod';
 import { attachmentIds, contentRevision, type Note } from '../src/domain.js';
 import { evidenceSchema } from '../src/evidence-policy.js';
 import type { Database } from './database.js';
@@ -12,7 +13,9 @@ export async function sourceTexts(
   records: any[],
   dataDir?: string,
 ) {
-  const sources = [{ noteId: note.id, revision: contentRevision(note), text: note.content }];
+  const sources: z.infer<typeof evidenceSchema>[] = [
+    { noteId: note.id, revision: contentRevision(note), text: note.content },
+  ];
   for (const id of attachmentIds(note.content)) {
     let extraction = records
       .filter((r) => r.kind === 'extraction' && r.data?.id === id)

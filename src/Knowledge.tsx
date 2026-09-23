@@ -141,7 +141,7 @@ export function IntelligenceWorker() {
               .filter(eligible)
               .flatMap((n) =>
                 ((latest(records, 'analysis', n)?.data as Analysis)?.suggestions || [])
-                  .filter((item) => item.kind !== 'topic')
+                  .filter((item) => item.kind === 'task' || item.kind === 'contact')
                   .map((item) => ({ note: n, item })),
               );
             const next = candidates.find(({ note: n, item }) => {
@@ -387,11 +387,13 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
   const included = notes.filter(eligible);
   const entries = included.flatMap((note) => {
     const record = latest(records, 'analysis', note);
-    return ((record?.data as Analysis)?.suggestions || []).map((item) => ({
-      note,
-      item,
-      decision: resolvedDecision(records, decisionKey(note.id, item)),
-    }));
+    return ((record?.data as Analysis)?.suggestions || [])
+      .filter((item) => item.kind !== 'insight')
+      .map((item) => ({
+        note,
+        item,
+        decision: resolvedDecision(records, decisionKey(note.id, item)),
+      }));
   });
   const decide = async (
     note: Note,
@@ -631,7 +633,8 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
         <section className="knowledge-section">
           <p className="muted">
             PDF-Text wird lokal gelesen. OCR sendet Bilder oder gescannte Seiten an OpenAI. Höchstens 100
-            PDF-Seiten, davon maximal fünf gescannte Seiten pro OCR-Aufruf.
+            PDF-Seiten, davon maximal fünf gescannte Seiten pro OCR-Aufruf. Lesbarer PDF-Text fließt bei der
+            Analyse in die KI-Anmerkungen der Notiz ein.
           </p>
           {included.flatMap((note) =>
             attachmentIds(note.content).map((id) => (

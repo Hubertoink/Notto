@@ -202,6 +202,44 @@ it('opens inline AI annotations and completes a task without changing the note',
   await waitFor(() => expect((checkbox as HTMLInputElement).checked).toBe(true));
   expect(await repo.get('local', note.id)).toEqual(note);
 });
+it('shows a PDF reading note with its source page in AI annotations', async () => {
+  const id = `${crypto.randomUUID()}.pdf`;
+  const note = newNote('local', `Gedanken zum Artikel\n[Artikel](attachments/${id})`);
+  await repo.put(note, null);
+  await knowledge.append(note, 'extraction', {
+    id,
+    pages: [
+      {
+        noteId: note.id,
+        revision: note.revision,
+        attachment: id,
+        page: 3,
+        text: 'Jugendliche gestalten den Raum.',
+      },
+    ],
+  });
+  await knowledge.append(note, 'analysis', {
+    suggestions: [
+      {
+        kind: 'insight',
+        title: 'Mitgestaltung',
+        detail: 'Die Aussage passt zur Raumplanung.',
+        quote: 'Jugendliche gestalten den Raum.',
+      },
+    ],
+  });
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  await userEvent.setup().click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
+  expect(await screen.findByText('Mitgestaltung')).toBeTruthy();
+  expect(screen.getByText('Jugendliche gestalten den Raum.')).toBeTruthy();
+  expect(screen.getByText(/Seite 3/)).toBeTruthy();
+});
 it('accepts a supported theory link and exposes a backlink on the target note', async () => {
   const source = newNote('local', 'Unser Konzept braucht ein gemeinsames Leitbild.');
   const target = newNote('local', 'Leitbildentwicklung: gemeinsame Werte und Beteiligung.');

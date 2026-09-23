@@ -1,0 +1,696 @@
+/* Noto: paper, ink and primary geometry. Shared by desktop, web and widget. */
+:root {
+  font-family: Arial, 'Segoe UI', sans-serif;
+}
+
+.geometric-mark {
+  --mark-size: 17px;
+  display: inline-block;
+  flex: 0 0 var(--mark-size);
+  width: var(--mark-size);
+  height: var(--mark-size);
+  background: currentColor;
+  transform: rotate(var(--mark-rotation, 0deg));
+}
+.geometric-mark--red {
+  color: var(--bauhaus-red);
+}
+.geometric-mark--blue {
+  color: var(--bauhaus-blue);
+}
+.geometric-mark--yellow {
+  color: var(--bauhaus-yellow);
+}
+.geometric-mark--ink {
+  color: var(--nt-text);
+}
+.geometric-mark--circle {
+  border-radius: 50%;
+}
+.geometric-mark--triangle {
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.geometric-mark--semicircle {
+  border-radius: 100% 100% 0 0;
+}
+.geometric-mark--ring {
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+}
+.geometric-mark--bar {
+  clip-path: polygon(0 36%, 100% 36%, 100% 64%, 0 64%);
+}
+.tag-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--nt-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+.tag-label > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tag-label .geometric-mark {
+  --mark-size: 12px;
+}
+
+/* Solid rectangular controls, with native focus and disabled states retained. */
+.notto-action.notto-action {
+  border-radius: 0 !important;
+  box-shadow: none;
+  font-weight: 700;
+}
+.notto-action--primary.notto-action--primary {
+  color: #fff;
+  background-color: var(--bauhaus-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+}
+.notto-action--secondary.notto-action--secondary {
+  color: var(--nt-text);
+  background-color: var(--nt-hover);
+  border: 1px solid var(--nt-line);
+}
+.notto-action--ghost.notto-action--ghost {
+  color: var(--nt-text);
+}
+.notto-action:focus-visible {
+  outline: 2px solid var(--nt-accent);
+  outline-offset: 3px;
+}
+.note-shortcut {
+  border: 0;
+  border-radius: 0;
+  padding: 0 0 0 8px;
+  font-size: 11px;
+}
+:is(
+  .search,
+  .search kbd,
+  .icon-button,
+  .nav-item,
+  .note-card,
+  .tag,
+  .workspace,
+  .tag-suggestions,
+  .tag-suggestions button,
+  .formatting-toolbar button,
+  .settings-navigation button,
+  .setup-notice,
+  .update-available,
+  .toast,
+  .knowledge-card,
+  .knowledge-progress,
+  .ai-save-bar,
+  .ai-activity,
+  .memory-overview,
+  .memory-symbol,
+  .memory-column,
+  .memory-card,
+  .memory-toggle,
+  .memory-add,
+  .annotation-shell,
+  .task-create input,
+  .task-create button,
+  .search-results > button,
+  .search-ai-controls button,
+  .source-cards > li,
+  .settings-section input,
+  .settings-section select,
+  .settings-section textarea,
+  .login-form input,
+  .modal-body input,
+  .modal-body select,
+  .modal-body textarea,
+  .knowledge-content input,
+  .knowledge-content select,
+  .knowledge-content textarea
+) {
+  border-radius: 0;
+}
+.modal-heading {
+  border-bottom-color: var(--nt-text);
+}
+.modal-heading h2,
+.knowledge-heading h1,
+.tasks-page h1 {
+  font-family: 'Arial Black', Arial, sans-serif;
+  text-transform: uppercase;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+}
+.knowledge-card,
+.memory-column {
+  border-top: 3px solid var(--nt-text);
+}
+.knowledge-table thead th {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.annotation-shell.annotation-open,
+.memory-preference .memory-symbol {
+  background-color: var(--nt-tint);
+}
+.editor-content textarea::placeholder {
+  color: var(--nt-muted);
+}
+.tag {
+  background: transparent;
+  padding: 4px 10px 4px 0;
+}
+.editor-tags {
+  gap: 6px 12px;
+}
+.tag-suggestions button[aria-selected='true'] {
+  background: var(--nt-tint);
+}
+.editor-heading h1 {
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+/* Navigation is always ink-dark, including in the light paper theme. */
+.sidebar {
+  --nt-text: #f1eee5;
+  --nt-muted: #c0c0b5;
+  --nt-line: #5a5b51;
+  --nt-hover: #292a24;
+  --nt-tint: #2c2d27;
+  --nt-paper: #20211b;
+  --nt-accent: #9db5ff;
+  color: var(--nt-text);
+  border-right: 1px solid #151613;
+}
+.brand {
+  gap: 15px;
+  padding: 8px 4px 20px;
+  font-size: 29px;
+  font-weight: 900;
+  letter-spacing: -1.2px;
+}
+.brand .brand-logo {
+  width: 61px;
+  height: 61px;
+}
+.sidebar-new {
+  padding: 0 0 14px;
+}
+.sidebar-new .notto-action {
+  height: 44px !important;
+  justify-content: flex-start;
+  padding-inline: 12px;
+}
+.sidebar-new .note-shortcut {
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.sidebar .nav-item {
+  gap: 15px;
+  padding-inline: 5px;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+}
+.sidebar-scroll > nav[aria-label='Notizbücher'] .nav-item,
+.sidebar .tag-navigation .nav-item {
+  text-transform: uppercase;
+  min-height: 33px;
+}
+.sidebar .nav-item.active {
+  color: var(--nt-text);
+  background: #2a2b25;
+  font-weight: 700;
+}
+.sidebar .tags-heading {
+  border-top: 1px solid var(--nt-line);
+  margin: 14px 2px 7px;
+  padding-top: 12px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+}
+.sidebar .collection-row .nav-item {
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.sidebar .collection-notes .nav-item {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 18px;
+}
+.sidebar .account-avatar {
+  background: #eae6dc;
+  color: #151613;
+  border: 0;
+  width: 34px;
+  height: 34px;
+}
+.sidebar .sync-indicator {
+  font-size: 11px;
+  gap: 6px;
+}
+.sidebar .geometric-mark--blue {
+  color: #2364ff;
+}
+.sidebar .sync-indicator:not(.sync-error) > svg {
+  color: #91ad75;
+}
+.all-tags .nav-item {
+  border-bottom: 1px solid var(--nt-line);
+  padding-block: 12px;
+}
+
+/* The notebook is a ruled working surface, not a stack of floating cards. */
+.note-list-panel {
+  background: var(--nt-bg);
+  width: 310px;
+}
+.list-heading {
+  padding: 28px 20px 13px;
+  align-items: flex-start;
+}
+.list-heading h1 {
+  margin-top: 0;
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-size: 27px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.055em;
+}
+.list-heading p {
+  color: var(--nt-text);
+}
+.list-heading > .notto-action {
+  flex-shrink: 0;
+}
+.note-list {
+  padding: 0 12px 16px;
+}
+.note-card {
+  border: 0;
+  border-bottom: 1px solid var(--nt-line);
+  border-left: 4px solid transparent;
+  margin: 0;
+  padding: 15px 12px 17px;
+}
+.note-card.selected {
+  border-color: transparent;
+  border-left-color: var(--bauhaus-red);
+  background: var(--nt-tint);
+  box-shadow: none;
+}
+.note-card h2 {
+  font-size: 15px;
+  font-weight: 750;
+}
+.note-card p {
+  color: var(--nt-text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.note-card-meta {
+  color: var(--nt-muted);
+  margin-bottom: 5px;
+}
+.note-card-tags {
+  gap: 7px 12px;
+  margin-top: 10px;
+}
+.note-card-tags .tag-label {
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.detail-panel {
+  background-image:
+    linear-gradient(light-dark(#f1eee5f2, #242420f2), light-dark(#f1eee5f2, #242420f2)),
+    var(--nt-note-background, none);
+}
+.floating-search-trigger {
+  border-radius: 0;
+  border-color: var(--nt-text);
+  box-shadow: none;
+  padding: 11px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.floating-search-trigger kbd {
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.notebook[data-note-overview='true'] .floating-search-trigger {
+  top: 24px;
+  bottom: auto;
+  width: 240px;
+}
+.floating-search-trigger kbd {
+  margin-left: auto;
+}
+.search-surface {
+  border: 1px solid var(--nt-text);
+  border-radius: 0;
+}
+
+/* A shared, scalable primary-shape composition frames the welcome and login. */
+.bauhaus-welcome {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  text-align: left;
+  align-items: flex-start;
+  padding: 110px clamp(24px, 5cqi, 50px) 65px;
+  min-height: 610px;
+}
+.bauhaus-composition {
+  display: block;
+  pointer-events: none;
+  color: var(--nt-text);
+}
+.bauhaus-welcome > .bauhaus-composition {
+  position: absolute;
+  z-index: -1;
+  width: 46%;
+  height: auto;
+  right: -10%;
+  top: 15%;
+}
+.welcome-copy {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 30px;
+}
+.bauhaus-welcome h2 {
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-size: clamp(38px, 11.7cqi, 96px);
+  font-weight: 900;
+  line-height: 0.99;
+  letter-spacing: -0.065em;
+  text-transform: uppercase;
+}
+.bauhaus-welcome p {
+  max-width: 75%;
+  font-size: 12px;
+  line-height: 1.8;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--nt-text);
+}
+.bauhaus-welcome .notto-action {
+  min-width: 215px;
+  min-height: 49px;
+  justify-content: flex-start;
+  padding-inline: 20px;
+}
+.bauhaus-welcome .welcome-shortcut {
+  margin-top: -15px;
+  font-size: 11px;
+  letter-spacing: 0.025em;
+}
+
+.login-story {
+  background: var(--nt-bg);
+  border-right-color: var(--nt-text);
+  padding: 32px clamp(28px, 4vw, 64px);
+  gap: 30px;
+}
+.login-brand {
+  gap: 16px;
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+}
+.login-brand img {
+  width: 58px;
+  height: 58px;
+}
+.login-intro {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-width: none;
+  margin: 15px 0;
+}
+.login-intro > .bauhaus-composition {
+  position: absolute;
+  width: 230px;
+  right: -155px;
+  top: -24px;
+  z-index: -1;
+}
+.login-intro h1 {
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-size: clamp(48px, 6.3vw, 96px);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.065em;
+  text-transform: uppercase;
+}
+.login-description {
+  color: var(--nt-text);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  line-height: 1.9;
+  text-transform: uppercase;
+  max-width: 85%;
+  margin-top: 30px;
+}
+.login-features {
+  gap: 12px;
+  margin-top: 30px;
+  font-size: 13px;
+}
+.login-features .geometric-mark {
+  --mark-size: 13px;
+}
+.login-caption {
+  border-top: 1px solid var(--nt-text);
+  padding-top: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+}
+.login-form-side {
+  border-top: 6px solid var(--bauhaus-blue);
+}
+.login-card h2 {
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 30px;
+  letter-spacing: -0.045em;
+}
+.login-form label {
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.075em;
+  font-weight: 700;
+}
+.login-form input {
+  background: transparent;
+  border-color: var(--nt-text);
+  min-height: 48px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 16px;
+}
+.login-form .notto-action {
+  min-height: 48px;
+}
+.login-footnote {
+  text-align: left;
+}
+.login-eyebrow {
+  color: var(--nt-muted);
+  letter-spacing: 0.14em;
+}
+
+.widget-surface {
+  background: var(--nt-paper);
+  border-color: var(--nt-text);
+  box-shadow: 0 5px 20px var(--nt-shadow);
+}
+.widget-peek-content {
+  grid-template-columns: minmax(0, 1fr);
+}
+.widget-brand {
+  gap: 9px;
+}
+.widget-brand > span {
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+}
+.widget-heading-logo {
+  margin-right: 0;
+}
+.widget-section-heading .eyebrow {
+  font-size: 11px;
+}
+.widget-section-heading > span:last-child {
+  background: transparent;
+  color: var(--nt-text);
+  border-radius: 0;
+}
+.widget-note-icon {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.widget-notes button {
+  border-radius: 0;
+  min-width: 0;
+}
+.widget-footer {
+  border-color: var(--nt-line);
+}
+.widget-new-note {
+  border-radius: 0;
+  box-shadow: none;
+  border-color: var(--bauhaus-blue);
+  background: var(--bauhaus-blue);
+  color: #fff !important;
+}
+.widget-new-note > span {
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.035em;
+}
+.widget-new-note .note-shortcut {
+  background: transparent;
+}
+
+@media (min-width: 1500px) {
+  .note-list-panel {
+    width: 350px;
+  }
+}
+@media (max-width: 1100px) and (min-width: 701px) {
+  .note-list-panel {
+    width: 280px;
+  }
+  .brand {
+    gap: 10px;
+    font-size: 26px;
+  }
+  .brand .brand-logo {
+    width: 48px;
+    height: 48px;
+  }
+  .list-heading {
+    padding-inline: 16px;
+  }
+  .list-heading h1 {
+    font-size: 24px;
+  }
+  .sidebar-new .notto-action {
+    padding-inline: 8px;
+    gap: 6px;
+  }
+}
+@container note-detail (max-width: 440px) {
+  .bauhaus-welcome {
+    min-height: 500px;
+    padding-top: 100px;
+  }
+  .bauhaus-welcome > .bauhaus-composition {
+    width: 38%;
+    right: -13%;
+    top: 34%;
+  }
+  .bauhaus-welcome p {
+    max-width: 90%;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+  }
+  .welcome-copy {
+    gap: 26px;
+  }
+}
+@media (max-width: 760px) {
+  .login-story {
+    padding: 22px 24px 28px;
+    gap: 12px;
+    border-bottom-color: var(--nt-text);
+  }
+  .login-intro {
+    display: block;
+    margin: 16px 0 0;
+  }
+  .login-intro h1 {
+    font-size: clamp(42px, 10vw, 64px);
+  }
+  .login-intro > .bauhaus-composition {
+    width: 150px;
+    right: -40px;
+    top: -30px;
+  }
+  .login-description {
+    font-size: 11px;
+    max-width: 74%;
+    margin-top: 18px;
+  }
+  .login-features {
+    display: none;
+  }
+  .login-brand img {
+    width: 36px;
+    height: 36px;
+  }
+  .login-brand {
+    font-size: 22px;
+  }
+  .login-form-side {
+    padding-top: 30px;
+    border-top: 0;
+  }
+  .login-card h2 {
+    font-size: 27px;
+  }
+}
+@media (max-width: 700px) {
+  .note-list-panel {
+    width: 100%;
+  }
+  .list-heading {
+    padding: 24px 65px 20px 62px;
+    min-height: 102px;
+  }
+  .list-heading h1 {
+    font-size: 25px;
+  }
+  .notebook[data-note-overview='true'] .floating-search-trigger {
+    top: auto;
+    bottom: 24px;
+    width: auto;
+  }
+  .sidebar-new .notto-action {
+    min-height: 44px;
+  }
+  .sidebar .nav-item {
+    min-height: 38px;
+  }
+  .note-list {
+    padding-bottom: 90px;
+  }
+  .tag-label {
+    font-size: 12px;
+  }
+}

@@ -14,19 +14,18 @@ import {
   FileText,
   FolderOpen,
   Hash,
-  Inbox,
   Menu,
   Pin,
   Plus,
-  Sparkles,
   Trash2,
   WifiOff,
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { Theme } from '@astryxdesign/core/theme';
-import { neutralTheme } from '@astryxdesign/theme-neutral/built';
+import { bauhausTheme } from './bauhaus-theme';
 import { useNotto } from './state';
 import { Action, Modal } from './components';
+import { BauhausComposition, GeometricMark, TagLabel, TagMark } from './Bauhaus';
 import { Editor } from './Editor';
 import { Settings } from './Settings';
 import { WebAccess } from './Login';
@@ -87,7 +86,7 @@ export default function App() {
     document.documentElement.classList.toggle('widget-document', widget && desktop);
   }, [widget]);
   return (
-    <Theme theme={neutralTheme} mode={mode}>
+    <Theme theme={bauhausTheme} mode={mode}>
       <WebAccess>
         {widget ? (
           <Widget />
@@ -375,8 +374,8 @@ function Notebook({
       <aside className="sidebar">
         <div className="sidebar-fixed">
           <div className="brand">
-            <img className="brand-logo" src="/noto.png" alt="" />
-            <span>noto</span>
+            <img className="brand-logo" src="/noto-bauhaus.svg" alt="" />
+            <span>NOTO</span>
           </div>
           <div className="sidebar-new">
             <Action
@@ -396,8 +395,13 @@ function Notebook({
         </div>
         <div className="sidebar-scroll">
           <nav aria-label="Notizbücher">
-            {nav('all', 'Alle Notizen', <Inbox size={18} />, active.length)}
-            {nav('pinned', 'Angeheftet', <Pin size={17} />, active.filter((n) => n.pinned).length)}
+            {nav('all', 'Alle Notizen', <GeometricMark shape="circle" tone="red" />, active.length)}
+            {nav(
+              'pinned',
+              'Angeheftet',
+              <GeometricMark shape="square" tone="ink" />,
+              active.filter((n) => n.pinned).length,
+            )}
             <button
               className={`nav-item ${knowledgeOpen ? 'active' : ''}`}
               aria-current={knowledgeOpen ? 'page' : undefined}
@@ -407,7 +411,7 @@ function Notebook({
                 setSidebar(false);
               }}
             >
-              <Sparkles size={18} />
+              <GeometricMark shape="triangle" tone="yellow" />
               <span>Wissen & KI</span>
             </button>
             <button
@@ -419,14 +423,14 @@ function Notebook({
                 setSidebar(false);
               }}
             >
-              <Check size={18} />
+              <GeometricMark shape="bar" tone="ink" />
               <span>Aufgaben</span>
               <span className="nav-count">{tasks.filter((t) => !t.done).length || ''}</span>
             </button>
             {nav(
               'archive',
               'Archiv',
-              <Archive size={17} />,
+              <GeometricMark shape="ring" tone="ink" />,
               notes.filter((n) => n.archived && !n.deleted).length,
             )}
           </nav>
@@ -466,7 +470,7 @@ function Notebook({
                     setSidebar(false);
                   }}
                 >
-                  <Hash size={15} />
+                  <TagMark name={t} />
                   <span>{t}</span>
                   <span className="nav-count">{count}</span>
                 </button>
@@ -771,7 +775,7 @@ function Notebook({
                       {tagsOf(n.content)
                         .slice(0, 3)
                         .map((t) => (
-                          <span key={t}>#{t}</span>
+                          <TagLabel key={t} name={t} />
                         ))}
                       {n.conflictOf && <span className="conflict-label">Konfliktkopie</span>}
                     </div>
@@ -849,28 +853,24 @@ function Notebook({
                 aiBackgroundEnabled={noteBackgroundId !== 'none'}
               />
             ) : (
-              <div className="welcome">
-                <div className="welcome-symbol">
-                  <PenGlyph />
+              <div className="welcome bauhaus-welcome">
+                <BauhausComposition />
+                <div className="welcome-copy">
+                  <h2>
+                    Denken.
+                    <br />
+                    Sammeln.
+                    <br />
+                    Ordnen.
+                  </h2>
+                  <p>
+                    Ideen, Begegnungen, Dinge für später.
+                    <br />
+                    Alles beginnt mit einem Gedanken.
+                  </p>
+                  <Action label="Neue Notiz" icon={<Plus size={18} />} variant="primary" onClick={openNew} />
+                  <span className="welcome-shortcut">{newNoteLabel} für eine neue Notiz</span>
                 </div>
-                <span className="eyebrow">PLATZ FÜR DEINE GEDANKEN</span>
-                <h2>
-                  Kleine Notiz.
-                  <br />
-                  Klarer Kopf.
-                </h2>
-                <p>
-                  Ideen, Begegnungen, Dinge für später.
-                  <br />
-                  Alles beginnt mit einem Gedanken.
-                </p>
-                <Action
-                  label="Etwas festhalten"
-                  icon={<Plus size={18} />}
-                  variant="primary"
-                  onClick={openNew}
-                />
-                <span className="welcome-shortcut">{newNoteLabel} für eine neue Notiz</span>
               </div>
             )}
           </section>
@@ -971,7 +971,7 @@ function Notebook({
                   setSidebar(false);
                 }}
               >
-                <Hash size={16} />
+                <TagMark name={name} />
                 <span>{name}</span>
                 <span className="nav-count">{count}</span>
               </button>
@@ -996,7 +996,4 @@ function Notebook({
       <IntelligenceWorker />
     </div>
   );
-}
-function PenGlyph() {
-  return <FileText size={32} strokeWidth={1.25} />;
 }

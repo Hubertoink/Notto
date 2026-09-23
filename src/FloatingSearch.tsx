@@ -139,8 +139,8 @@ export function FloatingSearch({
         {open && (
           <motion.div
             className="search-surface"
-            initial={reduced ? false : { opacity: 0, width: 130, height: 48, borderRadius: 28 }}
-            animate={{ opacity: 1, width: '100%', height: 'auto', borderRadius: 18 }}
+            initial={reduced ? false : { opacity: 0, width: 130, height: 48 }}
+            animate={{ opacity: 1, width: '100%', height: 'auto' }}
             transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 360, damping: 32 }}
           >
             <div className="search-field">

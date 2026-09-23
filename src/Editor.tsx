@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { Action, Modal, NoteMarkdown, NoteReferenceLink, readableDate, InlineImage } from './components';
 import { newNote, reviseNote, tagsOf, attachmentIds, titleOf, type Note, type Revision } from './domain';
+import { TagLabel } from './Bauhaus';
 import { PdfAttachment } from './PdfAttachment';
 import { repo } from './repository';
 import { useNotto } from './state';
@@ -904,7 +905,7 @@ export function Editor({
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => acceptSuggestion(suggestion.id)}
                   >
-                    {suggestion.label}
+                    {tagToken.kind === 'tag' ? <TagLabel name={suggestion.id} /> : suggestion.label}
                   </button>
                 ))}
                 {!suggestions.length && <p className="suggestions-empty">Keine passende Notiz</p>}
@@ -929,7 +930,7 @@ export function Editor({
           <div className="editor-tags">
             {tagsOf(content).map((tag) => (
               <span className="tag" key={tag}>
-                #{tag}
+                <TagLabel name={tag} />
               </span>
             ))}
           </div>

@@ -3,10 +3,10 @@ import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'motion/react';
 import '@astryxdesign/core/reset.css';
 import '@astryxdesign/core/astryx.css';
-import '@astryxdesign/theme-neutral/theme.css';
 import './styles.css';
 import App from './App';
 import { NottoProvider } from './state';
+import './bauhaus.css';
 
 class Boundary extends Component<{ children: ReactNode }, { error: string }> {
   state = { error: '' };

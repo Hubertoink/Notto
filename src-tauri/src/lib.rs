@@ -542,7 +542,7 @@ fn snap_widget(app: tauri::AppHandle, side: Option<String>) -> Result<String> {
 fn widget_mode(app: tauri::AppHandle, mode: String) -> Result<()> {
     let w = app.get_webview_window("widget").ok_or("Widget fehlt")?;
     let (width, height): (f64, f64) = match mode.as_str() {
-        "peek" => (368., 368.),
+        "peek" => (368., 316.),
         "edit" => (480., 430.),
         _ => (64., 118.),
     };

@@ -106,8 +106,8 @@ export function Widget() {
         initial={false}
         animate={{
           width: mode === 'idle' ? 48 : mode === 'peek' ? 352 : 464,
-          height: mode === 'idle' ? 102 : mode === 'peek' ? 352 : 414,
-          borderRadius: mode === 'idle' ? 24 : 20,
+          height: mode === 'idle' ? 102 : mode === 'peek' ? 300 : 414,
+          borderRadius: mode === 'idle' ? 4 : 2,
         }}
         transition={reduced ? { duration: 0 } : { duration: 0.29, ease: [0.22, 1, 0.36, 1] }}
         onPointerEnter={() => clearTimeout(close.current)}
@@ -131,7 +131,7 @@ export function Widget() {
                 change('peek');
               }}
             >
-              <img src="/noto.png" alt="" />
+              <img src="/noto-bauhaus.svg" alt="" />
             </button>
             <button
               className="widget-grip"
@@ -150,17 +150,15 @@ export function Widget() {
           </div>
         ) : mode === 'peek' ? (
           <motion.div
-            className="widget-peek"
+            className="widget-peek-content"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: reduced ? 0 : 0.09, duration: 0.12 }}
           >
             <div className="widget-heading">
               <button className="widget-brand" onClick={() => openMain(null)}>
-                <img className="widget-heading-logo" src="/noto.png" alt="" />
-                <span>
-                  noto<strong>.</strong>
-                </span>
+                <img className="widget-heading-logo" src="/noto-bauhaus.svg" alt="" />
+                <span>NOTO</span>
               </button>
               <div className="toolbar widget-toolbar">
                 <Action

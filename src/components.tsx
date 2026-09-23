@@ -132,7 +132,13 @@ export function Sources({
 }
 
 export function Action(props: ButtonProps) {
-  return <Button size="lg" {...props} className={`notto-action ${props.className || ''}`} />;
+  return (
+    <Button
+      size="lg"
+      {...props}
+      className={`notto-action notto-action--${props.variant || 'secondary'} ${props.className || ''}`}
+    />
+  );
 }
 export function Modal({
   title,

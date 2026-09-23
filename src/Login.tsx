@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, FileText, Tags, Sparkles } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { BauhausComposition, GeometricMark } from './Bauhaus';
 import { cloud, ownBackend } from './cloud';
 import { Action } from './components';
 import { useNotto } from './state';
@@ -13,7 +14,7 @@ export function WebAccess({ children }: { children: ReactNode }) {
   if (!authReady)
     return (
       <main className="login-loading" role="status">
-        <img src="/noto.png" alt="" />
+        <img src="/noto-bauhaus.svg" alt="" />
         Noto wird geöffnet …
       </main>
     );
@@ -64,29 +65,32 @@ export function Login() {
     <main className="login-page">
       <section className="login-story" aria-label="Noto">
         <a className="login-brand" href="/" aria-label="Noto Startseite">
-          <img src="/noto.png" alt="" />
-          <span>noto</span>
+          <img src="/noto-bauhaus.svg" alt="" />
+          <span>NOTO</span>
         </a>
         <div className="login-intro">
-          <img className="login-hero-logo" src="/noto.png" alt="" />
-          <p className="login-eyebrow">DEIN PLATZ FÜR GEDANKEN</p>
+          <BauhausComposition />
           <h1>
-            Ein Gedanke.
+            Denken.
             <br />
-            Alles kann daraus werden.
+            Sammeln.
+            <br />
+            Ordnen.
           </h1>
           <p className="login-description">
-            Ideen, Aufgaben und kleine Entdeckungen. Halte fest, was dir wichtig ist – und finde es wieder.
+            Ideen, Begegnungen, Dinge für später.
+            <br />
+            Alles beginnt mit einem Gedanken.
           </p>
           <div className="login-features">
             <span>
-              <FileText size={17} /> Deine Originale bleiben deine.
+              <GeometricMark shape="square" tone="red" /> Deine Originale bleiben deine.
             </span>
             <span>
-              <Tags size={17} /> Mit Tags verbunden.
+              <GeometricMark shape="circle" tone="blue" /> Mit Tags verbunden.
             </span>
             <span>
-              <Sparkles size={17} /> Auf Wunsch mit KI geordnet.
+              <GeometricMark shape="triangle" tone="yellow" /> Auf Wunsch mit KI geordnet.
             </span>
           </div>
         </div>

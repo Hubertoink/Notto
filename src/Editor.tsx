@@ -624,47 +624,6 @@ export function Editor({
           </div>
         )}
       </div>
-      {note && !compact && (
-        <NoteAnnotations
-          key={note.id}
-          note={note}
-          hasUnsavedChanges={dirty}
-          onRewrite={setRewriteRequest}
-          onAcceptRelation={async (relation: Relation) => {
-            if (dirty || saving || imageOperations.current > 0 || !note)
-              throw new Error('Bitte Änderungen zuerst speichern.');
-            const generation = editGeneration.current;
-            setSaving(true);
-            try {
-              await queue.current;
-              const source = await repo.get(scope, note.id);
-              const target = await repo.get(scope, relation.targetId);
-              if (!source || !target || !eligible(source) || !eligible(target))
-                throw new Error('Die Verknüpfung ist nicht mehr verfügbar.');
-              if (editGeneration.current !== generation || textRef.current !== source.content)
-                throw new Error('Der Text hat sich geändert. Bitte zuerst speichern und erneut prüfen.');
-              const next = applyRelation(source, target, relation);
-              const updated = reviseNote(source, { content: next });
-              await repo.put(updated, source.revision);
-              undoStack.current.push(textRef.current);
-              lastHistory.current = null;
-              setContent(next);
-              textRef.current = next;
-              initial.current = next;
-              base.current = updated.revision;
-              setCollections(updated.collections || []);
-              collectionRef.current = updated.collections || [];
-              initialCollectionRef.current = updated.collections || [];
-              await repo.removeDraft(scope, draftId);
-              setDraftStatus('Gespeichert');
-              onSaved(updated);
-            } finally {
-              setSaving(false);
-            }
-          }}
-          aiBackgroundEnabled={aiBackgroundEnabled}
-        />
-      )}
       {rewriteRequest !== null && (
         <Modal title="Notiz überarbeiten" className="rewrite-dialog" onClose={() => setRewriteRequest(null)}>
           <p className="rewrite-intro">Was möchtest du verbessern?</p>
@@ -1044,6 +1003,49 @@ export function Editor({
             )}
           </div>
         )}
+      </div>
+      {note && !compact && (
+        <NoteAnnotations
+          key={note.id}
+          note={note}
+          hasUnsavedChanges={dirty}
+          onRewrite={setRewriteRequest}
+          onAcceptRelation={async (relation: Relation) => {
+            if (dirty || saving || imageOperations.current > 0 || !note)
+              throw new Error('Bitte Änderungen zuerst speichern.');
+            const generation = editGeneration.current;
+            setSaving(true);
+            try {
+              await queue.current;
+              const source = await repo.get(scope, note.id);
+              const target = await repo.get(scope, relation.targetId);
+              if (!source || !target || !eligible(source) || !eligible(target))
+                throw new Error('Die Verknüpfung ist nicht mehr verfügbar.');
+              if (editGeneration.current !== generation || textRef.current !== source.content)
+                throw new Error('Der Text hat sich geändert. Bitte zuerst speichern und erneut prüfen.');
+              const next = applyRelation(source, target, relation);
+              const updated = reviseNote(source, { content: next });
+              await repo.put(updated, source.revision);
+              undoStack.current.push(textRef.current);
+              lastHistory.current = null;
+              setContent(next);
+              textRef.current = next;
+              initial.current = next;
+              base.current = updated.revision;
+              setCollections(updated.collections || []);
+              collectionRef.current = updated.collections || [];
+              initialCollectionRef.current = updated.collections || [];
+              await repo.removeDraft(scope, draftId);
+              setDraftStatus('Gespeichert');
+              onSaved(updated);
+            } finally {
+              setSaving(false);
+            }
+          }}
+          aiBackgroundEnabled={aiBackgroundEnabled}
+        />
+      )}
+      <div className="editor-controls">
         {error && (
           <div className="inline-error" role="alert">
             {error}

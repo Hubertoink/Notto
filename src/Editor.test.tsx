@@ -190,7 +190,13 @@ it('opens inline AI annotations and completes a task without changing the note',
     </Theme>,
   );
   const user = userEvent.setup();
-  await user.click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
+  const annotations = await screen.findByRole('button', { name: /KI-Anmerkungen/ });
+  const collections = screen.getByRole('button', { name: /Sammlungen/ });
+  const originalText = screen.getByText('Steam einrichten');
+  expect(collections.compareDocumentPosition(annotations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  await user.click(annotations);
+  expect(originalText.isConnected).toBe(true);
+  expect(collections.compareDocumentPosition(annotations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   const checkbox = await screen.findByRole('checkbox', { name: 'Steam einrichten erledigt' });
   await user.click(checkbox);
   await waitFor(() => expect((checkbox as HTMLInputElement).checked).toBe(true));

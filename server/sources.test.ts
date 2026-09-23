@@ -46,7 +46,8 @@ it('extracts actual PDF text before server analysis and persists page provenance
   expect(result).toHaveLength(2);
   expect(result[1]).toMatchObject({ text: 'Atlas has four PCs.', page: 1, attachment: id, noteId: note.id });
   expect(JSON.parse(query.mock.calls[0][1][2]).kind).toBe('extraction');
-});
+  // PDF.js initialization can exceed the default five seconds on a cold Windows runner.
+}, 20000);
 it('uses the newest extracted attachment and ignores detached attachments', async () => {
   const id = `${crypto.randomUUID()}.pdf`,
     note = newNote('alice', `[Projekt](attachments/${id})`);

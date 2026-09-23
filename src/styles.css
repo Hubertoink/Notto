@@ -655,6 +655,10 @@ textarea:focus-visible {
   flex: 0 0 auto;
   min-width: 0;
 }
+.editor-controls {
+  flex: 0 0 auto;
+  min-width: 0;
+}
 .editor-body {
   display: flex;
   flex-direction: column;

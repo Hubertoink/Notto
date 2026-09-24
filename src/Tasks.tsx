@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, useRef, type CSSProperties } from 'react';
-import { Sparkles, X, WandSparkles, RefreshCw, Globe } from 'lucide-react';
+import { Sparkles, X, WandSparkles, RefreshCw, Globe, ListTodo, Link2, FileText } from 'lucide-react';
 import {
   analyze,
   research as researchNote,
@@ -21,7 +21,7 @@ import { aiAnnotationBackgrounds } from './note-backgrounds';
 import { compactParenthesizedLines } from './annotation-markdown';
 import './tasks.css';
 import { RelationSuggestions } from './RelationSuggestions';
-import { visibleRelations, type Relation } from './note-relations';
+import { visibleRelations, linkedTo, relationKey, type RelationBatch, type Relation } from './note-relations';
 import { eligible } from './intelligence';
 import { AttachmentTitle } from './AttachmentTitle';
 
@@ -103,6 +103,10 @@ export function TasksPage({ tasks, onOpen }: { tasks: Task[]; onOpen: (id: strin
       <p className="muted">
         {tasks.filter((t) => !t.done).length} offen · {tasks.filter((t) => t.done).length} erledigt.{' '}
         <Sparkles size={14} /> kennzeichnet KI-Vorschläge.
+      </p>
+      <p className="muted">
+        Hake Aufgaben ab, wenn sie erledigt sind oder du sie nicht weiterverfolgen möchtest.
+        Rechercheergebnisse bleiben in den KI-Anmerkungen erhalten.
       </p>
       <form
         className="task-create"
@@ -244,6 +248,42 @@ export function NoteAnnotations({
     seen.add(key);
     return true;
   });
+  const acceptedKeys = new Set(
+    records
+      .filter(
+        (r) =>
+          r.scope === note.scope &&
+          r.kind === 'relation-decision' &&
+          (r.data as { status: string }).status === 'accepted',
+      )
+      .map((r) => (r.data as { key: string }).key),
+  );
+  const acceptedLinks = new Set(
+    records
+      .filter((r) => r.scope === note.scope && r.kind === 'note-relations')
+      .flatMap((r) => (r.data as RelationBatch).suggestions || [])
+      .filter(
+        (r) =>
+          r.sourceId === note.id &&
+          acceptedKeys.has(relationKey(r)) &&
+          linkedTo(note, r.targetId) &&
+          notes.some((n) => n.id === r.targetId && !n.deleted),
+      )
+      .map((r) => r.targetId),
+  ).size;
+  const indicators = [
+    { Icon: Globe, count: uniqueResearch.length, label: 'Recherche vorhanden', state: 'complete' },
+    { Icon: ListTodo, count: tasks.filter((t) => !t.done).length, label: 'Aufgaben offen', state: 'pending' },
+    {
+      Icon: ListTodo,
+      count: tasks.filter((t) => t.done).length,
+      label: 'Aufgaben erledigt',
+      state: 'complete',
+    },
+    { Icon: Link2, count: relations.length, label: 'Verlinkungen offen', state: 'pending' },
+    { Icon: Link2, count: acceptedLinks, label: 'Verlinkungen übernommen', state: 'complete' },
+    { Icon: FileText, count: insights.length, label: 'PDF-Anmerkungen vorhanden', state: 'complete' },
+  ].filter((indicator) => indicator.count > 0);
   return (
     <motion.div
       layout={!reduced && !docked}
@@ -259,7 +299,7 @@ export function NoteAnnotations({
       <div className="annotation-heading">
         <button
           ref={trigger}
-          className={`annotation-toggle ${tasks.length || insights.length || uniqueResearch.length || relations.length ? 'has-annotations' : ''}`}
+          className={`annotation-toggle ${indicators.length ? 'has-annotations' : ''}`}
           aria-expanded={expanded}
           onClick={() => {
             toggle(!expanded);
@@ -268,7 +308,17 @@ export function NoteAnnotations({
         >
           <Sparkles size={17} />
           <span>KI-Anmerkungen</span>
-          <span>{tasks.length + insights.length + uniqueResearch.length + relations.length || ''}</span>
+          {indicators.map(({ Icon, count, label, state }) => (
+            <span
+              key={label}
+              className={`annotation-indicator ${state}`}
+              title={`${label}: ${count}`}
+              aria-label={`${label}: ${count}`}
+            >
+              <Icon size={16} aria-hidden="true" /> <span>{count}</span>
+              <span className="annotation-indicator-label">{label}</span>
+            </span>
+          ))}
         </button>
         {expanded && (
           <button
@@ -294,6 +344,14 @@ export function NoteAnnotations({
             style={{ overflow: 'hidden' }}
           >
             <div className="annotation-panel">
+              <div className="annotation-status-list" aria-label="Anmerkungen nach Kategorie">
+                {indicators.map(({ Icon, count, label, state }) => (
+                  <span key={label} className={`annotation-indicator ${state}`}>
+                    <Icon size={16} aria-hidden="true" />
+                    {count} {label}
+                  </span>
+                ))}
+              </div>
               {excluded && <p className="inline-error">{excluded}</p>}
               <div className="annotation-actions">
                 {onRewrite && (

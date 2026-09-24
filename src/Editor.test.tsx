@@ -182,6 +182,7 @@ it('opens inline AI annotations and completes a task without changing the note',
   await knowledge.append(note, 'analysis', {
     suggestions: [{ kind: 'task', title: 'Steam einrichten', detail: 'Vier PCs', quote: note.content }],
   });
+  await knowledge.append(note, 'research', { text: 'Recherche bleibt erhalten.', sources: [] });
   render(
     <Theme theme={neutralTheme}>
       <NottoProvider>
@@ -191,6 +192,8 @@ it('opens inline AI annotations and completes a task without changing the note',
   );
   const user = userEvent.setup();
   const annotations = await screen.findByRole('button', { name: /KI-Anmerkungen/ });
+  await waitFor(() => expect(annotations.textContent).toContain('Aufgaben offen'));
+  expect(annotations.textContent).toContain('Recherche vorhanden');
   const collections = screen.getByRole('button', { name: /Sammlungen/ });
   const originalText = screen.getByText('Steam einrichten');
   expect(collections.compareDocumentPosition(annotations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -200,6 +203,9 @@ it('opens inline AI annotations and completes a task without changing the note',
   const checkbox = await screen.findByRole('checkbox', { name: 'Steam einrichten erledigt' });
   await user.click(checkbox);
   await waitFor(() => expect((checkbox as HTMLInputElement).checked).toBe(true));
+  await screen.findByRole('button', { name: /KI-Anmerkungen.*Aufgaben erledigt/ });
+  expect(screen.queryByRole('button', { name: /KI-Anmerkungen.*Aufgaben offen/ })).toBeNull();
+  expect(screen.getByRole('button', { name: /KI-Anmerkungen/ }).textContent).toContain('Recherche vorhanden');
   expect(await repo.get('local', note.id)).toEqual(note);
 });
 it('shows a PDF reading note with its source page in AI annotations', async () => {
@@ -270,12 +276,23 @@ it('accepts a supported theory link and exposes a backlink on the target note', 
     </Theme>,
   );
   const user = userEvent.setup();
+  await screen.findByRole('button', { name: /KI-Anmerkungen.*Verlinkungen offen/ });
   await user.click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
   await user.click(await screen.findByRole('button', { name: 'Verknüpfung übernehmen' }));
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect((await repo.get('local', source.id))?.content).toBe(
     `Unser Konzept braucht ein [gemeinsames Leitbild](notes/${target.id}).`,
   );
+  const updatedSource = (await repo.get('local', source.id))!;
+  view.rerender(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={updatedSource} onSaved={saved} />
+      </NottoProvider>
+    </Theme>,
+  );
+  await screen.findByRole('button', { name: /KI-Anmerkungen.*Verlinkungen übernommen/ });
+  expect(screen.queryByRole('button', { name: /KI-Anmerkungen.*Verlinkungen offen/ })).toBeNull();
   view.unmount();
   render(
     <Theme theme={neutralTheme}>

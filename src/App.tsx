@@ -757,6 +757,10 @@ function Notebook({
             active={knowledgeOpen}
             tab={knowledgeTab}
             onTabChange={setKnowledgeTab}
+            onOpenTasks={() => {
+              setKnowledgeOpen(false);
+              setTasksOpen(true);
+            }}
             onOpen={(id) => {
               setKnowledgeOpen(false);
               setTasksOpen(false);

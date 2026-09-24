@@ -141,6 +141,39 @@
   color: var(--nt-text);
   background: var(--nt-paper);
 }
+.annotation-shell .annotation-toggle {
+  flex-wrap: wrap;
+  white-space: normal;
+  min-width: 0;
+}
+.annotation-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.annotation-indicator.pending {
+  color: light-dark(#795700, #f4cf65);
+}
+.annotation-indicator.complete {
+  color: light-dark(#21643b, #94d9a9);
+}
+.annotation-status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.annotation-indicator-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
 .annotation-panel {
   padding: 16px;
   padding-top: 6px;

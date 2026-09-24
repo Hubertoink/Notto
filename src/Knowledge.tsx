@@ -196,11 +196,13 @@ export function Knowledge({
   onOpen,
   tab: selectedTab,
   onTabChange,
+  onOpenTasks,
 }: {
   active?: boolean;
   onOpen: (id: string) => void;
   tab?: string;
   onTabChange?: (tab: string) => void;
+  onOpenTasks?: () => void;
 }) {
   const { scope, notes } = useNotto();
   const [serverJobs, setServerJobs] = useState<BackgroundJob[]>([]);
@@ -440,7 +442,6 @@ export function Knowledge({
         {[
           ['overview', 'Überblick'],
           ['organize', 'Notizsekretär'],
-          ['task', 'Aufgabenvorschläge'],
           ['contact', 'Kontakte'],
           ['topic', 'Themen'],
           ['files', 'Anhänge'],
@@ -752,13 +753,15 @@ export function Knowledge({
             />
           )}
           <div className="knowledge-summary">
-            <h3>
-              {included.length} freigegebene Notizen · {entries.length} Vorschläge
-            </h3>
+            <h3>{included.length} freigegebene Notizen</h3>
             <p>
-              Analysiere gespeicherte Notizen oder aktiviere die Hintergrundanalyse. Die KI erzeugt zunächst
-              Vorschläge. Du entscheidest über die Übernahme.
+              Aufgaben findest du unter „Aufgaben“ und direkt in den KI-Anmerkungen deiner Notizen. Dort
+              kannst du sie abhaken. Verlinkungen und Recherchen findest du in den KI-Anmerkungen; Kontakte
+              und Themen in den gleichnamigen Reitern.
             </p>
+            <button className="text-button" onClick={onOpenTasks}>
+              Aufgaben öffnen
+            </button>
             <Action
               label="Offene Analysen starten"
               variant="primary"
@@ -838,6 +841,13 @@ export function Knowledge({
               onClick={() => void run('Wissen synchronisieren', () => knowledge.sync(scope))}
             />
           )}
+        </section>
+      ) : tab === 'task' ? (
+        <section>
+          <p>Aufgaben verwaltest du jetzt zentral unter „Aufgaben“.</p>
+          <button className="text-button" onClick={onOpenTasks}>
+            Aufgaben öffnen
+          </button>
         </section>
       ) : tab === 'topic' ? (
         <Topics

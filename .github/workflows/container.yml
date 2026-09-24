@@ -33,6 +33,8 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64
-          tags: ${{ vars.REGISTRY_HOST }}/notto:${{ github.sha }}
+          tags: |
+            ${{ vars.REGISTRY_HOST }}/notto:${{ github.sha }}
+            ${{ vars.REGISTRY_HOST }}/notto:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

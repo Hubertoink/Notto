@@ -35,6 +35,14 @@ PDF-Text und OCR werden über die bestehenden Anhangfunktionen erzeugt und als s
 
 ## Aktualisieren
 
+### Updates mit `latest` in mStudio
+
+Der GitHub-Workflow **Notto container** veröffentlicht nach erfolgreichen Tests dasselbe Image unter der vollständigen Commit-ID und unter `p-wqa66m.project.space/notto:latest`. `latest` bezeichnet den zuletzt erfolgreich veröffentlichten Container-Build von `main`; der Workflow wird weiterhin manuell gestartet.
+
+In mStudio im **App-Stack** einmalig bei **app und worker** das Image auf `p-wqa66m.project.space/notto:latest` setzen. Für jedes weitere Update nach Abschluss des GitHub-Workflows das Image erneut pullen und beide Container neu erstellen (Recreate). Ein Neustart allein garantiert nicht, dass ein neues Image geladen wird. Die Registry selbst und die Datenbank bleiben unverändert; Umgebungsvariablen, Ports und Volumes beibehalten.
+
+`latest` aktualisiert laufende Container nicht automatisch. Für eine Rückkehr zu einer älteren Version bei beiden Diensten den vollständigen Commit-Tag der gewünschten Version einsetzen, pullen und neu erstellen. Nach jedem Update `https://noto-app.de/api/health` und die Weboberfläche prüfen.
+
 Wenn Zugangsdaten in mStudio geändert wurden, für reine Code-Updates **nur die Images aktualisieren**, damit die aktuelle Serverkonfiguration erhalten bleibt:
 
 ```sh

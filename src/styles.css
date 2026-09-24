@@ -1467,10 +1467,16 @@ textarea:focus-visible {
   height: 100%;
   min-height: 0;
 }
+.editor-compact .editor-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
 .editor-compact .editor-content {
   margin-top: 13px;
-  min-height: 100px;
-  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 .editor-compact textarea {
   min-height: 100px;
@@ -1728,7 +1734,7 @@ textarea:focus-visible {
     padding: 19px;
   }
   .editor-compact .editor-content {
-    min-height: 80px;
+    min-height: 0;
   }
   .editor-compact .editor-footer {
     gap: 6px;
@@ -1740,7 +1746,7 @@ textarea:focus-visible {
     padding: 19px;
   }
   .widget-document .editor-compact .editor-content {
-    min-height: 100px;
+    min-height: 0;
   }
   .widget-document .editor-compact .editor-footer {
     flex-wrap: nowrap;

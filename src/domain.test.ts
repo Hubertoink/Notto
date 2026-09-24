@@ -81,4 +81,12 @@ describe('original notes', () => {
       'Siehe und .',
     );
   });
+  it('omits inline images so the preview shows the surrounding text', () => {
+    expect(
+      excerptOf(
+        'Cocktails-Ideensammlung\nEine lose Sammlung. ![Bild](attachments/a.png) ![Bild](attachments/b.png) Weitere Ideen.',
+      ),
+    ).toBe('Eine lose Sammlung. Weitere Ideen.');
+    expect(excerptOf('Nur Bilder\n![Bild](attachments/a.png) ![Bild](attachments/b.png)')).toBe('');
+  });
 });

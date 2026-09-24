@@ -595,7 +595,7 @@ export async function research(note: Note, item: Suggestion) {
         if (a.type === 'url_citation' && /^https?:\/\//.test(a.url))
           sources.push({ title: a.title || a.url, url: a.url });
   if (!sources.length)
-    throw new Error('Keine zitierbaren Webquellen gefunden. Es werden keine Kontaktdaten übernommen.');
+    throw new Error('Keine zitierbaren Webquellen gefunden. Die Recherche wurde nicht gespeichert.');
   const current = await repo.get(note.scope, note.id);
   if (!current || !eligible(current) || !currentContent(current, contentRevision(note))) return;
   await knowledge.append({ ...note, revision: contentRevision(note) }, 'research', {

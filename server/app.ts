@@ -106,7 +106,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '1.1.1' };
+    return { ok: true, version: '1.1.4' };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (
@@ -353,14 +353,17 @@ export async function buildApp(db: Database, env: Environment) {
         excludedNotes: z.array(uuid).max(10000),
       })
       .parse(req.body);
+    const previousSettings = (
+      await db.query('SELECT document FROM ai_settings WHERE user_id=$1', [req.nottoUser!.id])
+    ).rows[0]?.document;
     await db.query(
       'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
       [req.nottoUser!.id, JSON.stringify(document)],
     );
     if (document.enabled && document.auto)
       await db.query(
-        "UPDATE jobs SET status='pending',attempts=0,available_at=now() WHERE user_id=$1 AND (status IN ('skipped','failed') OR (kind='analysis' AND status='done'))",
-        [req.nottoUser!.id],
+        "UPDATE jobs SET status='pending',attempts=0,available_at=now() WHERE user_id=$1 AND (status IN ('skipped','failed') OR ($2 AND kind='analysis' AND status='done'))",
+        [req.nottoUser!.id, document.autoResearch && !previousSettings?.autoResearch],
       );
     return { ok: true };
   });

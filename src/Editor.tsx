@@ -45,6 +45,7 @@ import { collectionNames, createCollection } from './collections';
 import { rewriteNote } from './rewrite';
 import { applyRelation, type Relation } from './note-relations';
 import { eligible } from './intelligence';
+import { tagPopupPosition } from './tag-popup';
 
 export function Editor({
   note,
@@ -200,16 +201,13 @@ export function Editor({
       );
       const bounds = marker.getClientRects()[0] || marker.getBoundingClientRect();
       const left = rect.left + el.clientLeft + bounds.left - el.scrollLeft;
-      const top = rect.top + el.clientTop + bounds.bottom - el.scrollTop + 4;
-      if (top < rect.top || top > rect.bottom + 4 || top >= window.innerHeight - 12) {
+      const belowTop = rect.top + el.clientTop + bounds.bottom - el.scrollTop + 4;
+      const aboveBottom = rect.top + el.clientTop + bounds.top - el.scrollTop - 4;
+      if (belowTop < rect.top || belowTop > rect.bottom + 4) {
         setTagPosition(null);
         return;
       }
-      setTagPosition({
-        left: Math.max(8, Math.min(left, window.innerWidth - 228)),
-        top,
-        maxHeight: Math.max(0, Math.min(200, window.innerHeight - top - 8)),
-      });
+      setTagPosition(tagPopupPosition(left, belowTop, aboveBottom, window.innerWidth, window.innerHeight));
     };
     update();
     window.addEventListener('resize', update);

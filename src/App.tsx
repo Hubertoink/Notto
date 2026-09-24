@@ -91,7 +91,20 @@ function navigationFromUrl() {
     selected: params.get('note'),
     creating: params.get('new') === '1',
     knowledge: params.get('knowledge') === '1',
+    knowledgeTab: [
+      'overview',
+      'organize',
+      'task',
+      'contact',
+      'topic',
+      'files',
+      'memory',
+      'settings',
+    ].includes(params.get('tab') || '')
+      ? params.get('tab')!
+      : 'overview',
     tasks: params.get('tasks') === '1',
+    settings: params.get('settings') === '1',
   };
 }
 export default function App() {
@@ -182,7 +195,7 @@ function Notebook({
             (!tag || tagsOf(d.content).includes(tag)) && (!collection || d.collections?.includes(collection)),
         )
       : [];
-  const [settings, setSettings] = useState(false);
+  const [settings, setSettings] = useState(initialNavigation.settings);
   const [isExpanded, toggleExpanded] = useSidebarDisclosure(scope);
   const [allTags, setAllTags] = useState(false);
   const toggleTags = (open: boolean) => {
@@ -191,7 +204,10 @@ function Notebook({
     } else setAllTags(open);
   };
   const [knowledgeOpen, setKnowledgeOpen] = useState(initialNavigation.knowledge);
+  const [knowledgeTab, setKnowledgeTab] = useState(initialNavigation.knowledgeTab);
   const [tasksOpen, setTasksOpen] = useState(initialNavigation.tasks);
+  const historyInitialized = useRef(false);
+  const restoringHistory = useRef(false);
   const records = useKnowledgeRecords(scope);
   const tasks = tasksFor(notes, records, scope);
   const openTaskNote = (id: string) => {
@@ -218,11 +234,13 @@ function Notebook({
       active = false;
     };
   }, [notify]);
-  useEffect(() => {
+  const restoreNavigation = () => {
     const navigation = navigationFromUrl();
     setSelected(navigation.selected);
     setKnowledgeOpen(navigation.knowledge);
+    setKnowledgeTab(navigation.knowledgeTab);
     setTasksOpen(navigation.tasks);
+    setSettings(navigation.settings);
     setCreating(navigation.creating);
     setSearchOpen(false);
     setAllTags(false);
@@ -230,7 +248,19 @@ function Notebook({
     setTag(navigation.tag);
     setCollection(navigation.collection);
     setView(navigation.view);
+  };
+  useEffect(() => {
+    restoringHistory.current = true;
+    restoreNavigation();
   }, [scope]);
+  useEffect(() => {
+    const onPopState = () => {
+      restoringHistory.current = true;
+      restoreNavigation();
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
   useEffect(() => {
     const params = new URLSearchParams();
     if (view !== 'all') params.set('view', view);
@@ -239,14 +269,17 @@ function Notebook({
     if (selected) params.set('note', selected);
     if (creating) params.set('new', '1');
     if (knowledgeOpen) params.set('knowledge', '1');
+    if (knowledgeOpen && knowledgeTab !== 'overview') params.set('tab', knowledgeTab);
     if (tasksOpen) params.set('tasks', '1');
+    if (settings) params.set('settings', '1');
     const query = params.toString();
-    window.history.replaceState(
-      null,
-      '',
-      `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
-    );
-  }, [view, tag, collection, selected, creating, knowledgeOpen, tasksOpen]);
+    const url = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
+    const replace = !historyInitialized.current || restoringHistory.current;
+    historyInitialized.current = true;
+    restoringHistory.current = false;
+    if (url !== `${window.location.pathname}${window.location.search}${window.location.hash}`)
+      window.history[replace ? 'replaceState' : 'pushState']({ noto: true }, '', url);
+  }, [view, tag, collection, selected, creating, knowledgeOpen, knowledgeTab, tasksOpen, settings]);
   const active = notes.filter((n) => !n.deleted && !n.archived);
   const tagCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -722,6 +755,8 @@ function Notebook({
           <Knowledge
             key={scope}
             active={knowledgeOpen}
+            tab={knowledgeTab}
+            onTabChange={setKnowledgeTab}
             onOpen={(id) => {
               setKnowledgeOpen(false);
               setTasksOpen(false);
@@ -771,7 +806,7 @@ function Notebook({
                     <span className="draft-label">Entwurf · lokal</span>
                   </div>
                   <h2>{titleOf(draft.content)}</h2>
-                  <p>{excerptOf(draft.content).slice(0, 155)}</p>
+                  {excerptOf(draft.content) && <p>{excerptOf(draft.content).slice(0, 155)}</p>}
                 </button>
               ))}
               {loading ? (
@@ -837,7 +872,7 @@ function Notebook({
                       {n.pinned && <Pin size={13} />}
                     </div>
                     <h2>{titleOf(n.content)}</h2>
-                    <p>{excerptOf(n.content).slice(0, 155)}</p>
+                    {excerptOf(n.content) && <p>{excerptOf(n.content).slice(0, 155)}</p>}
                     <div className="note-card-tags">
                       {tagsOf(n.content)
                         .slice(0, 3)

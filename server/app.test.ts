@@ -26,6 +26,45 @@ const headers = (secret?: string) => ({
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
 });
+it('keeps completed analyses completed after a model switch but schedules newly enabled research', async () => {
+  const note = newNote(alice, 'Music Assistant auf dem Heimserver prüfen');
+  await app.inject({
+    method: 'POST',
+    url: '/api/notes/push',
+    headers: headers(aToken),
+    payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
+  });
+  const settings = {
+    enabled: true,
+    auto: true,
+    autoResearch: false,
+    model: 'gpt-4.1-mini',
+    excludedTags: '',
+    excludedNotes: [],
+  };
+  const save = (payload: typeof settings) =>
+    app.inject({ method: 'PUT', url: '/api/ai/settings', headers: headers(aToken), payload });
+  await save(settings);
+  await pg.query("UPDATE jobs SET status='done' WHERE note_id=$1 AND kind='analysis'", [note.id]);
+  expect((await save({ ...settings, model: 'gpt-5-mini' })).statusCode).toBe(200);
+  expect(
+    (
+      await pg.query<{ status: string }>("SELECT status FROM jobs WHERE note_id=$1 AND kind='analysis'", [
+        note.id,
+      ])
+    ).rows[0].status,
+  ).toBe('done');
+  await save({ ...settings, autoResearch: true });
+  expect(
+    (
+      await pg.query<{ status: string }>("SELECT status FROM jobs WHERE note_id=$1 AND kind='analysis'", [
+        note.id,
+      ])
+    ).rows[0].status,
+  ).toBe('pending');
+  await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+  await pg.query('DELETE FROM jobs WHERE note_id=$1', [note.id]);
+});
 it('checks theory links in two stages without sending private notes and rejects revoked targets', async () => {
   const source = newNote(alice, 'Die Jugendhauskonzeption braucht ein Leitbild.');
   const target = newNote(alice, 'Leitbildentwicklung verbindet Werte und Handlungsziele.');

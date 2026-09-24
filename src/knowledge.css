@@ -227,6 +227,50 @@
 .knowledge-row-actions button {
   font-size: 12px !important;
 }
+.knowledge-files-heading,
+.organization-results-heading,
+.organization-result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.knowledge-files-heading h2,
+.organization-results-heading h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+.knowledge-files-heading p,
+.organization-results-heading p {
+  margin: 0;
+}
+.knowledge-files-heading details {
+  max-width: 420px;
+  color: var(--nt-muted);
+  font-size: 13px;
+}
+.knowledge-files-heading summary {
+  cursor: pointer;
+  white-space: nowrap;
+}
+.knowledge-file-table {
+  min-width: 760px;
+}
+.knowledge-file-table th:first-child,
+.knowledge-file-table td:first-child {
+  width: 23%;
+}
+.knowledge-file-table th:nth-child(2),
+.knowledge-file-table td:nth-child(2) {
+  width: 23%;
+}
+.knowledge-file-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.knowledge-file-table .knowledge-row-actions {
+  min-width: 280px;
+}
 .topic-note-links {
   display: grid;
   gap: 5px;
@@ -235,23 +279,141 @@
   text-align: left;
   font-size: 13px;
 }
+.organization-compose {
+  gap: 20px;
+  padding: clamp(20px, 3vw, 32px);
+}
+.organization-intro {
+  max-width: 700px;
+}
+.organization-eyebrow {
+  color: var(--nt-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.organization-intro h2 {
+  margin: 8px 0;
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1.15;
+}
+.organization-intro p {
+  margin: 0;
+  line-height: 1.5;
+}
+.knowledge-content .organization-request {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-weight: 700;
+}
 .organization textarea {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  margin: 12px 0;
+  margin: 0;
   padding: 12px;
   font: inherit;
+  font-weight: 400;
   resize: vertical;
   color: inherit;
   background: var(--nt-paper);
   border: 1px solid var(--nt-line);
   border-radius: 8px;
 }
-.organization-proposal {
-  margin-top: 20px;
-  padding-top: 16px;
+.organization-compose-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+.organization-submit {
+  border: 1px solid var(--bauhaus-blue);
+  background: var(--bauhaus-blue);
+  color: white;
+  padding: 11px 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.organization-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.organization-compose-footer .muted {
+  font-size: 13px;
+}
+.organization-run-info {
+  color: var(--nt-muted);
+  font-size: 12px;
+}
+.organization-run-info p {
+  margin: 8px 0 0;
+}
+.organization-results-heading {
+  align-items: end;
+  margin-top: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--nt-line);
+}
+.organization-results-heading h2 {
+  margin-top: 5px;
+}
+.organization-empty {
+  padding: 24px;
+  border: 1px dashed var(--nt-line);
+}
+.organization-result {
+  gap: 22px;
+}
+.organization-result-header {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--nt-line);
+}
+.organization-result-header h3 {
+  margin: 6px 0;
+  font-size: 21px;
+}
+.organization-result-header p {
+  margin: 0;
+}
+.organization-result-count {
+  flex: none;
+  color: var(--nt-muted);
+  font-size: 12px;
+}
+.organization-result-section {
+  display: grid;
+  gap: 10px;
+}
+.organization-result-section h4,
+.organization-group-heading {
+  margin: 0;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.organization-claim {
+  padding: 12px 0;
   border-top: 1px solid var(--nt-line);
+}
+.organization-claim p {
+  margin: 0;
+  line-height: 1.5;
+}
+.organization-proposal {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--nt-line);
+}
+.organization-proposal h5 {
+  margin: 0;
+  font-size: 16px;
+}
+.organization-proposal p {
+  margin: 0;
 }
 .organization-source blockquote {
   margin: 8px 0 12px;
@@ -272,6 +434,11 @@
   max-width: 780px;
 }
 @media (max-width: 700px) {
+  .knowledge-files-heading,
+  .organization-result-header {
+    flex-direction: column;
+    gap: 8px;
+  }
   .knowledge-table {
     min-width: 480px;
   }

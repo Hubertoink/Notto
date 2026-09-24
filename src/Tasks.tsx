@@ -1,8 +1,9 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, useRef, type CSSProperties } from 'react';
-import { Sparkles, X, WandSparkles, RefreshCw } from 'lucide-react';
+import { Sparkles, X, WandSparkles, RefreshCw, Globe } from 'lucide-react';
 import {
   analyze,
+  research as researchNote,
   config,
   knowledge,
   type Analysis,
@@ -15,7 +16,7 @@ import { addTask, checkTask, newest, noteAnalysis, tasksFor, type Task } from '.
 import { useNotto } from './state';
 import { Sources, NoteMarkdown } from './components';
 import type { Note } from './domain';
-import { attachmentIds, currentContent } from './domain';
+import { attachmentIds, currentContent, titleOf } from './domain';
 import { aiAnnotationBackgrounds } from './note-backgrounds';
 import { compactParenthesizedLines } from './annotation-markdown';
 import './tasks.css';
@@ -193,12 +194,19 @@ export function NoteAnnotations({
     } else setOpen(next);
   };
   const reduced = useReducedMotion();
-  const refresh = async () => {
+  const refresh = async (web = false) => {
     if (updating || hasUnsavedChanges) return;
     setUpdating(true);
     setUpdateError('');
     try {
-      await analyze(note);
+      if (web)
+        await researchNote(note, {
+          kind: 'topic',
+          title: titleOf(note.content),
+          detail: note.content,
+          quote: note.content.slice(0, 4000),
+        });
+      else await analyze(note);
     } catch (error) {
       setUpdateError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -301,7 +309,18 @@ export function NoteAnnotations({
                   <RefreshCw size={15} />
                   {updating ? 'Wird aktualisiert …' : 'Aktualisieren'}
                 </button>
+                <button
+                  className="annotation-command annotation-command-secondary"
+                  disabled={updating || hasUnsavedChanges || !!excluded}
+                  onClick={() => void refresh(true)}
+                >
+                  <Globe size={15} /> Webrecherche starten
+                </button>
               </div>
+              <p className="muted small">
+                Aktualisieren analysiert diese Notiz erneut. Webrecherche ergänzt Hintergrundwissen zu ihren
+                Themen und Links mit Quellen.
+              </p>
               {analysis && !currentContent(note, analysis.revision) && (
                 <p className="muted small">Anmerkungen zur früheren Textversion.</p>
               )}

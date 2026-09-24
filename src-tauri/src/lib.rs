@@ -590,6 +590,7 @@ pub fn run() {
                 WebviewUrl::App("index.html?window=widget".into()),
             )
             .title("Noto · Schnellnotiz")
+            .disable_drag_drop_handler()
             .inner_size(64., 118.)
             .decorations(false)
             .transparent(true)

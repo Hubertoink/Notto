@@ -87,7 +87,7 @@ export function Organization({
   return (
     <section className="knowledge-section organization" aria-label="Notizsekretär">
       <form
-        className="knowledge-card"
+        className="knowledge-card organization-compose"
         onSubmit={(event) => {
           event.preventDefault();
           void run(async () => {
@@ -96,24 +96,30 @@ export function Organization({
           });
         }}
       >
-        <label htmlFor="organization-request">Was soll Noto in deinen Notizen ordnen oder klären?</label>
-        <textarea
-          id="organization-request"
-          rows={3}
-          maxLength={1000}
-          value={instruction}
-          disabled={busy}
-          onChange={(event) => setInstruction(event.target.value)}
-          placeholder="Zum Beispiel: Fasse den aktuellen Stand des Medienraums zusammen und finde ergänzende oder widersprüchliche Notizen."
-        />
-        <p className="muted">
-          Noto liest passende Notizen und schlägt eine belegte Übersicht, Zusammenhänge und Sammlungen vor. Du
-          entscheidest über die Übernahme.
-        </p>
-        <div className="settings-actions">
+        <div className="organization-intro">
+          <span className="organization-eyebrow">Neuer Auftrag</span>
+          <h2>Was möchtest du klären?</h2>
+          <p className="muted">
+            Beschreibe ein Thema oder eine offene Frage. Noto sucht passende Notizen und zeigt dir belegte
+            Vorschläge.
+          </p>
+        </div>
+        <label className="organization-request" htmlFor="organization-request">
+          <span>Dein Auftrag</span>
+          <textarea
+            id="organization-request"
+            rows={3}
+            maxLength={1000}
+            value={instruction}
+            disabled={busy}
+            onChange={(event) => setInstruction(event.target.value)}
+            placeholder="Zum Beispiel: Was ist der aktuelle Stand des Medienraums? Finde ergänzende oder widersprüchliche Notizen."
+          />
+        </label>
+        <div className="organization-compose-footer">
           <button
             type="submit"
-            className="text-button"
+            className="organization-submit"
             disabled={busy || !instruction.trim() || !config(scope).enabled}
           >
             Notizen organisieren
@@ -123,11 +129,15 @@ export function Organization({
               Abbrechen
             </button>
           )}
+          <span className="muted">Vorschläge werden erst nach deiner Bestätigung übernommen.</span>
         </div>
-        <small className="muted">
-          Bis zu acht KI-Anfragen je Durchlauf. Eine bereits laufende Anfrage kann beim Abbrechen noch
-          abgeschlossen werden.
-        </small>
+        <details className="organization-run-info">
+          <summary>Hinweis zum Durchlauf</summary>
+          <p className="muted small">
+            Bis zu acht KI-Anfragen je Durchlauf. Eine bereits laufende Anfrage kann beim Abbrechen noch
+            abgeschlossen werden.
+          </p>
+        </details>
       </form>
       {progress && <p role="status">{progress}</p>}
       {error && (
@@ -135,8 +145,19 @@ export function Organization({
           {error}
         </p>
       )}
+      <div className="organization-results-heading">
+        <div>
+          <span className="organization-eyebrow">Deine Ergebnisse</span>
+          <h2>Übersichten und Vorschläge</h2>
+        </div>
+        {organizations.length > 0 && (
+          <span className="knowledge-status">
+            {organizations.length} {organizations.length === 1 ? 'Durchlauf' : 'Durchläufe'}
+          </span>
+        )}
+      </div>
       {!organizations.length && (
-        <p className="muted">Hier erscheinen deine Übersichten und Ordnungsvorschläge.</p>
+        <p className="organization-empty muted">Nach deinem ersten Auftrag erscheinen hier die Ergebnisse.</p>
       )}
       {organizations.slice(0, 20).map((record) => {
         const parsed = organizationRecordSchema.safeParse(record.data);
@@ -161,7 +182,7 @@ export function Organization({
         };
         if (!current)
           return (
-            <article key={record.id} className="knowledge-card">
+            <article key={record.id} className="knowledge-card organization-result organization-stale">
               <p>
                 Eine Quelle dieser Übersicht wurde geändert oder ausgeschlossen. Bitte den Auftrag erneut
                 starten.
@@ -169,15 +190,22 @@ export function Organization({
             </article>
           );
         return (
-          <article key={record.id} className="knowledge-card">
-            <h3>{data.title}</h3>
-            <p className="muted">
-              {data.request} · {new Date(record.at).toLocaleDateString('de')}
-            </p>
-            {data.claims.length > 0 && (
+          <article key={record.id} className="knowledge-card organization-result">
+            <header className="organization-result-header">
               <div>
+                <span className="organization-eyebrow">{new Date(record.at).toLocaleDateString('de')}</span>
+                <h3>{data.title}</h3>
+                <p className="muted">{data.request}</p>
+              </div>
+              <span className="organization-result-count">
+                {data.sources.length} {data.sources.length === 1 ? 'Quelle' : 'Quellen'}
+              </span>
+            </header>
+            {data.claims.length > 0 && (
+              <section className="organization-result-section" aria-label="Übersicht">
+                <h4>Übersicht</h4>
                 {data.claims.map((claim, index) => (
-                  <div key={index}>
+                  <div className="organization-claim" key={index}>
                     <p>
                       {claim.kind === 'conflict' ? (
                         <strong>Widerspruch: </strong>
@@ -193,13 +221,13 @@ export function Organization({
                   </div>
                 ))}
                 {buttons(record, 'overview', current)}
-              </div>
+              </section>
             )}
+            {data.relations.length > 0 && <h4 className="organization-group-heading">Zusammenhänge</h4>}
             {data.relations.map((relation, index) => (
-              <div className="organization-proposal" key={`relation:${index}`}>
-                <h4>Zusammenhang · {relationLabels[relation.kind]}</h4>
+              <section className="organization-proposal" key={`relation:${index}`}>
+                <h5>{relationLabels[relation.kind]}</h5>
                 {source(relation.from.index)}
-                <p>{relationLabels[relation.kind]}</p>
                 {source(relation.to.index)}
                 <p>{relation.reason}</p>
                 <details>
@@ -208,11 +236,12 @@ export function Organization({
                   {source(relation.to.index, relation.to.quote)}
                 </details>
                 {buttons(record, `relation:${index}`, current)}
-              </div>
+              </section>
             ))}
+            {data.collections.length > 0 && <h4 className="organization-group-heading">Sammlungen</h4>}
             {data.collections.map((collection, index) => (
-              <div className="organization-proposal" key={`collection:${index}`}>
-                <h4>Sammlung · {collection.name}</h4>
+              <section className="organization-proposal" key={`collection:${index}`}>
+                <h5>{collection.name}</h5>
                 {source(collection.source.index)}
                 <p>{collection.reason}</p>
                 <details>
@@ -220,7 +249,7 @@ export function Organization({
                   {source(collection.source.index, collection.source.quote)}
                 </details>
                 {buttons(record, `collection:${index}`, current)}
-              </div>
+              </section>
             ))}
             {data.insufficient && (
               <p className="muted">Die vorhandenen Quellen reichen nur für eine teilweise Einordnung.</p>

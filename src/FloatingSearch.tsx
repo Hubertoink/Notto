@@ -240,7 +240,7 @@ export function FloatingSearch({
                   }}
                 >
                   <strong>{titleOf(n.content)}</strong>
-                  <span>{excerptOf(n.content)}</span>
+                  {excerptOf(n.content) && <span>{excerptOf(n.content)}</span>}
                   {related.some((r) => r.id === n.id) && <small>Sinngemäßer KI-Treffer</small>}
                   {n.archived && <small>Archiv</small>}
                 </button>

@@ -191,7 +191,17 @@ export function IntelligenceWorker() {
   return null;
 }
 
-export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen: (id: string) => void }) {
+export function Knowledge({
+  active = true,
+  onOpen,
+  tab: selectedTab,
+  onTabChange,
+}: {
+  active?: boolean;
+  onOpen: (id: string) => void;
+  tab?: string;
+  onTabChange?: (tab: string) => void;
+}) {
   const { scope, notes } = useNotto();
   const [serverJobs, setServerJobs] = useState<BackgroundJob[]>([]);
   const [jobsLoaded, setJobsLoaded] = useState(false);
@@ -226,8 +236,10 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
       clearInterval(timer);
     };
   }, [scope, active]);
-  const [records, setRecords] = useState<KnowledgeRecord[]>([]),
-    [tab, setTab] = useState('overview');
+  const [records, setRecords] = useState<KnowledgeRecord[]>([]);
+  const [localTab, setLocalTab] = useState('overview');
+  const tab = selectedTab ?? localTab;
+  const setTab = onTabChange ?? setLocalTab;
   const [settings, setSettings] = useState<AIConfig>(() => config(scope));
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
@@ -385,6 +397,20 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
     }
   };
   const included = notes.filter(eligible);
+  const fileEntries = included.flatMap((note) =>
+    attachmentIds(note.content).map((id) => ({
+      note,
+      id,
+      extraction: records
+        .filter(
+          (record) =>
+            record.kind === 'extraction' &&
+            record.noteId === note.id &&
+            (record.data as { id?: string }).id === id,
+        )
+        .sort((a, b) => b.at.localeCompare(a.at))[0],
+    })),
+  );
   const entries = included.flatMap((note) => {
     const record = latest(records, 'analysis', note);
     return ((record?.data as Analysis)?.suggestions || [])
@@ -559,7 +585,8 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
           </label>
           <p id="model-description" className="muted small">
             Automatisch von OpenAI geladen. Angezeigt werden verfügbare Modelle der unterstützten
-            Analysefamilien. Die Auswahl gilt auch für Hintergrundanalysen.
+            Analysefamilien. Die Auswahl gilt für neue Analysen und Recherchen. Vorhandene Ergebnisse bleiben
+            erhalten; einzelne Notizen kannst du manuell erneut analysieren.
           </p>
           {modelsLoading && (
             <p role="status" className="muted small">
@@ -631,59 +658,84 @@ export function Knowledge({ active = true, onOpen }: { active?: boolean; onOpen:
         </fieldset>
       ) : tab === 'files' ? (
         <section className="knowledge-section">
-          <p className="muted">
-            PDF-Text wird lokal gelesen. OCR sendet Bilder oder gescannte Seiten an OpenAI. Höchstens 100
-            PDF-Seiten, davon maximal fünf gescannte Seiten pro OCR-Aufruf. Lesbarer PDF-Text fließt bei der
-            Analyse in die KI-Anmerkungen der Notiz ein.
-          </p>
-          {included.flatMap((note) =>
-            attachmentIds(note.content).map((id) => (
-              <article className="knowledge-card" key={`${note.id}:${id}`}>
-                <button className="text-button" onClick={() => onOpen(note.id)}>
-                  {titleOf(note.content)}
-                </button>
-                <p>
-                  <AttachmentTitle content={note.content} scope={note.scope} id={id} />
-                </p>
-                <div className="settings-actions">
-                  {id.endsWith('.pdf') && (
-                    <Action
-                      label="PDF-Text lesen"
-                      isDisabled={!!busy}
-                      onClick={() => void run('PDF auslesen', () => extract(note, id))}
-                    />
-                  )}
-                  <Action
-                    label="Texterkennung mit KI"
-                    isDisabled={!!busy}
-                    onClick={() => void run('Text erkennen', () => extract(note, id, true))}
-                  />
-                  <Action
-                    label="Erkannten Text ansehen"
-                    isDisabled={
-                      !records.some(
-                        (r) => r.kind === 'extraction' && r.noteId === note.id && (r.data as any).id === id,
-                      )
-                    }
-                    onClick={() => {
-                      const r = records
-                        .filter(
-                          (r) => r.kind === 'extraction' && r.noteId === note.id && (r.data as any).id === id,
-                        )
-                        .sort((a, b) => b.at.localeCompare(a.at))[0];
-                      setSource({
-                        title: 'Erkannter Text · bitte prüfen',
-                        text: (r.data as { pages: Evidence[] }).pages
-                          .map((p) => `${p.page ? `Seite ${p.page}\n` : ''}${p.text}`)
-                          .join('\n\n'),
-                      });
-                    }}
-                  />
-                </div>
-              </article>
-            )),
+          <div className="knowledge-files-heading">
+            <div>
+              <h2>Anhänge</h2>
+              <p className="muted">
+                {fileEntries.length} {fileEntries.length === 1 ? 'Datei' : 'Dateien'} in deinen Notizen
+              </p>
+            </div>
+            <details>
+              <summary>Texterkennung</summary>
+              <p className="muted">
+                PDF-Text wird lokal gelesen. OCR sendet Bilder oder gescannte Seiten an OpenAI (maximal 100
+                PDF-Seiten, davon fünf gescannte Seiten je Aufruf).
+              </p>
+            </details>
+          </div>
+          {fileEntries.length > 0 && (
+            <div className="knowledge-table-wrap" role="region" aria-label="Anhangsliste" tabIndex={0}>
+              <table className="knowledge-table knowledge-file-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Datei</th>
+                    <th scope="col">Notiz</th>
+                    <th scope="col">Typ</th>
+                    <th scope="col">Text</th>
+                    <th scope="col">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fileEntries.map(({ note, id, extraction }) => (
+                    <tr key={`${note.id}:${id}`}>
+                      <td className="knowledge-file-name">
+                        <AttachmentTitle content={note.content} scope={note.scope} id={id} />
+                      </td>
+                      <td>
+                        <button className="text-button knowledge-note-title" onClick={() => onOpen(note.id)}>
+                          {titleOf(note.content)}
+                        </button>
+                      </td>
+                      <td className="knowledge-status">
+                        {id.toLowerCase().endsWith('.pdf') ? 'PDF' : 'Bild'}
+                      </td>
+                      <td className="knowledge-status">{extraction ? 'Erkannt' : 'Offen'}</td>
+                      <td>
+                        <div className="knowledge-row-actions">
+                          {id.toLowerCase().endsWith('.pdf') && (
+                            <Action
+                              label="PDF lesen"
+                              isDisabled={!!busy}
+                              onClick={() => void run('PDF auslesen', () => extract(note, id))}
+                            />
+                          )}
+                          <Action
+                            label="OCR starten"
+                            isDisabled={!!busy}
+                            onClick={() => void run('Text erkennen', () => extract(note, id, true))}
+                          />
+                          {extraction && (
+                            <Action
+                              label="Text ansehen"
+                              onClick={() =>
+                                setSource({
+                                  title: 'Erkannter Text · bitte prüfen',
+                                  text: (extraction.data as { pages: Evidence[] }).pages
+                                    .map((page) => `${page.page ? `Seite ${page.page}\n` : ''}${page.text}`)
+                                    .join('\n\n'),
+                                })
+                              }
+                            />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-          {!included.some((n) => attachmentIds(n.content).length) && (
+          {!fileEntries.length && (
             <p>Noch keine freigegebenen Anhänge. Füge im Editor ein Bild oder PDF hinzu.</p>
           )}
         </section>

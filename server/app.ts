@@ -1,4 +1,5 @@
 import { memorySchema } from '../src/memory-policy.js';
+import { commandRoutes } from './command-routes.js';
 import { organizationRecordSchema, organizationDecisionSchema } from '../src/agent-policy.js';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
@@ -386,6 +387,7 @@ export async function buildApp(db: Database, env: Environment) {
     if (!settings?.enabled) fail('KI zuerst für dieses Notizbuch aktivieren.', 403);
     return openai(db, req.nottoUser!.id, p.endpoint, p.body, env);
   });
+  commandRoutes(app, db, env);
   if (env.staticDir) {
     await app.register(staticFiles, { root: resolve(env.staticDir) });
     app.setNotFoundHandler((req, reply) =>

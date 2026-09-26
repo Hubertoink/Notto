@@ -1,0 +1,166 @@
+.command-hint {
+  margin: 14px 0 20px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.note-commands {
+  margin: 24px 0;
+  padding: 18px;
+  border: 1px solid var(--nt-line);
+  background: var(--nt-paper);
+}
+.command-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.command-heading > span {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--nt-muted);
+}
+.command-composer {
+  padding: 12px;
+  margin: 12px 0;
+  border: 1px solid var(--nt-line);
+  border-left: 3px solid var(--nt-accent);
+}
+.command-composer p {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.note-commands code {
+  font-weight: 700;
+  color: inherit;
+}
+.note-commands button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.command-run {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--nt-line);
+}
+.command-run header {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 12px;
+}
+.command-run header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.command-run time {
+  opacity: 0.6;
+}
+.command-run header button {
+  margin-left: auto;
+}
+.command-request {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  margin-bottom: 6px;
+}
+.command-run > small {
+  color: var(--nt-muted);
+  font-size: 12px;
+}
+.command-summary {
+  white-space: pre-wrap;
+  line-height: 1.65;
+}
+.command-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+  gap: 12px;
+}
+.command-card {
+  min-width: 0;
+  border: 1px solid var(--nt-line);
+}
+.command-card > div {
+  padding: 14px;
+}
+.command-card h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+.command-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.command-card a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+}
+.command-card small {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: var(--nt-muted);
+}
+.note-commands .command-image {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: #fff;
+  cursor: zoom-in;
+}
+.command-image img {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: scale-down;
+}
+.command-image-full {
+  max-width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+}
+.command-image-loading {
+  min-height: 100px;
+  display: grid;
+  place-items: center;
+}
+.command-error {
+  color: var(--nt-error);
+}
+.command-warnings {
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  padding-left: 18px;
+}
+.command-sources {
+  margin-top: 14px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.command-spin {
+  animation: command-spin 1.5s linear infinite;
+}
+@keyframes command-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .command-spin {
+    animation: none;
+  }
+}

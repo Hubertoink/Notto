@@ -178,7 +178,7 @@ export function createNottoClient(url: string): SupabaseClient {
   // implemented above are used; no Supabase service is involved in this adapter.
   return adapter as unknown as SupabaseClient;
 }
-export async function serverRequest(url: string, path: string, body?: unknown) {
+export async function serverRequest(url: string, path: string, body?: unknown, blob = false) {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (desktop) {
@@ -193,6 +193,7 @@ export async function serverRequest(url: string, path: string, body?: unknown) {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(15000),
   });
+  if (response.ok && blob) return response.blob();
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'Serverfehler');
   return result;

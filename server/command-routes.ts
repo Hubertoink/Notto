@@ -1,0 +1,121 @@
+import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import { currentContent, contentRevision } from '../src/domain.js';
+import { noteAllowed } from '../src/evidence-policy.js';
+import { commandUrls } from '../src/note-command.js';
+import type { AIEnvironment } from './openai.js';
+import { limit, type Database } from './database.js';
+import { publicUrl } from './browser-network.js';
+
+const fields = 'id,note_id,revision,prompt,status,stage,error,result,created_at';
+const fail = (message: string, statusCode: number): never => {
+  throw Object.assign(new Error(message), { statusCode });
+};
+export function commandRoutes(app: FastifyInstance, db: Database, env: AIEnvironment) {
+  app.get('/api/commands', async (req) => {
+    const { noteId } = z.object({ noteId: z.uuid() }).parse(req.query);
+    return {
+      commands: (
+        await db.query(
+          `SELECT ${fields} FROM note_commands WHERE user_id=$1 AND note_id=$2 ORDER BY created_at DESC LIMIT 50`,
+          [req.nottoUser!.id, noteId],
+        )
+      ).rows,
+    };
+  });
+  app.put('/api/commands/:id', async (req) => {
+    const id = z.uuid().parse((req.params as { id: string }).id);
+    const input = z
+      .object({ noteId: z.uuid(), revision: z.uuid(), prompt: z.string().trim().min(1).max(4000) })
+      .parse(req.body);
+    const user = req.nottoUser!.id;
+    const existing = (
+      await db.query(`SELECT ${fields} FROM note_commands WHERE user_id=$1 AND id=$2`, [user, id])
+    ).rows[0];
+    if (existing) {
+      if (
+        existing.note_id !== input.noteId ||
+        existing.prompt !== input.prompt ||
+        existing.revision !== input.revision
+      )
+        fail('Auftrag-ID wird bereits verwendet.', 409);
+      return { command: existing };
+    }
+    if (!env.openaiKey) fail('OpenAI ist auf dem Server noch nicht eingerichtet.', 503);
+    const row = (
+      await db.query(
+        'SELECT n.document,s.document AS settings FROM notes n LEFT JOIN ai_settings s ON s.user_id=n.user_id WHERE n.user_id=$1 AND n.id=$2',
+        [user, input.noteId],
+      )
+    ).rows[0];
+    if (!row || row.document.deleted) fail('Notiz nicht gefunden.', 404);
+    if (!row.settings?.enabled || !noteAllowed(row.document, row.settings))
+      fail('KI für diese Notiz zuerst in „Wissen & KI“ freigeben.', 403);
+    if (!currentContent(row.document, input.revision))
+      fail('Bitte die aktuelle Notiz zuerst synchronisieren.', 409);
+    if (row.document.content.length > 60000)
+      fail('Für einen KI-Auftrag darf die Notiz höchstens 60.000 Zeichen enthalten.', 400);
+    try {
+      for (const url of commandUrls(input.prompt)) publicUrl(url);
+    } catch (e) {
+      fail(e instanceof Error ? e.message : 'Ungültiger Link.', 400);
+    }
+    await limit(db, `commands:${user}`, 12, 3600);
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [user]);
+      const active = (
+        await client.query(
+          "SELECT count(*)::int AS count FROM note_commands WHERE user_id=$1 AND status IN ('pending','running')",
+          [user],
+        )
+      ).rows[0].count;
+      if (active >= 3) fail('Es laufen bereits drei Aufträge. Bitte einen abschließen oder abbrechen.', 429);
+      await client.query(
+        'INSERT INTO note_commands(id,user_id,note_id,revision,prompt,note_content,model) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING',
+        [
+          id,
+          user,
+          input.noteId,
+          contentRevision(row.document),
+          input.prompt,
+          row.document.content,
+          row.settings.model,
+        ],
+      );
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+    return {
+      command: (await db.query(`SELECT ${fields} FROM note_commands WHERE user_id=$1 AND id=$2`, [user, id]))
+        .rows[0],
+    };
+  });
+  app.put('/api/commands/:id/cancel', async (req) => {
+    const id = z.uuid().parse((req.params as { id: string }).id);
+    await db.query(
+      "UPDATE note_commands SET status='cancelled',stage='Abgebrochen',lease_until=NULL,updated_at=now() WHERE id=$1 AND user_id=$2 AND status IN ('pending','running')",
+      [id, req.nottoUser!.id],
+    );
+    return { ok: true };
+  });
+  app.get('/api/commands/:id/images/:imageId', async (req, reply) => {
+    const { id, imageId } = z.object({ id: z.uuid(), imageId: z.uuid() }).parse(req.params);
+    const image = (
+      await db.query(
+        "SELECT i.bytes FROM command_images i JOIN note_commands c ON c.id=i.command_id WHERE i.id=$1 AND c.id=$2 AND c.user_id=$3 AND c.status='done'",
+        [imageId, id, req.nottoUser!.id],
+      )
+    ).rows[0];
+    if (!image) fail('Bild nicht gefunden.', 404);
+    return reply
+      .type('image/jpeg')
+      .header('Cache-Control', 'private, no-store')
+      .send(Buffer.from(image.bytes));
+  });
+}

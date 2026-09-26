@@ -1,4 +1,5 @@
 import { knowledgeRole, uniqueSources } from '../src/knowledge-policy.js';
+import { workCommandOnce } from './command-worker.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { contentRevision, currentContent } from '../src/domain.js';
@@ -20,6 +21,7 @@ function text(response: any) {
   );
 }
 export async function workOnce(db: Database, env: AIEnvironment) {
+  if (await workCommandOnce(db, env)) return true;
   const { rows } = await db.query(
     "UPDATE jobs SET status='running',error=NULL,lease_until=now()+interval '4 minutes',attempts=attempts+1 WHERE id=(SELECT id FROM jobs WHERE (status='pending' AND (available_at<=now() OR error='Tageslimit erreicht. Fortsetzung am nächsten UTC-Tag.')) OR (status='running' AND lease_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *",
   );

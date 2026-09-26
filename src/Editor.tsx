@@ -46,6 +46,11 @@ import { rewriteNote } from './rewrite';
 import { applyRelation, type Relation } from './note-relations';
 import { eligible } from './intelligence';
 import { tagPopupPosition } from './tag-popup';
+import { NoteCommands } from './NoteCommands';
+import { noteCommands } from './note-command';
+import { readCloudConfig, syncNotes } from './cloud';
+import { serverRequest } from './backend';
+import { contentRevision } from './domain';
 
 export function Editor({
   note,
@@ -485,6 +490,7 @@ export function Editor({
       clearTimeout(statusTimer.current);
       notify('Notiz gespeichert');
       onSaved(saved);
+      return saved;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -726,7 +732,15 @@ export function Editor({
           }}
         >
           {preview ? (
-            <NoteMarkdown content={content || '*Noch kein Text.*'} scope={scope} />
+            <NoteMarkdown
+              content={
+                noteCommands(content).reduceRight(
+                  (text, command) => text.slice(0, command.start) + text.slice(command.end),
+                  content,
+                ) || '*KI-Auftrag in dieser Notiz*'
+              }
+              scope={scope}
+            />
           ) : (
             <div className="inline-note-editor">
               {segments.map((segment, index) =>
@@ -885,6 +899,42 @@ export function Editor({
                 );
               })}
           </div>
+        )}
+        {!compact && (
+          <NoteCommands
+            key={`${scope}:${note?.id || 'new'}`}
+            content={content}
+            noteId={note?.id}
+            scope={scope}
+            editing={!preview}
+            dirty={dirty}
+            onStart={async (prompt, id) => {
+              try {
+                const saved = dirty || !note ? await save() : note;
+                if (!saved)
+                  throw new Error(
+                    'Die Notiz konnte nicht gespeichert werden. Bitte den Hinweis im Editor prüfen.',
+                  );
+                // An in-flight sync may have read the notebook before this save.
+                // Wait for it, then run a pass that includes the saved revision.
+                const conflicts = (await syncNotes(scope)) + (await syncNotes(scope));
+                if (conflicts)
+                  throw new Error(
+                    'Es gibt eine Konfliktkopie. Bitte zuerst die gewünschte Notizfassung öffnen.',
+                  );
+                const result = await serverRequest(readCloudConfig().url, `/commands/${id}`, {
+                  noteId: saved.id,
+                  revision: contentRevision(saved),
+                  prompt,
+                });
+                return result.command;
+              } catch (error) {
+                // Saving a new note remounts this editor; keep failures visible.
+                notify(error instanceof Error ? error.message : 'Auftrag konnte nicht gestartet werden.');
+                throw error;
+              }
+            }}
+          />
         )}
         {tagsOf(content).length > 0 && (
           <div className="editor-tags">

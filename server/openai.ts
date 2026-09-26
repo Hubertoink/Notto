@@ -18,6 +18,7 @@ export async function openai(
   endpoint: string,
   body: Record<string, unknown>,
   env: AIEnvironment,
+  signal?: AbortSignal,
 ) {
   if (!env.openaiKey)
     throw Object.assign(new Error('OpenAI ist auf dem Server noch nicht eingerichtet.'), { statusCode: 503 });
@@ -94,7 +95,7 @@ export async function openai(
     method: 'POST',
     headers,
     body: payload,
-    signal: AbortSignal.timeout(120000),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000),
   });
   const result = (await response.json()) as { error?: { message?: string } };
   if (!response.ok)

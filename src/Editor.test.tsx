@@ -303,6 +303,39 @@ it('shows a PDF reading note with its source page in AI annotations', async () =
   expect(screen.getByText('Jugendliche gestalten den Raum.')).toBeTruthy();
   expect(screen.getByText(/Seite 3/)).toBeTruthy();
 });
+it('saves checklist changes directly from reading mode as text revisions', async () => {
+  const note = newNote('local', 'Essensliste\n\n- [ ] Toilettenpapier\n- [x] Milch');
+  await repo.put(note, null);
+  const saved = vi.fn();
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={saved} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const user = userEvent.setup();
+  await screen.findByRole('checkbox', { name: 'Toilettenpapier erledigen' });
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('checkbox', { name: 'Toilettenpapier erledigen' }) as HTMLInputElement).disabled,
+    ).toBe(false),
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'Toilettenpapier erledigen' }));
+  await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+  const updated = (await repo.get('local', note.id))!;
+  expect(updated.content).toContain('- [x] Toilettenpapier');
+  expect(updated.history.at(-2)?.content).toBe(note.content);
+  await screen.findByRole('checkbox', { name: 'Milch wieder öffnen' });
+  await waitFor(() =>
+    expect((screen.getByRole('checkbox', { name: 'Milch wieder öffnen' }) as HTMLInputElement).disabled).toBe(
+      false,
+    ),
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'Milch wieder öffnen' }));
+  await waitFor(() => expect(saved).toHaveBeenCalledTimes(2));
+  expect((await repo.get('local', note.id))?.content).toContain('- [ ] Milch');
+});
 it('accepts a supported theory link and exposes a backlink on the target note', async () => {
   const source = newNote('local', 'Unser Konzept braucht ein gemeinsames Leitbild.');
   const target = newNote('local', 'Leitbildentwicklung: gemeinsame Werte und Beteiligung.');

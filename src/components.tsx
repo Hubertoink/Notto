@@ -16,6 +16,7 @@ import { uniqueSources } from './knowledge-policy';
 import { excerptOf, titleOf } from './domain';
 import { imageLayout, noteImages, updateImageLayout } from './image-layout';
 import { parseNoteLink, relationLabels, type NoteLinkTarget } from './note-links';
+import { markdownTasks } from './note-tools';
 
 function NoteReferencePreview({
   targets,
@@ -625,7 +626,17 @@ function MarkdownImage({
     </>
   );
 }
-export function NoteMarkdown({ content, scope }: { content: string; scope: string }) {
+export function NoteMarkdown({
+  content,
+  scope,
+  onTaskChange,
+  taskDisabled = false,
+}: {
+  content: string;
+  scope: string;
+  onTaskChange?: (index: number, checked: boolean) => void;
+  taskDisabled?: boolean;
+}) {
   const readingContent = useMemo(() => {
     let result = content;
     for (const image of noteImages(content)
@@ -644,6 +655,7 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
       (match) => (match.startsWith('```') || match.startsWith('~~~') ? match : ''),
     );
   }, [content]);
+  const tasks = useMemo(() => markdownTasks(readingContent), [readingContent]);
   // Stable component types keep loaded attachments mounted during save/status updates.
   const components = useMemo<Components>(
     () => ({
@@ -680,10 +692,29 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
     }),
     [scope],
   );
+  let taskIndex = 0;
+  const interactiveComponents: Components = {
+    ...components,
+    input: ({ node: _node, type, checked, ...props }) => {
+      if (type !== 'checkbox') return <input type={type} {...props} />;
+      const index = taskIndex++;
+      const task = tasks[index];
+      const next = !checked;
+      return (
+        <input
+          type="checkbox"
+          checked={!!checked}
+          disabled={!onTaskChange || taskDisabled}
+          aria-label={`${task?.label || `Aufgabe ${index + 1}`} ${next ? 'erledigen' : 'wieder öffnen'}`}
+          onChange={() => onTaskChange?.(index, next)}
+        />
+      );
+    },
+  };
   return (
     <div className="markdown">
       <ImageGallery content={content} scope={scope} />
-      <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
+      <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={interactiveComponents}>
         {readingContent}
       </Markdown>
     </div>

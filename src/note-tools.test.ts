@@ -6,7 +6,9 @@ import {
   noteLink,
   noteReferenceIds,
   formatText,
+  markdownTasks,
   normalizeCollections,
+  toggleMarkdownTask,
 } from './note-tools';
 import { noteLinkHref } from './note-links';
 
@@ -38,6 +40,17 @@ it('finds every target stored behind the same visible term', () => {
   const second = newNote('local', 'Zweites Ziel');
   const href = noteLinkHref([{ id: first.id }, { id: second.id, relation: 'context' }]);
   expect(noteReferenceIds(`[Gemeinsamer Begriff](${href})`)).toEqual([first.id, second.id]);
+});
+
+it('toggles the selected Markdown task while ignoring code examples', () => {
+  const content =
+    '- [ ] Erste Aufgabe\n- [x] Zweite Aufgabe\n\n```md\n- [ ] Nur ein Beispiel\n```\n\n    - [ ] Codeblock';
+  expect(markdownTasks(content).map((task) => [task.label, task.checked])).toEqual([
+    ['Erste Aufgabe', false],
+    ['Zweite Aufgabe', true],
+  ]);
+  expect(toggleMarkdownTask(content, 1, false)).toContain('- [ ] Zweite Aufgabe');
+  expect(toggleMarkdownTask(content, 0, true)).toContain('- [x] Erste Aufgabe');
 });
 
 it('formats selections and removes formatting without losing surrounding text', () => {

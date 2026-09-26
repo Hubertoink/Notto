@@ -25,6 +25,40 @@ export function backlinks(note: Note, notes: Note[]): Note[] {
   );
 }
 
+export function markdownTasks(content: string) {
+  const tasks: { checked: boolean; checkOffset: number; label: string }[] = [];
+  let offset = 0;
+  let fence = '';
+  let lastContentLine = '';
+  for (const line of content.split('\n')) {
+    const structural = line.replace(/^ {0,3}(?:> ?)+/, '');
+    const fenceMarker = structural.match(/^ {0,3}(`{3,}|~{3,})/);
+    if (fenceMarker) {
+      if (!fence) fence = fenceMarker[1];
+      else if (fenceMarker[1][0] === fence[0] && fenceMarker[1].length >= fence.length) fence = '';
+    } else if (!fence) {
+      const match = line.match(/^(\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+)\[([ xX])\](?:\s+(.*)|\s*)$/);
+      const indent = line.match(/^ */)?.[0].length || 0;
+      const nestedList = /^(\s*(?:>\s*)*(?:[-+*]|\d+[.)])\s+)/.test(lastContentLine);
+      if (match && (indent < 4 || nestedList))
+        tasks.push({
+          checked: match[2].toLowerCase() === 'x',
+          checkOffset: offset + match[1].length + 1,
+          label: (match[3] || `Aufgabe ${tasks.length + 1}`).replace(/[*_`~]/g, '').trim(),
+        });
+    }
+    if (line.trim()) lastContentLine = line;
+    offset += line.length + 1;
+  }
+  return tasks;
+}
+
+export function toggleMarkdownTask(content: string, index: number, checked: boolean) {
+  const task = markdownTasks(content)[index];
+  if (!task || task.checked === checked) return content;
+  return content.slice(0, task.checkOffset) + (checked ? 'x' : ' ') + content.slice(task.checkOffset + 1);
+}
+
 export type Format =
   'bold' | 'italic' | 'heading' | 'bullet' | 'number' | 'task' | 'quote' | 'link' | 'table';
 export function formatText(text: string, start: number, end: number, kind: Format) {

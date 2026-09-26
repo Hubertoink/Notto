@@ -5,6 +5,7 @@ import {
   noteLink,
   formatText,
   normalizeCollections,
+  toggleMarkdownTask,
   type Format,
 } from './note-tools';
 import { createPortal } from 'react-dom';
@@ -510,6 +511,40 @@ export function Editor({
       setSaving(false);
     }
   }
+  async function toggleReadingTask(index: number, checked: boolean) {
+    if (!note || saving || !ready || imageOperations.current > 0) return;
+    const before = textRef.current;
+    const next = toggleMarkdownTask(before, index, checked);
+    if (next === before) return;
+    setSaving(true);
+    setError('');
+    setSaveConflict(false);
+    try {
+      await queue.current;
+      const current = await repo.get(scope, note.id);
+      if (!current) throw new Error('Die ursprüngliche Notiz ist nicht mehr verfügbar.');
+      if (current.revision !== base.current || textRef.current !== before)
+        throw new Error('Die Notiz wurde inzwischen geändert. Bitte erneut versuchen.');
+      const updated = reviseNote(current, { content: next, collections });
+      await repo.put(updated, current.revision);
+      await repo.removeDraft(scope, draftId);
+      undoStack.current = [...undoStack.current.slice(-49), before];
+      lastHistory.current = null;
+      setContent(next);
+      textRef.current = next;
+      initial.current = next;
+      base.current = updated.revision;
+      setDraftStatus('Gespeichert');
+      ++editGeneration.current;
+      clearTimeout(statusTimer.current);
+      notify(checked ? 'Aufgabe erledigt' : 'Aufgabe wieder geöffnet');
+      onSaved(updated);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
+    }
+  }
   async function addFiles(files: File[]) {
     if (!files.length) return;
     imageOperations.current++;
@@ -796,6 +831,8 @@ export function Editor({
                 ) || '*KI-Auftrag in dieser Notiz*'
               }
               scope={scope}
+              onTaskChange={(index, checked) => void toggleReadingTask(index, checked)}
+              taskDisabled={!note || saving || !ready}
             />
           ) : (
             <div className="inline-note-editor">

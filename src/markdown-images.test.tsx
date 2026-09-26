@@ -19,6 +19,21 @@ it('hides tag-only lines in reading mode while preserving prose and code', () =>
   expect(screen.getByText('Text mit #bezug')).toBeTruthy();
   expect(screen.getByText('#code')).toBeTruthy();
 });
+it('makes reading-mode tasks interactive only when a save handler is present', () => {
+  const change = vi.fn();
+  const view = render(
+    <NoteMarkdown scope="local" content={'- [ ] Toilettenpapier\n- [x] Milch'} onTaskChange={change} />,
+  );
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Toilettenpapier erledigen' }));
+  expect(change).toHaveBeenCalledWith(0, true);
+  expect((screen.getByRole('checkbox', { name: 'Milch wieder öffnen' }) as HTMLInputElement).disabled).toBe(
+    false,
+  );
+  view.rerender(<NoteMarkdown scope="local" content="- [ ] Nur lesen" />);
+  expect((screen.getByRole('checkbox', { name: 'Nur lesen erledigen' }) as HTMLInputElement).disabled).toBe(
+    true,
+  );
+});
 it('removes only the selected image reference, blocks native dragging and does not resize thumbnails', async () => {
   vi.mocked(fetchAttachment).mockResolvedValue({ bytes: [1], mime: 'image/png' } as any);
   vi.stubGlobal(

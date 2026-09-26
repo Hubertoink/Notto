@@ -1,5 +1,5 @@
 import { memorySchema } from '../src/memory-policy.js';
-import { commandRoutes } from './command-routes.js';
+import { commandRoutes, queueSavedCommands } from './command-routes.js';
 import { organizationRecordSchema, organizationDecisionSchema } from '../src/agent-policy.js';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
@@ -14,7 +14,7 @@ import { limit } from './database.js';
 import { digest, hashPassword, verifyPassword, token } from './security.js';
 import { openai, type AIEnvironment } from './openai.js';
 import { selectableModels } from './models.js';
-import { validNote } from '../src/domain.js';
+import { validNote, type Note } from '../src/domain.js';
 declare module 'fastify' {
   interface FastifyRequest {
     nottoUser: { id: string; email: string } | null;
@@ -213,6 +213,7 @@ export async function buildApp(db: Database, env: Environment) {
         p.p_id,
       ]);
       if (accepted.rowCount) {
+        await queueSavedCommands(client, user, p.p_document as Note, env);
         await client.query(
           'INSERT INTO jobs(id,user_id,note_id,revision) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',
           [randomUUID(), user, p.p_id, p.p_revision],

@@ -6,7 +6,7 @@ import { buildApp } from './app';
 import { workCommandOnce } from './command-worker';
 import { openai } from './openai';
 import { digest } from './security';
-import { newNote } from '../src/domain';
+import { newNote, reviseNote } from '../src/domain';
 import type { Database } from './database';
 
 vi.mock('./openai', () => ({ openai: vi.fn() }));
@@ -124,7 +124,7 @@ afterAll(async () => {
   await pg.close();
 });
 
-it('queues only on explicit start, is idempotent, and runs with automation disabled', async () => {
+it('supports idempotent manual retries with automation disabled', async () => {
   expect(await workCommandOnce(adapter, env)).toBe(false);
   const id = randomUUID();
   expect((await start(id)).statusCode).toBe(200);
@@ -240,4 +240,128 @@ it('recovers an expired lease once and bounds repeated interrupted attempts', as
   await workCommandOnce(adapter, env);
   expect((await pg.query('SELECT status FROM note_commands')).rows[0]).toEqual({ status: 'failed' });
   expect(openai).toHaveBeenCalledTimes(1);
+});
+
+it('starts saved commands exactly once, including sync retries and later edits', async () => {
+  const save = (document: typeof note, base: string | null) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/notes/push',
+      headers: headers(),
+      payload: {
+        p_id: document.id,
+        p_revision: document.revision,
+        p_base_revision: base,
+        p_document: document,
+      },
+    });
+  const updated = reviseNote(note, { content: note.content + '\nMehr Kontext' });
+  expect((await save(updated, note.revision)).json()).toEqual({ accepted: true });
+  expect((await save(updated, note.revision)).json()).toEqual({ accepted: true });
+  expect((await pg.query('SELECT status,prompt FROM note_commands')).rows).toEqual([
+    { status: 'pending', prompt: 'Zeige ein passendes Icon' },
+  ]);
+  const later = reviseNote(updated, { content: updated.content + '\nWeitergeschrieben' });
+  expect((await save(later, updated.revision)).json().accepted).toBe(true);
+  expect((await pg.query('SELECT id FROM note_commands')).rows).toHaveLength(1);
+  const changed = reviseNote(later, {
+    content: later.content.replace('ein passendes Icon', 'zwei passende Icons'),
+  });
+  expect((await save(changed, later.revision)).json().accepted).toBe(true);
+  expect((await pg.query('SELECT id FROM note_commands')).rows).toHaveLength(2);
+  const conflicting = reviseNote(note, { content: '/ki Darf nicht starten' });
+  expect((await save(conflicting, note.revision)).json().accepted).toBe(false);
+  expect((await pg.query('SELECT id FROM note_commands')).rows).toHaveLength(2);
+});
+
+it('saves without AI consent but records why the command cannot start', async () => {
+  await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+    user,
+    JSON.stringify({ ...settings, enabled: false }),
+  ]);
+  const updated = reviseNote(note, { content: note.content + '\nZusatz' });
+  const result = await app.inject({
+    method: 'POST',
+    url: '/api/notes/push',
+    headers: headers(),
+    payload: {
+      p_id: note.id,
+      p_revision: updated.revision,
+      p_base_revision: note.revision,
+      p_document: updated,
+    },
+  });
+  expect(result.json().accepted).toBe(true);
+  const job: any = (await pg.query('SELECT status,error FROM note_commands')).rows[0];
+  expect(job.status).toBe('failed');
+  expect(job.error).toContain('freigeben');
+  expect(await workCommandOnce(adapter, env)).toBe(false);
+  expect(openai).not.toHaveBeenCalled();
+});
+
+it('really searches for reviews, verifies recency and preserves clickable citations without screenshots', async () => {
+  await start();
+  await pg.query(
+    "UPDATE note_commands SET prompt='Suche Rezensionen zu den letzten drei Veröffentlichungen',note_content='Mouhanad Khorchide'",
+  );
+  const text = 'Eine belegte Rezension. [1]';
+  const searched = {
+    status: 'completed',
+    output: [
+      { type: 'web_search_call', status: 'completed' },
+      {
+        type: 'message',
+        content: [
+          {
+            type: 'output_text',
+            text,
+            annotations: [
+              {
+                type: 'url_citation',
+                start_index: text.indexOf('[1]'),
+                end_index: text.length,
+                title: 'Rezension',
+                url: 'https://example.com/review',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) =>
+    body.tools
+      ? searched
+      : {
+          status: 'completed',
+          output: [
+            {
+              content: [
+                {
+                  type: 'output_text',
+                  text: JSON.stringify(
+                    (body.text as any)?.format?.name === 'research_result'
+                      ? {
+                          summary: 'Eine Rezension belegt',
+                          text: '[Rezension](https://example.com/review)',
+                          partial: true,
+                        }
+                      : { queries: ['Mouhanad Khorchide Rezension'] },
+                  ),
+                },
+              ],
+            },
+          ],
+        },
+  );
+  await workCommandOnce(adapter, env);
+  expect(openai).toHaveBeenCalledTimes(5);
+  for (const call of vi.mocked(openai).mock.calls.filter((call) => call[3].tools)) {
+    expect(call[3]).toMatchObject({ tools: [{ type: 'web_search' }], tool_choice: 'required' });
+    expect(call[3].input).toBe('Mouhanad Khorchide Rezension');
+  }
+  const job: any = (await pg.query('SELECT result FROM note_commands')).rows[0];
+  expect(job.result.research).toContain('[Rezension](https://example.com/review)');
+  expect(job.result.searched).toBe(true);
+  expect((await pg.query('SELECT id FROM command_images')).rows).toHaveLength(0);
 });

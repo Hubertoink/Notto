@@ -83,8 +83,9 @@ export async function openai(
         instructions: `${knowledgeRole}\n${body.instructions ?? ''}${context}`,
         text: body.text,
         max_output_tokens: 4000,
-        max_tool_calls: 2,
+        max_tool_calls: web && body.max_tool_calls === 6 ? 6 : 2,
         ...(tools.length ? { tools, parallel_tool_calls: false } : {}),
+        ...(web && body.tool_choice === 'required' ? { tool_choice: 'required' } : {}),
         include: web ? ['web_search_call.action.sources'] : ['reasoning.encrypted_content'],
       });
     } else clean.encoding_format = 'float';

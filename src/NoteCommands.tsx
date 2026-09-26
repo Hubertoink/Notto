@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ExternalLink, LoaderCircle, Play, Square, WandSparkles } from 'lucide-react';
+import { Check, CircleAlert, ExternalLink, LoaderCircle, Play, Square, WandSparkles } from 'lucide-react';
 import { serverRequest } from './backend';
 import { ownBackend, readCloudConfig } from './cloud';
-import { Modal, readableDate } from './components';
+import { Modal, NoteMarkdown, readableDate } from './components';
 import { noteCommands, type NoteCommand } from './note-command';
 import './note-commands.css';
 
@@ -145,7 +145,8 @@ export function NoteCommands({
   if (!drafts.length && !commands.length)
     return editing ? (
       <p className="command-hint">
-        Mit <code>/ki</code> am Zeilenanfang einen KI-Auftrag formulieren. Startet erst nach deinem Klick.
+        Mit <code>/ki</code> am Zeilenanfang einen KI-Auftrag formulieren. Neue Aufträge starten beim
+        Speichern.
       </p>
     ) : null;
   return (
@@ -156,6 +157,12 @@ export function NoteCommands({
         <span>Im Hintergrund</span>
       </div>
       {!connected && <p>Für Hintergrundaufträge bitte mit deinem Noto-Server anmelden.</p>}
+      {connected && !!drafts.length && (
+        <p className="muted small">
+          Neue Aufträge starten nach dem Speichern und Synchronisieren automatisch. Bereits gestartete
+          Aufträge werden beim Weiterschreiben nicht wiederholt.
+        </p>
+      )}
       {drafts.map((prompt) => {
         const active = commands.some(
           (command) => command.prompt === prompt && ['pending', 'running'].includes(command.status),
@@ -202,6 +209,11 @@ export function NoteCommands({
               <span role="status">
                 {active ? (
                   <LoaderCircle size={15} className="command-spin" />
+                ) : command.result?.partial ||
+                  (command.status === 'done' &&
+                    !command.result?.items.length &&
+                    !command.result?.research) ? (
+                  <CircleAlert size={15} />
                 ) : command.status === 'done' ? (
                   <Check size={15} />
                 ) : (
@@ -231,6 +243,10 @@ export function NoteCommands({
             {command.result && (
               <>
                 <p className="command-summary">{command.result.summary}</p>
+                {command.result.searched && (
+                  <small>Websuche durchgeführt · Quellen sind direkt im Ergebnis verlinkt.</small>
+                )}
+                {command.result.research && <NoteMarkdown content={command.result.research} scope={scope} />}
                 <div className="command-results">
                   {command.result.items.map((item, index) => (
                     <section className="command-card" key={index}>
@@ -260,7 +276,7 @@ export function NoteCommands({
                 )}
                 {!!command.result.sources.length && (
                   <details className="command-sources">
-                    <summary>Besuchte Quellen · {command.result.sources.length}</summary>
+                    <summary>Quellen · {command.result.sources.length}</summary>
                     <ul>
                       {command.result.sources.map((source, index) => (
                         <li key={index}>
@@ -268,6 +284,16 @@ export function NoteCommands({
                             {source.title || source.url}
                           </a>
                         </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {!!command.result.searchQueries?.length && (
+                  <details className="command-sources">
+                    <summary>Durchgeführte Suchanfragen</summary>
+                    <ul>
+                      {command.result.searchQueries.map((query, index) => (
+                        <li key={index}>{query}</li>
                       ))}
                     </ul>
                   </details>

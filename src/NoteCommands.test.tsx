@@ -13,7 +13,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
-it('never starts a typed command until the user explicitly clicks', async () => {
+it('keeps unsaved typing inert and explains automatic start on save', async () => {
   vi.mocked(serverRequest).mockResolvedValue({ commands: [] });
   const onStart = vi.fn(async (prompt, id) => ({
     id,
@@ -38,6 +38,7 @@ it('never starts a typed command until the user explicitly clicks', async () => 
   );
   await waitFor(() => expect(serverRequest).toHaveBeenCalled());
   expect(onStart).not.toHaveBeenCalled();
+  expect(screen.getByText(/Neue Aufträge starten nach dem Speichern/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Speichern & starten' }));
   await waitFor(() => expect(screen.getByText('Wartet')).toBeTruthy());
   expect(onStart).toHaveBeenCalledTimes(1);

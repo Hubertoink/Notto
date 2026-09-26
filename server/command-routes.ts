@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { currentContent, contentRevision } from '../src/domain.js';
+import { currentContent, contentRevision, type Note } from '../src/domain.js';
 import { noteAllowed } from '../src/evidence-policy.js';
-import { commandUrls } from '../src/note-command.js';
+import { commandUrls, noteCommands } from '../src/note-command.js';
 import type { AIEnvironment } from './openai.js';
 import { limit, type Database } from './database.js';
 import { publicUrl } from './browser-network.js';
@@ -11,6 +12,76 @@ const fields = 'id,note_id,revision,prompt,status,stage,error,result,created_at'
 const fail = (message: string, statusCode: number): never => {
   throw Object.assign(new Error(message), { statusCode });
 };
+
+// Called inside the note-save transaction. Synchronization retries and later
+// edits must not run the same instruction again; an explicit retry still can.
+export async function queueSavedCommands(
+  client: Pick<Database, 'query'>,
+  user: string,
+  note: Note,
+  env: AIEnvironment,
+) {
+  if (note.deleted) return;
+  const prompts = [
+    ...new Set(
+      noteCommands(note.content)
+        .map((c) => c.prompt)
+        .filter(Boolean),
+    ),
+  ];
+  if (!prompts.length) return;
+  await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [user]);
+  const settings = (await client.query('SELECT document FROM ai_settings WHERE user_id=$1', [user])).rows[0]
+    ?.document;
+  for (const prompt of prompts) {
+    if (
+      (
+        await client.query(
+          'SELECT id FROM note_commands WHERE user_id=$1 AND note_id=$2 AND prompt=$3 LIMIT 1',
+          [user, note.id, prompt],
+        )
+      ).rows.length
+    )
+      continue;
+    const counts = (
+      await client.query(
+        "SELECT count(*) FILTER (WHERE status IN ('pending','running'))::int AS active, count(*) FILTER (WHERE created_at>now()-interval '1 hour')::int AS recent FROM note_commands WHERE user_id=$1",
+        [user],
+      )
+    ).rows[0];
+    let error = !env.openaiKey
+      ? 'OpenAI ist auf dem Server noch nicht eingerichtet.'
+      : !settings?.enabled || !noteAllowed(note, settings)
+        ? 'KI für diese Notiz zuerst in „Wissen & KI“ freigeben.'
+        : prompt.length > 4000 || note.content.length > 60000
+          ? 'Bitte den Auftrag auf 4.000 und die Notiz auf 60.000 Zeichen kürzen.'
+          : counts.active >= 3
+            ? 'Es laufen bereits drei Aufträge. Bitte später erneut starten.'
+            : counts.recent >= 12
+              ? 'Maximal zwölf Aufträge pro Stunde. Bitte später erneut starten.'
+              : null;
+    try {
+      for (const url of commandUrls(prompt)) publicUrl(url);
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Ungültiger Link.';
+    }
+    await client.query(
+      'INSERT INTO note_commands(id,user_id,note_id,revision,prompt,note_content,model,status,stage,error) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      [
+        randomUUID(),
+        user,
+        note.id,
+        contentRevision(note),
+        prompt,
+        note.content,
+        settings?.model || '',
+        error ? 'failed' : 'pending',
+        error ? 'Nicht gestartet' : 'Wartet',
+        error,
+      ],
+    );
+  }
+}
 export function commandRoutes(app: FastifyInstance, db: Database, env: AIEnvironment) {
   app.get('/api/commands', async (req) => {
     const { noteId } = z.object({ noteId: z.uuid() }).parse(req.query);
@@ -72,6 +143,13 @@ export function commandRoutes(app: FastifyInstance, db: Database, env: AIEnviron
         )
       ).rows[0].count;
       if (active >= 3) fail('Es laufen bereits drei Aufträge. Bitte einen abschließen oder abbrechen.', 429);
+      const recent = (
+        await client.query(
+          "SELECT count(*)::int AS count FROM note_commands WHERE user_id=$1 AND created_at>now()-interval '1 hour'",
+          [user],
+        )
+      ).rows[0].count;
+      if (recent >= 12) fail('Maximal zwölf Aufträge pro Stunde. Bitte später erneut starten.', 429);
       await client.query(
         'INSERT INTO note_commands(id,user_id,note_id,revision,prompt,note_content,model) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING',
         [

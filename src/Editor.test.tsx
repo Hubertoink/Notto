@@ -16,6 +16,7 @@ import * as intelligence from './intelligence';
 import * as rewriting from './rewrite';
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 beforeAll(() => {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
   vi.stubGlobal('CSS', { escape: (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '\\$&') });
   HTMLDialogElement.prototype.showModal = function () {
     this.setAttribute('open', '');
@@ -192,8 +193,8 @@ it('opens inline AI annotations and completes a task without changing the note',
   );
   const user = userEvent.setup();
   const annotations = await screen.findByRole('button', { name: /KI-Anmerkungen/ });
-  await waitFor(() => expect(annotations.textContent).toContain('Aufgaben offen'));
-  expect(annotations.textContent).toContain('Recherche vorhanden');
+  await screen.findByRole('button', { name: 'Aufgaben offen: 1' });
+  expect(screen.getByRole('button', { name: 'Recherche vorhanden: 1' })).toBeTruthy();
   const collections = screen.getByRole('button', { name: /Sammlungen/ });
   const originalText = screen.getByText('Steam einrichten');
   expect(collections.compareDocumentPosition(annotations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -202,10 +203,18 @@ it('opens inline AI annotations and completes a task without changing the note',
   expect(collections.compareDocumentPosition(annotations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   const checkbox = await screen.findByRole('checkbox', { name: 'Steam einrichten erledigt' });
   await user.click(checkbox);
-  await waitFor(() => expect((checkbox as HTMLInputElement).checked).toBe(true));
-  await screen.findByRole('button', { name: /KI-Anmerkungen.*Aufgaben erledigt/ });
-  expect(screen.queryByRole('button', { name: /KI-Anmerkungen.*Aufgaben offen/ })).toBeNull();
-  expect(screen.getByRole('button', { name: /KI-Anmerkungen/ }).textContent).toContain('Recherche vorhanden');
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('checkbox', { name: 'Steam einrichten erledigt' }) as HTMLInputElement).checked,
+    ).toBe(true),
+  );
+  await screen.findByRole('button', { name: 'Aufgaben erledigt: 1' });
+  expect(screen.queryByRole('button', { name: /Aufgaben offen/ })).toBeNull();
+  await user.click(screen.getByRole('button', { name: '1 Recherche vorhanden' }));
+  await waitFor(() => expect(document.activeElement?.textContent).toContain('Recherche bleibt erhalten.'));
+  expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: '1 Aufgaben erledigt' }));
+  await waitFor(() => expect(document.activeElement?.textContent).toContain('Erledigte Aufgaben'));
   expect(await repo.get('local', note.id)).toEqual(note);
 });
 it('shows a PDF reading note with its source page in AI annotations', async () => {
@@ -276,8 +285,8 @@ it('accepts a supported theory link and exposes a backlink on the target note', 
     </Theme>,
   );
   const user = userEvent.setup();
-  await screen.findByRole('button', { name: /KI-Anmerkungen.*Verlinkungen offen/ });
-  await user.click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
+  await user.click(await screen.findByRole('button', { name: 'Verlinkungen offen: 1' }));
+  await waitFor(() => expect(document.activeElement?.textContent).toContain('Offene Verlinkungen'));
   await user.click(await screen.findByRole('button', { name: 'Verknüpfung übernehmen' }));
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect((await repo.get('local', source.id))?.content).toBe(
@@ -291,8 +300,11 @@ it('accepts a supported theory link and exposes a backlink on the target note', 
       </NottoProvider>
     </Theme>,
   );
-  await screen.findByRole('button', { name: /KI-Anmerkungen.*Verlinkungen übernommen/ });
-  expect(screen.queryByRole('button', { name: /KI-Anmerkungen.*Verlinkungen offen/ })).toBeNull();
+  await user.click(await screen.findByRole('button', { name: 'Verlinkungen übernommen: 1' }));
+  await waitFor(() =>
+    expect(document.activeElement?.textContent).toContain('bereits im Notiztext eingefügt'),
+  );
+  expect(screen.queryByRole('button', { name: /Verlinkungen offen/ })).toBeNull();
   view.unmount();
   render(
     <Theme theme={neutralTheme}>

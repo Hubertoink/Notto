@@ -105,6 +105,24 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
+}
+.annotation-heading-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px;
+}
+.annotation-section {
+  scroll-margin: 12px;
+}
+.annotation-section:focus {
+  outline: 2px solid var(--nt-blue, #648bff);
+  outline-offset: 4px;
+}
+.annotation-section h3 {
+  font-size: 14px;
+  margin: 16px 0 8px;
 }
 .annotation-shell .annotation-toggle,
 .annotation-shell.annotation-open .annotation-toggle {
@@ -208,6 +226,8 @@
   min-width: 0;
 }
 .annotation-indicator {
+  background: transparent;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 5px;

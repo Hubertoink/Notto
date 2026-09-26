@@ -922,6 +922,15 @@ export function Editor({
                   throw new Error(
                     'Es gibt eine Konfliktkopie. Bitte zuerst die gewünschte Notizfassung öffnen.',
                   );
+                // Saving may already have queued this instruction on the server.
+                const queued = await serverRequest(readCloudConfig().url, `/commands?noteId=${saved.id}`);
+                const active = queued.commands.find(
+                  (command: import('./note-command').NoteCommand) =>
+                    command.prompt === prompt &&
+                    (['pending', 'running'].includes(command.status) ||
+                      ((dirty || !note) && command.revision === contentRevision(saved))),
+                );
+                if (active) return active;
                 const result = await serverRequest(readCloudConfig().url, `/commands/${id}`, {
                   noteId: saved.id,
                   revision: contentRevision(saved),

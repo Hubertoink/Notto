@@ -22,11 +22,15 @@ try {
   await pg.exec(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
   const user = randomUUID(),
     id = randomUUID();
-  const prompt =
-    'Wähle fünf für Noto passende Icons oder Komponenten von dieser Seite aus. Erkläre ihren Nutzen kurz und zeige jeweils einen Screenshot. Verwende die Demo-Komponenten, nicht die Seitennavigation.';
+  const research = process.argv.includes('--research');
+  const prompt = research
+    ? 'Suche Rezensionen zu den letzten drei Veröffentlichungen von Khorchide'
+    : 'Wähle fünf für Noto passende Icons oder Komponenten von dieser Seite aus. Erkläre ihren Nutzen kurz und zeige jeweils einen Screenshot. Verwende die Demo-Komponenten, nicht die Seitennavigation.';
   const note = newNote(
     user,
-    `Noto-Komponenten\nhttps://www.shad-table.dev/animated-icons-table\n/ki ${prompt}`,
+    research
+      ? `## Mouhanad Khorchide\nInteressante Gedanken zum Islam und der Form der Barmherzigkeit. Welche Auswirkungen könnte das für Jugendarbeit in Mannheim haben?\n/Ki ${prompt}\n[Zeit.de_Portrait](https://www.zeit.de/2026/40/mouhanad-khorchide-islamische-theologie-uni-muenster)`
+      : `Noto-Komponenten\nhttps://www.shad-table.dev/animated-icons-table\n/ki ${prompt}`,
   );
   await pg.query('INSERT INTO users(id,email,password_hash) VALUES($1,$2,$3)', [
     user,
@@ -57,14 +61,17 @@ try {
   const job: any = (await pg.query('SELECT status,stage,error,result FROM note_commands WHERE id=$1', [id]))
     .rows[0];
   await mkdir('output/command-eval', { recursive: true });
-  await writeFile('output/command-eval/result.json', JSON.stringify(job, null, 2));
+  await writeFile(
+    `output/command-eval/${research ? 'research' : 'result'}.json`,
+    JSON.stringify(job, null, 2),
+  );
   console.log(JSON.stringify(job, null, 2));
   const images: any[] = (await pg.query('SELECT id,bytes FROM command_images WHERE command_id=$1', [id]))
     .rows;
   for (const image of images)
     await writeFile(`output/command-eval/${image.id}.jpg`, Buffer.from(image.bytes));
   console.log(`Saved ${images.length} real screenshots.`);
-  if (job.status !== 'done' || !images.length) process.exitCode = 1;
+  if (job.status !== 'done' || (research ? !job.result?.research : !images.length)) process.exitCode = 1;
 } finally {
   await pg.close();
 }

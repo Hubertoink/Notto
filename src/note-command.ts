@@ -46,6 +46,11 @@ export const commandAnswerSchema = z.object({
 
 export interface CommandResult {
   summary: string;
+  /** Web-search answer with provider-verified, clickable citations. */
+  research?: string;
+  searched?: boolean;
+  searchQueries?: string[];
+  partial?: boolean;
   items: {
     title: string;
     detail: string;

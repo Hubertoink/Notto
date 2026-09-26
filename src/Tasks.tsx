@@ -210,6 +210,25 @@ export function NoteAnnotations({
     } else setOpen(next);
   };
   const reduced = useReducedMotion();
+  const anchors = useRef<Record<string, HTMLElement | null>>({});
+  const [jumpTarget, setJumpTarget] = useState<string | null>(null);
+  const jumpTo = (category: string) => {
+    toggle(true);
+    setJumpTarget(category);
+  };
+  useEffect(() => {
+    if (!expanded || !jumpTarget) return;
+    const timer = setTimeout(
+      () => {
+        const target = anchors.current[jumpTarget];
+        target?.focus({ preventScroll: true });
+        target?.scrollIntoView({ behavior: reduced ? 'instant' : 'smooth', block: 'nearest' });
+        setJumpTarget(null);
+      },
+      reduced ? 0 : 250,
+    );
+    return () => clearTimeout(timer);
+  }, [expanded, jumpTarget, reduced]);
   const refresh = async (web = false) => {
     if (updating || hasUnsavedChanges) return;
     setUpdating(web ? 'research' : 'analysis');
@@ -285,17 +304,48 @@ export function NoteAnnotations({
       .map((r) => r.targetId),
   ).size;
   const indicators = [
-    { Icon: Globe, count: uniqueResearch.length, label: 'Recherche vorhanden', state: 'complete' },
-    { Icon: ListTodo, count: tasks.filter((t) => !t.done).length, label: 'Aufgaben offen', state: 'pending' },
+    {
+      category: 'research',
+      Icon: Globe,
+      count: uniqueResearch.length,
+      label: 'Recherche vorhanden',
+      state: 'complete',
+    },
+    {
+      category: 'tasks-open',
+      Icon: ListTodo,
+      count: tasks.filter((t) => !t.done).length,
+      label: 'Aufgaben offen',
+      state: 'pending',
+    },
     {
       Icon: ListTodo,
+      category: 'tasks-done',
       count: tasks.filter((t) => t.done).length,
       label: 'Aufgaben erledigt',
       state: 'complete',
     },
-    { Icon: Link2, count: relations.length, label: 'Verlinkungen offen', state: 'pending' },
-    { Icon: Link2, count: acceptedLinks, label: 'Verlinkungen übernommen', state: 'complete' },
-    { Icon: FileText, count: insights.length, label: 'PDF-Anmerkungen vorhanden', state: 'complete' },
+    {
+      category: 'relations',
+      Icon: Link2,
+      count: relations.length,
+      label: 'Verlinkungen offen',
+      state: 'pending',
+    },
+    {
+      category: 'accepted',
+      Icon: Link2,
+      count: acceptedLinks,
+      label: 'Verlinkungen übernommen',
+      state: 'complete',
+    },
+    {
+      category: 'insights',
+      Icon: FileText,
+      count: insights.length,
+      label: 'PDF-Anmerkungen vorhanden',
+      state: 'complete',
+    },
   ].filter((indicator) => indicator.count > 0);
   const annotationCount = tasks.length + insights.length + uniqueResearch.length + relations.length;
   const reviewState = excluded
@@ -365,8 +415,12 @@ export function NoteAnnotations({
           <span className={`annotation-status annotation-status-${reviewState}`}>
             <ReviewIcon size={14} aria-hidden="true" /> {reviewLabel}
           </span>
-          {indicators.map(({ Icon, count, label, state }) => (
-            <span
+        </button>
+        <div className="annotation-heading-indicators">
+          {indicators.map(({ Icon, count, label, state, category }) => (
+            <button
+              type="button"
+              onClick={() => jumpTo(category)}
               key={label}
               className={`annotation-indicator ${state}`}
               title={`${label}: ${count}`}
@@ -374,9 +428,9 @@ export function NoteAnnotations({
             >
               <Icon size={16} aria-hidden="true" /> <span>{count}</span>
               <span className="annotation-indicator-label">{label}</span>
-            </span>
+            </button>
           ))}
-        </button>
+        </div>
         {expanded && (
           <button
             className="annotation-close icon-button"
@@ -409,11 +463,16 @@ export function NoteAnnotations({
                 </div>
               </div>
               <div className="annotation-status-list" aria-label="Anmerkungen nach Kategorie">
-                {indicators.map(({ Icon, count, label, state }) => (
-                  <span key={label} className={`annotation-indicator ${state}`}>
+                {indicators.map(({ Icon, count, label, state, category }) => (
+                  <button
+                    type="button"
+                    key={label}
+                    className={`annotation-indicator ${state}`}
+                    onClick={() => jumpTo(category)}
+                  >
                     <Icon size={16} aria-hidden="true" />
                     {count} {label}
-                  </span>
+                  </button>
                 ))}
               </div>
               {excluded && <p className="inline-error">{excluded}</p>}
@@ -453,42 +512,115 @@ export function NoteAnnotations({
                   Hier erscheinen künftig passende Notizen, Aufgaben, PDF-Anmerkungen und Rechercheergebnisse.
                 </p>
               )}
-              {tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
-              ))}
-              {!excluded &&
-                insights.map(({ item, source }, index) => (
-                  <article className="pdf-insight" key={`${item.quote}:${index}`}>
-                    <strong>{item.title}</strong>
-                    <p>{item.detail}</p>
-                    <blockquote>{item.quote}</blockquote>
-                    {source?.attachment && (
-                      <small>
-                        <AttachmentTitle content={note.content} id={source.attachment} scope={note.scope} />
-                        {source.page ? ` · Seite ${source.page}` : ''}
-                      </small>
-                    )}
-                  </article>
-                ))}
-              {!excluded && (
-                <RelationSuggestions
-                  note={note}
-                  notes={notes}
-                  records={records}
-                  disabled={hasUnsavedChanges}
-                  onAccept={onAcceptRelation}
-                />
+              {[false, true].map(
+                (done) =>
+                  tasks.some((task) => task.done === done) && (
+                    <section
+                      className="annotation-section"
+                      key={String(done)}
+                      tabIndex={-1}
+                      ref={(el) => {
+                        anchors.current[done ? 'tasks-done' : 'tasks-open'] = el;
+                      }}
+                    >
+                      <h3>{done ? 'Erledigte Aufgaben' : 'Offene Aufgaben'}</h3>
+                      {tasks
+                        .filter((task) => task.done === done)
+                        .map((task) => (
+                          <TaskRow key={task.id} task={task} />
+                        ))}
+                    </section>
+                  ),
               )}
-              {uniqueResearch.map((r) => (
-                <article key={r.id}>
-                  <strong>Recherche</strong>
-                  <NoteMarkdown
-                    content={compactParenthesizedLines((r.data as Research).text)}
-                    scope={note.scope}
-                  />
-                  <Sources sources={(r.data as Research).sources ?? []} compact />
-                </article>
-              ))}
+              {!!insights.length && (
+                <section
+                  className="annotation-section"
+                  tabIndex={-1}
+                  ref={(el) => {
+                    anchors.current.insights = el;
+                  }}
+                >
+                  <h3>PDF-Anmerkungen</h3>
+                  {excluded && <p>{excluded}</p>}
+                  {!excluded &&
+                    insights.map(({ item, source }, index) => (
+                      <article className="pdf-insight" key={`${item.quote}:${index}`}>
+                        <strong>{item.title}</strong>
+                        <p>{item.detail}</p>
+                        <blockquote>{item.quote}</blockquote>
+                        {source?.attachment && (
+                          <small>
+                            <AttachmentTitle
+                              content={note.content}
+                              id={source.attachment}
+                              scope={note.scope}
+                            />
+                            {source.page ? ` · Seite ${source.page}` : ''}
+                          </small>
+                        )}
+                      </article>
+                    ))}
+                </section>
+              )}
+              {!!relations.length && (
+                <section
+                  className="annotation-section"
+                  tabIndex={-1}
+                  ref={(el) => {
+                    anchors.current.relations = el;
+                  }}
+                >
+                  <h3>Offene Verlinkungen</h3>
+                  {hasUnsavedChanges && <p>Speichere die Notiz, um eine Verlinkung zu übernehmen.</p>}
+                  {excluded ? (
+                    <p>{excluded}</p>
+                  ) : (
+                    <RelationSuggestions
+                      note={note}
+                      notes={notes}
+                      records={records}
+                      disabled={hasUnsavedChanges}
+                      onAccept={onAcceptRelation}
+                    />
+                  )}
+                </section>
+              )}
+              {!!acceptedLinks && (
+                <section
+                  className="annotation-section"
+                  tabIndex={-1}
+                  ref={(el) => {
+                    anchors.current.accepted = el;
+                  }}
+                >
+                  <h3>Übernommene Verlinkungen</h3>
+                  <p>
+                    {acceptedLinks} {acceptedLinks === 1 ? 'Verlinkung ist' : 'Verlinkungen sind'} bereits im
+                    Notiztext eingefügt. Du kannst die verknüpften Notizen dort über ihre Links öffnen.
+                  </p>
+                </section>
+              )}
+              {!!uniqueResearch.length && (
+                <section
+                  className="annotation-section"
+                  tabIndex={-1}
+                  ref={(el) => {
+                    anchors.current.research = el;
+                  }}
+                >
+                  <h3>Rechercheergebnisse</h3>
+                  {uniqueResearch.map((r) => (
+                    <article key={r.id}>
+                      <strong>Recherche</strong>
+                      <NoteMarkdown
+                        content={compactParenthesizedLines((r.data as Research).text)}
+                        scope={note.scope}
+                      />
+                      <Sources sources={(r.data as Research).sources ?? []} compact />
+                    </article>
+                  ))}
+                </section>
+              )}
             </div>
           </motion.div>
         )}

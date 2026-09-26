@@ -386,6 +386,9 @@ it('accepts a supported theory link and exposes a backlink on the target note', 
       </NottoProvider>
     </Theme>,
   );
+  const outgoingSummary = (await screen.findByText('Verlinkt')).closest('summary')!;
+  expect(outgoingSummary.classList.contains('connection-summary-outgoing')).toBe(true);
+  expect(outgoingSummary.querySelector('.connection-icon svg')).toBeTruthy();
   await user.click(await screen.findByRole('button', { name: 'Verlinkungen übernommen: 1' }));
   await waitFor(() =>
     expect(document.activeElement?.textContent).toContain('bereits im Notiztext eingefügt'),
@@ -399,7 +402,10 @@ it('accepts a supported theory link and exposes a backlink on the target note', 
       </NottoProvider>
     </Theme>,
   );
-  await user.click(await screen.findByText('Rückverweise · 1'));
+  const backlinkSummary = (await screen.findByText('Rückverweise')).closest('summary')!;
+  expect(backlinkSummary.classList.contains('connection-summary-incoming')).toBe(true);
+  expect(backlinkSummary.querySelector('.connection-icon svg')).toBeTruthy();
+  await user.click(backlinkSummary);
   expect(await screen.findByRole('link', { name: /Unser Konzept braucht/ })).toBeTruthy();
 });
 it('refreshes outdated annotations from the saved revision and closes through the icon', async () => {

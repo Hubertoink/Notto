@@ -741,6 +741,10 @@ textarea:focus-visible {
     animation: note-save 420ms ease-out both;
   }
 }
+.note-action-archive,
+.note-action-archive svg {
+  overflow: visible;
+}
 @keyframes note-pin {
   0%,
   100% {
@@ -2187,9 +2191,89 @@ button.tags-heading {
   padding: 12px 0;
   border-top: 1px solid var(--nt-line);
 }
-.note-connections summary {
+.connection-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 2px 7px 2px 2px;
   cursor: pointer;
   color: var(--nt-muted);
+  border-radius: 7px;
+  list-style: none;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+.connection-summary::-webkit-details-marker {
+  display: none;
+}
+.connection-summary:is(:hover, :focus-visible) {
+  color: var(--nt-text);
+  background: var(--nt-hover);
+}
+.connection-chevron {
+  width: 14px;
+  color: var(--nt-muted);
+  transform-origin: center;
+  transition: transform 160ms ease;
+}
+.note-connections details[open] > .connection-summary .connection-chevron {
+  transform: rotate(90deg);
+}
+.connection-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--nt-text);
+  background: var(--nt-paper);
+  border: 1px solid var(--nt-line);
+  border-radius: 50%;
+}
+.connection-count {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 5px;
+  color: var(--nt-paper);
+  background: var(--nt-text);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .connection-summary-outgoing:is(:hover, :focus-visible) .connection-icon svg {
+    animation: connection-outgoing 560ms ease-out both;
+  }
+  .connection-summary-incoming:is(:hover, :focus-visible) .connection-icon svg {
+    animation: connection-incoming 620ms ease-out both;
+  }
+}
+@keyframes connection-outgoing {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  42% {
+    transform: translate(2px, -2px);
+  }
+  72% {
+    transform: translate(-1px, 1px);
+  }
+}
+@keyframes connection-incoming {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0);
+  }
+  38% {
+    transform: translateX(-2px) rotate(-10deg);
+  }
+  70% {
+    transform: translateX(1px) rotate(3deg);
+  }
 }
 .note-connections ul {
   margin: 10px 0 0;

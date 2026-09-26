@@ -33,6 +33,8 @@ import {
   PenLine,
   Save,
   X,
+  ArrowUpRight,
+  ChevronRight,
 } from 'lucide-react';
 import { Action, Modal, NoteMarkdown, NoteReferenceLink, readableDate, InlineImage } from './components';
 import { newNote, reviseNote, tagsOf, attachmentIds, titleOf, type Note, type Revision } from './domain';
@@ -1079,7 +1081,14 @@ export function Editor({
           <div className="note-connections">
             {outgoing.length > 0 && (
               <details>
-                <summary>Verlinkt · {outgoing.length}</summary>
+                <summary className="connection-summary connection-summary-outgoing">
+                  <ChevronRight className="connection-chevron" size={14} aria-hidden="true" />
+                  <span className="connection-icon" aria-hidden="true">
+                    <ArrowUpRight size={16} />
+                  </span>
+                  <span>Verlinkt</span>
+                  <span className="connection-count">{outgoing.length}</span>
+                </summary>
                 <ul>
                   {outgoing.map((n) => (
                     <li key={n.id}>
@@ -1091,14 +1100,13 @@ export function Editor({
             )}
             {incoming.length > 0 && (
               <details>
-                <summary className="backlink-summary">
-                  <span className="source-circles" aria-hidden="true">
-                    <span className="source-circle">↩</span>
-                    {incoming.length > 1 && (
-                      <span className="source-circle source-more">+{incoming.length - 1}</span>
-                    )}
+                <summary className="connection-summary connection-summary-incoming">
+                  <ChevronRight className="connection-chevron" size={14} aria-hidden="true" />
+                  <span className="connection-icon" aria-hidden="true">
+                    <Undo2 size={16} />
                   </span>
-                  Rückverweise · {incoming.length}
+                  <span>Rückverweise</span>
+                  <span className="connection-count">{incoming.length}</span>
                 </summary>
                 <ul>
                   {incoming.map((n) => (

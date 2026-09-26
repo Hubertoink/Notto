@@ -9,6 +9,7 @@ import { sourceTexts } from './sources.js';
 import { findServerRelations } from './note-relations.js';
 import type { Database } from './database.js';
 import { openai, type AIEnvironment } from './openai.js';
+import { commandEvidence, withoutNoteCommands } from '../src/note-command.js';
 const analysis = analysisSchema;
 function text(response: any) {
   if (response.status !== 'completed') throw new Error('Unvollständige KI-Antwort.');
@@ -37,6 +38,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
       n = row?.document;
     if (
       !row ||
+      !withoutNoteCommands(n.content).trim() ||
       !currentContent(n, job.revision) ||
       n.deleted ||
       !c?.enabled ||
@@ -218,6 +220,10 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         item = a?.data?.suggestions?.[index];
       if (!item || (item.kind !== 'task' && item.kind !== 'contact'))
         throw new Error('Recherchevorschlag fehlt.');
+      if (commandEvidence(n.content, item.quote)) {
+        await db.query("UPDATE jobs SET status='skipped',lease_until=NULL WHERE id=$1", [job.id]);
+        return true;
+      }
       const key = `${job.note_id}:${item.kind}:${item.quote.trim().toLocaleLowerCase('de')}`;
       if (
         records.some((r) => r.kind === 'research' && r.data.key === key) ||

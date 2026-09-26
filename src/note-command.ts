@@ -29,6 +29,28 @@ export function commandUrls(text: string) {
   ];
 }
 
+export function withoutNoteCommands(content: string, prompts?: readonly string[]) {
+  return noteCommands(content)
+    .filter((command) => !prompts || prompts.includes(command.prompt))
+    .reduceRight(
+      (text, command) =>
+        text.slice(0, command.start) + text.slice(command.end + (text[command.end] === '\n' ? 1 : 0)),
+      content,
+    );
+}
+
+export function commandEvidence(content: string, quote: string) {
+  const value = quote.trim().toLocaleLowerCase('de');
+  return (
+    !!value &&
+    noteCommands(content).some(
+      ({ prompt, start, end }) =>
+        content.slice(start, end).trim().toLocaleLowerCase('de') === value ||
+        prompt.toLocaleLowerCase('de') === value,
+    )
+  );
+}
+
 export const commandAnswerSchema = z.object({
   summary: z.string().max(6000),
   items: z

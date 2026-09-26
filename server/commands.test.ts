@@ -135,7 +135,10 @@ it('supports idempotent manual retries with automation disabled', async () => {
   expect(job.status).toBe('done');
   expect(job.result.items[0].imageId).toBeTruthy();
   expect(openai).toHaveBeenCalledTimes(1);
-  expect((await pg.query('SELECT document FROM notes')).rows[0]).toEqual({ document: note });
+  const cleaned: any = (await pg.query('SELECT document FROM notes')).rows[0].document;
+  expect(cleaned.content).toBe('Komponenten\nhttps://example.com/icons\n');
+  expect(cleaned.history[0]).toEqual(note.history[0]);
+  expect(cleaned.history).toHaveLength(2);
 });
 it('rejects other accounts, stale revisions and excluded notes', async () => {
   expect((await start(randomUUID(), other)).statusCode).toBe(404);
@@ -145,6 +148,53 @@ it('rejects other accounts, stale revisions and excluded notes', async () => {
     JSON.stringify({ ...settings, excludedNotes: [note.id] }),
   ]);
   expect((await start()).statusCode).toBe(403);
+});
+it('cleans a completed prompt without losing edits or a changed instruction', async () => {
+  await start();
+  const edited = reviseNote(note, { content: note.content + '\nNeue Gedanken\n/ki Ein anderer Auftrag' });
+  vi.mocked(openai).mockImplementationOnce(async () => {
+    await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
+      note.id,
+      JSON.stringify(edited),
+      edited.revision,
+    ]);
+    return response();
+  });
+  await workCommandOnce(adapter, env);
+  const cleaned: any = (await pg.query('SELECT document FROM notes WHERE id=$1', [note.id])).rows[0].document;
+  expect(cleaned.content).toBe(
+    'Komponenten\nhttps://example.com/icons\nNeue Gedanken\n/ki Ein anderer Auftrag',
+  );
+  expect(cleaned.history.some((version: any) => version.content === edited.content)).toBe(true);
+});
+it('retains a failed prompt so it can be corrected and retried', async () => {
+  await start();
+  vi.mocked(openai).mockRejectedValueOnce(new Error('Offline'));
+  await workCommandOnce(adapter, env);
+  expect((await pg.query('SELECT document FROM notes WHERE id=$1', [note.id])).rows[0].document).toEqual(
+    note,
+  );
+});
+it('removes legacy completed instructions on save and accepts a retried push', async () => {
+  await start();
+  await pg.query("UPDATE note_commands SET status='done',result=$1", [
+    JSON.stringify({ items: [{ title: 'Ergebnis' }] }),
+  ]);
+  const edited = reviseNote(note, { content: note.content + '\nNeue Gedanken' });
+  const payload = {
+    p_id: note.id,
+    p_revision: edited.revision,
+    p_base_revision: note.revision,
+    p_document: edited,
+  };
+  for (let retry = 0; retry < 2; retry++)
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/notes/push', headers: headers(), payload })).json()
+        .accepted,
+    ).toBe(true);
+  const cleaned: any = (await pg.query('SELECT document FROM notes WHERE id=$1', [note.id])).rows[0].document;
+  expect(cleaned.content).toBe('Komponenten\nhttps://example.com/icons\nNeue Gedanken');
+  expect((await pg.query('SELECT id FROM note_commands')).rows).toHaveLength(1);
 });
 it('keeps screenshot bytes and results private to the owner', async () => {
   const job = (await start()).json().command;

@@ -48,6 +48,11 @@ it('extracts actual PDF text before server analysis and persists page provenance
   expect(JSON.parse(query.mock.calls[0][1][2]).kind).toBe('extraction');
   // PDF.js initialization can exceed the default five seconds on a cold Windows runner.
 }, 20000);
+it('excludes executable prompts from ordinary annotation evidence', async () => {
+  const note = newNote('alice', 'Gedanken zur Jugendarbeit\n/Ki Suche Rezensionen\nWeiterer Inhalt');
+  const sources = await sourceTexts({} as Database, 'alice', note, []);
+  expect(sources[0].text).toBe('Gedanken zur Jugendarbeit\nWeiterer Inhalt');
+});
 it('uses the newest extracted attachment and ignores detached attachments', async () => {
   const id = `${crypto.randomUUID()}.pdf`,
     note = newNote('alice', `[Projekt](attachments/${id})`);

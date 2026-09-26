@@ -5,6 +5,7 @@ import type { z } from 'zod';
 import { attachmentIds, contentRevision, type Note } from '../src/domain.js';
 import { evidenceSchema } from '../src/evidence-policy.js';
 import type { Database } from './database.js';
+import { withoutNoteCommands } from '../src/note-command.js';
 
 export async function sourceTexts(
   db: Database,
@@ -14,7 +15,7 @@ export async function sourceTexts(
   dataDir?: string,
 ) {
   const sources: z.infer<typeof evidenceSchema>[] = [
-    { noteId: note.id, revision: contentRevision(note), text: note.content },
+    { noteId: note.id, revision: contentRevision(note), text: withoutNoteCommands(note.content) },
   ];
   for (const id of attachmentIds(note.content)) {
     let extraction = records

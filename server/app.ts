@@ -15,6 +15,7 @@ import { digest, hashPassword, verifyPassword, token } from './security.js';
 import { openai, type AIEnvironment } from './openai.js';
 import { selectableModels } from './models.js';
 import { validNote, type Note } from '../src/domain.js';
+import { withoutNoteCommands } from '../src/note-command.js';
 declare module 'fastify' {
   interface FastifyRequest {
     nottoUser: { id: string; email: string } | null;
@@ -221,6 +222,15 @@ export async function buildApp(db: Database, env: Environment) {
       }
       await client.query('COMMIT');
       if (accepted.rowCount || rows[0]?.revision === p.p_revision) return { accepted: true };
+      const incoming = p.p_document as Note;
+      if (
+        rows[0]?.document.history?.some(
+          (entry: Note['history'][number]) =>
+            entry.revision === p.p_revision && entry.content === incoming.content,
+        ) &&
+        withoutNoteCommands(rows[0].document.content) === withoutNoteCommands(incoming.content)
+      )
+        return { accepted: true };
       if (!rows[0]) fail('Serverfassung fehlt; lokale Fassung bleibt erhalten.', 409);
       return { accepted: false, document: rows[0].document };
     } catch (e) {

@@ -1,5 +1,6 @@
 import type { Note } from './domain';
 import { currentContent } from './domain';
+import { commandEvidence } from './note-command';
 import {
   decisionKey,
   knowledge,
@@ -47,6 +48,12 @@ export function tasksFor(notes: Note[], records: KnowledgeRecord[], scope: strin
       });
     for (const item of [...current, ...retained]) {
       if (item.kind !== 'task') continue;
+      if (
+        [note.content, ...note.history.map((version) => version.content)].some((content) =>
+          commandEvidence(content, item.quote),
+        )
+      )
+        continue;
       const id = decisionKey(note.id, item);
       if (tasks.has(id)) continue;
       const decision = resolvedDecision(scoped, id);

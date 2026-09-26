@@ -196,7 +196,7 @@ it('opens inline AI annotations and completes a task without changing the note',
   await screen.findByRole('button', { name: 'Aufgaben offen: 1' });
   expect(screen.getByRole('button', { name: 'Recherche vorhanden: 1' })).toBeTruthy();
   const collections = screen.getByRole('button', { name: /Sammlungen/ });
-  const originalText = screen.getByText('Steam einrichten');
+  const originalText = screen.getByText('Steam einrichten', { selector: 'p' });
   expect(collections.compareDocumentPosition(annotations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   await user.click(annotations);
   expect(originalText.isConnected).toBe(true);
@@ -216,6 +216,54 @@ it('opens inline AI annotations and completes a task without changing the note',
   await user.click(screen.getByRole('button', { name: '1 Aufgaben erledigt' }));
   await waitFor(() => expect(document.activeElement?.textContent).toContain('Erledigte Aufgaben'));
   expect(await repo.get('local', note.id)).toEqual(note);
+});
+it('shares one annotation shell with a keyboard accessible commands tab', async () => {
+  const note = newNote('local', 'Notiz\n/ki Recherchiere Quellen');
+  await repo.put(note, null);
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
+  expect(screen.getByRole('tab', { name: 'Aufträge' }).getAttribute('aria-selected')).toBe('true');
+  expect(document.querySelector('.editor-body .note-commands')).toBeNull();
+  await user.click(screen.getByRole('tab', { name: 'Anmerkungen' }));
+  expect(screen.getByRole('tabpanel', { name: 'Anmerkungen' })).toBeTruthy();
+  expect(screen.queryByRole('tabpanel', { name: 'Aufträge' })).toBeNull();
+  await user.keyboard('{ArrowRight}');
+  expect(screen.getByRole('tabpanel', { name: 'Aufträge' })).toBeTruthy();
+});
+it('merges server prompt cleanup into an unsaved draft without losing text', async () => {
+  const note = newNote('local', 'Gedanken\n/ki Suche Rezensionen\n');
+  await repo.put(note, null);
+  const saved = vi.fn();
+  const renderNote = (n: typeof note) => (
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={n} onSaved={saved} />
+      </NottoProvider>
+    </Theme>
+  );
+  const view = render(renderNote(note));
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+  const input = await screen.findByRole('textbox', { name: 'Notiztext' });
+  fireEvent.change(input, { target: { value: note.content + 'Mein neuer Absatz' } });
+  const cleaned = reviseNote(note, { content: 'Gedanken\n' });
+  await repo.put(cleaned, note.revision);
+  view.rerender(renderNote(cleaned));
+  await waitFor(() =>
+    expect((screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement).value).toBe(
+      'Gedanken\nMein neuer Absatz',
+    ),
+  );
+  await user.click(screen.getByRole('button', { name: 'Festhalten' }));
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect((await repo.get('local', note.id))?.content).toBe('Gedanken\nMein neuer Absatz');
 });
 it('shows a PDF reading note with its source page in AI annotations', async () => {
   const id = `${crypto.randomUUID()}.pdf`;

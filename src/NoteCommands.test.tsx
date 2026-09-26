@@ -8,6 +8,16 @@ vi.mock('./cloud', () => ({ ownBackend: () => true, readCloudConfig: () => ({ ur
 vi.mock('./components', () => ({
   readableDate: () => 'Heute',
   Modal: ({ children }: any) => <div>{children}</div>,
+  Sources: ({ sources }: any) => (
+    <details>
+      <summary>Quellen</summary>
+      {sources.map((source: any) => (
+        <a key={source.url} href={source.url}>
+          {source.title}
+        </a>
+      ))}
+    </details>
+  ),
 }));
 afterEach(() => {
   cleanup();
@@ -38,7 +48,7 @@ it('keeps unsaved typing inert and explains automatic start on save', async () =
   );
   await waitFor(() => expect(serverRequest).toHaveBeenCalled());
   expect(onStart).not.toHaveBeenCalled();
-  expect(screen.getByText(/Neue Aufträge starten nach dem Speichern/)).toBeTruthy();
+  expect(screen.getByText('Startet beim Speichern.')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Speichern & starten' }));
   await waitFor(() => expect(screen.getByText('Wartet')).toBeTruthy());
   expect(onStart).toHaveBeenCalledTimes(1);
@@ -77,7 +87,6 @@ it('loads completed results again after reopening the note', async () => {
     />,
   );
   await waitFor(() => expect(screen.getByText('Gefundene Komponenten')).toBeTruthy());
-  expect(screen.getByRole('link', { name: /Quelle öffnen/ }).getAttribute('href')).toBe(
-    'https://example.com',
-  );
+  fireEvent.click(screen.getAllByText('Quellen')[0]);
+  expect(screen.getByRole('link', { name: 'Archiv' }).getAttribute('href')).toBe('https://example.com');
 });

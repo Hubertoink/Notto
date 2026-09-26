@@ -3,12 +3,20 @@ import 'fake-indexeddb/auto';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { db, repo } from './repository';
 import { newNote } from './domain';
-import { knowledge, type KnowledgeRecord } from './intelligence';
+import { knowledge, evidence, type KnowledgeRecord } from './intelligence';
 import { addTask, checkTask, tasksFor } from './task-store';
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 beforeEach(async () => {
   await db.knowledge.clear();
   await db.notes.clear();
+});
+it('excludes command instructions from local analysis and old AI task suggestions', async () => {
+  const note = newNote('local', 'Gedanken\n/ki Suche Rezensionen');
+  expect((await evidence(note, []))[0].text).toBe('Gedanken\n');
+  await knowledge.append(note, 'analysis', {
+    suggestions: [{ kind: 'task', title: 'Rezensionen suchen', detail: '', quote: '/ki Suche Rezensionen' }],
+  });
+  expect(tasksFor([note], await knowledge.list('local'), 'local')).toEqual([]);
 });
 it('persists manual tasks independently and isolates notebooks', async () => {
   await addTask('local', '  Einkauf  ');

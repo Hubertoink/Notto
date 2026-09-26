@@ -1,5 +1,6 @@
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useState, useRef, type CSSProperties } from 'react';
+import { useReducedMotion } from 'motion/react';
+import { useEffect, useState, useRef, useId, type ReactNode, type CSSProperties } from 'react';
+import { withoutNoteCommands, commandEvidence } from './note-command';
 import {
   Sparkles,
   X,
@@ -162,19 +163,29 @@ export function NoteAnnotations({
   onRewrite,
   aiBackgroundEnabled = false,
   onAcceptRelation,
+  commands,
+  commandCount = 0,
+  hasCommandDrafts = false,
 }: {
   note: Note;
   hasUnsavedChanges?: boolean;
   onRewrite?: (instruction: string) => void;
   aiBackgroundEnabled?: boolean;
   onAcceptRelation?: (r: Relation) => Promise<void>;
+  commands?: ReactNode;
+  commandCount?: number;
+  hasCommandDrafts?: boolean;
 }) {
   const { notes = [] } = useNotto();
   const records = useKnowledgeRecords(note.scope);
   const excluded = noteExclusionReason(note, config(note.scope));
   const [open, setOpen] = useState(false);
   const [docked, setDocked] = useState(false);
-  const [closing, setClosing] = useState(false);
+  const [tab, setTab] = useState<'annotations' | 'commands'>(hasCommandDrafts ? 'commands' : 'annotations');
+  const tabId = useId();
+  useEffect(() => {
+    if (hasCommandDrafts) setTab('commands');
+  }, [hasCommandDrafts]);
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('notto-ai-sidebar') !== 'closed');
   const [updating, setUpdating] = useState<'analysis' | 'research' | null>(null);
   const [updateError, setUpdateError] = useState('');
@@ -199,11 +210,8 @@ export function NoteAnnotations({
     return () => observer.disconnect();
   }, []);
   const expanded = docked ? sidebarOpen : open;
-  // Keep the occupied column until AnimatePresence has removed its contents.
-  // Otherwise the exiting panel participates in the collapsed auto-width track.
-  const layoutExpanded = expanded || closing;
+  const layoutExpanded = expanded;
   const toggle = (next: boolean) => {
-    setClosing(docked && !next);
     if (docked) {
       setSidebarOpen(next);
       localStorage.setItem('notto-ai-sidebar', next ? 'open' : 'closed');
@@ -213,6 +221,7 @@ export function NoteAnnotations({
   const anchors = useRef<Record<string, HTMLElement | null>>({});
   const [jumpTarget, setJumpTarget] = useState<string | null>(null);
   const jumpTo = (category: string) => {
+    setTab('annotations');
     toggle(true);
     setJumpTarget(category);
   };
@@ -228,7 +237,7 @@ export function NoteAnnotations({
       reduced ? 0 : 250,
     );
     return () => clearTimeout(timer);
-  }, [expanded, jumpTarget, reduced]);
+  }, [expanded, jumpTarget, reduced, tab]);
   const refresh = async (web = false) => {
     if (updating || hasUnsavedChanges) return;
     setUpdating(web ? 'research' : 'analysis');
@@ -237,9 +246,9 @@ export function NoteAnnotations({
       if (web)
         await researchNote(note, {
           kind: 'topic',
-          title: titleOf(note.content),
-          detail: note.content,
-          quote: note.content.slice(0, 4000),
+          title: titleOf(withoutNoteCommands(note.content)),
+          detail: withoutNoteCommands(note.content),
+          quote: withoutNoteCommands(note.content).slice(0, 4000),
         });
       else await analyze(note);
     } catch (error) {
@@ -276,6 +285,14 @@ export function NoteAnnotations({
   const seen = new Set<string>();
   const uniqueResearch = research.filter((r) => {
     const key = (r.data as { key?: string }).key ?? r.id;
+    const quote = key.slice(`${note.id}:task:`.length);
+    if (
+      key.startsWith(`${note.id}:task:`) &&
+      [note.content, ...note.history.map((version) => version.content)].some((content) =>
+        commandEvidence(content, quote),
+      )
+    )
+      return false;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -389,10 +406,8 @@ export function NoteAnnotations({
           ? RefreshCw
           : Clock3;
   return (
-    <motion.div
-      layout={!reduced && !docked}
-      transition={{ type: 'spring', stiffness: 360, damping: 34 }}
-      className={`note-annotations annotation-shell ${layoutExpanded ? 'annotation-open' : ''} ${aiBackground && expanded ? 'has-ai-background' : ''}`}
+    <div
+      className={`note-annotations annotation-shell ${docked ? 'annotation-docked' : 'annotation-inline'} ${layoutExpanded ? 'annotation-open' : ''} ${aiBackground && expanded ? 'has-ai-background' : ''}`}
       style={
         {
           width: layoutExpanded ? '100%' : 'fit-content',
@@ -417,6 +432,19 @@ export function NoteAnnotations({
           </span>
         </button>
         <div className="annotation-heading-indicators">
+          {(commandCount > 0 || hasCommandDrafts) && (
+            <button
+              type="button"
+              className="annotation-indicator complete"
+              aria-label={`KI-Aufträge: ${commandCount || 1}`}
+              onClick={() => {
+                setTab('commands');
+                toggle(true);
+              }}
+            >
+              <WandSparkles size={16} /> {commandCount || 1}
+            </button>
+          )}
           {indicators.map(({ Icon, count, label, state, category }) => (
             <button
               type="button"
@@ -444,187 +472,225 @@ export function NoteAnnotations({
           </button>
         )}
       </div>
-      <AnimatePresence initial={false} onExitComplete={() => setClosing(false)}>
-        {expanded && (
-          <motion.div
-            key="contents"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: reduced ? 0 : 0.22 }}
-            style={{ overflow: 'hidden' }}
+      <div hidden={!expanded}>
+        <div
+          className="annotation-tabs"
+          role="tablist"
+          aria-label="KI-Bereich"
+          onKeyDown={(event) => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const next =
+              event.key === 'Home'
+                ? 'annotations'
+                : event.key === 'End'
+                  ? 'commands'
+                  : tab === 'annotations'
+                    ? 'commands'
+                    : 'annotations';
+            setTab(next);
+            event.currentTarget
+              .querySelector<HTMLButtonElement>(`#${CSS.escape(`${tabId}-${next}-tab`)}`)
+              ?.focus();
+          }}
+        >
+          <button
+            type="button"
+            id={`${tabId}-annotations-tab`}
+            role="tab"
+            aria-selected={tab === 'annotations'}
+            aria-controls={`${tabId}-annotations`}
+            onClick={() => setTab('annotations')}
           >
-            <div className="annotation-panel">
-              <div className={`annotation-review annotation-review-${reviewState}`} role="status">
-                <ReviewIcon size={18} aria-hidden="true" />
-                <div>
-                  <strong>{reviewLabel}</strong>
-                  <p>{reviewDescription}</p>
-                </div>
-              </div>
-              <div className="annotation-status-list" aria-label="Anmerkungen nach Kategorie">
-                {indicators.map(({ Icon, count, label, state, category }) => (
-                  <button
-                    type="button"
-                    key={label}
-                    className={`annotation-indicator ${state}`}
-                    onClick={() => jumpTo(category)}
-                  >
-                    <Icon size={16} aria-hidden="true" />
-                    {count} {label}
-                  </button>
-                ))}
-              </div>
-              {excluded && <p className="inline-error">{excluded}</p>}
-              <div className="annotation-actions">
-                {onRewrite && (
-                  <button className="annotation-command" disabled={!!excluded} onClick={() => onRewrite('')}>
-                    <WandSparkles size={16} /> Notiz überarbeiten
-                  </button>
-                )}
-                <button
-                  className="annotation-command annotation-command-secondary"
-                  disabled={!!updating || hasUnsavedChanges || !!excluded}
-                  onClick={() => void refresh()}
-                >
-                  <RefreshCw size={15} className="annotation-refresh-icon" aria-hidden="true" />
-                  {updating === 'analysis' ? 'Wird aktualisiert …' : 'Aktualisieren'}
-                </button>
-                <button
-                  className="annotation-command annotation-command-secondary"
-                  disabled={!!updating || hasUnsavedChanges || !!excluded}
-                  onClick={() => void refresh(true)}
-                >
-                  <Globe size={15} /> {updating === 'research' ? 'Recherche läuft …' : 'Webrecherche starten'}
-                </button>
-              </div>
-              <p className="muted small">
-                Aktualisieren analysiert diese Notiz erneut. Webrecherche ergänzt Hintergrundwissen zu ihren
-                Themen und Links mit Quellen.
-              </p>
-              {updateError && (
-                <p role="alert" className="inline-error">
-                  {updateError}
-                </p>
-              )}
-              {!excluded && analysisCurrent && !annotationCount && (
-                <p className="annotation-empty">
-                  Hier erscheinen künftig passende Notizen, Aufgaben, PDF-Anmerkungen und Rechercheergebnisse.
-                </p>
-              )}
-              {[false, true].map(
-                (done) =>
-                  tasks.some((task) => task.done === done) && (
-                    <section
-                      className="annotation-section"
-                      key={String(done)}
-                      tabIndex={-1}
-                      ref={(el) => {
-                        anchors.current[done ? 'tasks-done' : 'tasks-open'] = el;
-                      }}
-                    >
-                      <h3>{done ? 'Erledigte Aufgaben' : 'Offene Aufgaben'}</h3>
-                      {tasks
-                        .filter((task) => task.done === done)
-                        .map((task) => (
-                          <TaskRow key={task.id} task={task} />
-                        ))}
-                    </section>
-                  ),
-              )}
-              {!!insights.length && (
+            Anmerkungen
+          </button>
+          <button
+            type="button"
+            id={`${tabId}-commands-tab`}
+            role="tab"
+            aria-selected={tab === 'commands'}
+            aria-controls={`${tabId}-commands`}
+            onClick={() => setTab('commands')}
+          >
+            Aufträge{commandCount ? ` · ${commandCount}` : ''}
+          </button>
+        </div>
+        <div
+          className="annotation-panel"
+          id={`${tabId}-annotations`}
+          role="tabpanel"
+          aria-labelledby={`${tabId}-annotations-tab`}
+          hidden={tab !== 'annotations'}
+        >
+          <details className={`annotation-review annotation-review-${reviewState}`}>
+            <summary>{reviewLabel}</summary>
+            <ReviewIcon size={18} aria-hidden="true" />
+            <div>
+              <p>{reviewDescription}</p>
+            </div>
+          </details>
+          <div className="annotation-status-list" aria-label="Anmerkungen nach Kategorie">
+            {indicators.map(({ Icon, count, label, state, category }) => (
+              <button
+                type="button"
+                key={label}
+                className={`annotation-indicator ${state}`}
+                onClick={() => jumpTo(category)}
+              >
+                <Icon size={16} aria-hidden="true" />
+                {count} {label}
+              </button>
+            ))}
+          </div>
+          {excluded && <p className="inline-error">{excluded}</p>}
+          <div className="annotation-actions">
+            {onRewrite && (
+              <button className="annotation-command" disabled={!!excluded} onClick={() => onRewrite('')}>
+                <WandSparkles size={16} /> Notiz überarbeiten
+              </button>
+            )}
+            <button
+              className="annotation-command annotation-command-secondary"
+              disabled={!!updating || hasUnsavedChanges || !!excluded}
+              onClick={() => void refresh()}
+            >
+              <RefreshCw size={15} className="annotation-refresh-icon" aria-hidden="true" />
+              {updating === 'analysis' ? 'Wird aktualisiert …' : 'Aktualisieren'}
+            </button>
+            <button
+              className="annotation-command annotation-command-secondary"
+              disabled={!!updating || hasUnsavedChanges || !!excluded}
+              onClick={() => void refresh(true)}
+            >
+              <Globe size={15} /> {updating === 'research' ? 'Recherche läuft …' : 'Webrecherche starten'}
+            </button>
+          </div>
+          {updateError && (
+            <p role="alert" className="inline-error">
+              {updateError}
+            </p>
+          )}
+          {!excluded && analysisCurrent && !annotationCount && (
+            <p className="annotation-empty">
+              Hier erscheinen künftig passende Notizen, Aufgaben, PDF-Anmerkungen und Rechercheergebnisse.
+            </p>
+          )}
+          {[false, true].map(
+            (done) =>
+              tasks.some((task) => task.done === done) && (
                 <section
                   className="annotation-section"
+                  key={String(done)}
                   tabIndex={-1}
                   ref={(el) => {
-                    anchors.current.insights = el;
+                    anchors.current[done ? 'tasks-done' : 'tasks-open'] = el;
                   }}
                 >
-                  <h3>PDF-Anmerkungen</h3>
-                  {excluded && <p>{excluded}</p>}
-                  {!excluded &&
-                    insights.map(({ item, source }, index) => (
-                      <article className="pdf-insight" key={`${item.quote}:${index}`}>
-                        <strong>{item.title}</strong>
-                        <p>{item.detail}</p>
-                        <blockquote>{item.quote}</blockquote>
-                        {source?.attachment && (
-                          <small>
-                            <AttachmentTitle
-                              content={note.content}
-                              id={source.attachment}
-                              scope={note.scope}
-                            />
-                            {source.page ? ` · Seite ${source.page}` : ''}
-                          </small>
-                        )}
-                      </article>
+                  <h3>{done ? 'Erledigte Aufgaben' : 'Offene Aufgaben'}</h3>
+                  {tasks
+                    .filter((task) => task.done === done)
+                    .map((task) => (
+                      <TaskRow key={task.id} task={task} />
                     ))}
                 </section>
+              ),
+          )}
+          {!!insights.length && (
+            <section
+              className="annotation-section"
+              tabIndex={-1}
+              ref={(el) => {
+                anchors.current.insights = el;
+              }}
+            >
+              <h3>PDF-Anmerkungen</h3>
+              {excluded && <p>{excluded}</p>}
+              {!excluded &&
+                insights.map(({ item, source }, index) => (
+                  <article className="pdf-insight" key={`${item.quote}:${index}`}>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                    <blockquote>{item.quote}</blockquote>
+                    {source?.attachment && (
+                      <small>
+                        <AttachmentTitle content={note.content} id={source.attachment} scope={note.scope} />
+                        {source.page ? ` · Seite ${source.page}` : ''}
+                      </small>
+                    )}
+                  </article>
+                ))}
+            </section>
+          )}
+          {!!relations.length && (
+            <section
+              className="annotation-section"
+              tabIndex={-1}
+              ref={(el) => {
+                anchors.current.relations = el;
+              }}
+            >
+              <h3>Offene Verlinkungen</h3>
+              {hasUnsavedChanges && <p>Speichere die Notiz, um eine Verlinkung zu übernehmen.</p>}
+              {excluded ? (
+                <p>{excluded}</p>
+              ) : (
+                <RelationSuggestions
+                  note={note}
+                  notes={notes}
+                  records={records}
+                  disabled={hasUnsavedChanges}
+                  onAccept={onAcceptRelation}
+                />
               )}
-              {!!relations.length && (
-                <section
-                  className="annotation-section"
-                  tabIndex={-1}
-                  ref={(el) => {
-                    anchors.current.relations = el;
-                  }}
-                >
-                  <h3>Offene Verlinkungen</h3>
-                  {hasUnsavedChanges && <p>Speichere die Notiz, um eine Verlinkung zu übernehmen.</p>}
-                  {excluded ? (
-                    <p>{excluded}</p>
-                  ) : (
-                    <RelationSuggestions
-                      note={note}
-                      notes={notes}
-                      records={records}
-                      disabled={hasUnsavedChanges}
-                      onAccept={onAcceptRelation}
-                    />
-                  )}
-                </section>
-              )}
-              {!!acceptedLinks && (
-                <section
-                  className="annotation-section"
-                  tabIndex={-1}
-                  ref={(el) => {
-                    anchors.current.accepted = el;
-                  }}
-                >
-                  <h3>Übernommene Verlinkungen</h3>
-                  <p>
-                    {acceptedLinks} {acceptedLinks === 1 ? 'Verlinkung ist' : 'Verlinkungen sind'} bereits im
-                    Notiztext eingefügt. Du kannst die verknüpften Notizen dort über ihre Links öffnen.
-                  </p>
-                </section>
-              )}
-              {!!uniqueResearch.length && (
-                <section
-                  className="annotation-section"
-                  tabIndex={-1}
-                  ref={(el) => {
-                    anchors.current.research = el;
-                  }}
-                >
-                  <h3>Rechercheergebnisse</h3>
-                  {uniqueResearch.map((r) => (
-                    <article key={r.id}>
-                      <strong>Recherche</strong>
-                      <NoteMarkdown
-                        content={compactParenthesizedLines((r.data as Research).text)}
-                        scope={note.scope}
-                      />
-                      <Sources sources={(r.data as Research).sources ?? []} compact />
-                    </article>
-                  ))}
-                </section>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+            </section>
+          )}
+          {!!acceptedLinks && (
+            <section
+              className="annotation-section"
+              tabIndex={-1}
+              ref={(el) => {
+                anchors.current.accepted = el;
+              }}
+            >
+              <h3>Übernommene Verlinkungen</h3>
+              <p>
+                {acceptedLinks} {acceptedLinks === 1 ? 'Verlinkung ist' : 'Verlinkungen sind'} bereits im
+                Notiztext eingefügt. Du kannst die verknüpften Notizen dort über ihre Links öffnen.
+              </p>
+            </section>
+          )}
+          {!!uniqueResearch.length && (
+            <section
+              className="annotation-section"
+              tabIndex={-1}
+              ref={(el) => {
+                anchors.current.research = el;
+              }}
+            >
+              <h3>Rechercheergebnisse</h3>
+              {uniqueResearch.map((r) => (
+                <article key={r.id}>
+                  <strong>Recherche</strong>
+                  <NoteMarkdown
+                    content={compactParenthesizedLines((r.data as Research).text)}
+                    scope={note.scope}
+                  />
+                  <Sources sources={(r.data as Research).sources ?? []} compact />
+                </article>
+              ))}
+            </section>
+          )}
+        </div>
+        <div
+          className="annotation-panel"
+          id={`${tabId}-commands`}
+          role="tabpanel"
+          aria-labelledby={`${tabId}-commands-tab`}
+          hidden={tab !== 'commands'}
+        >
+          {commands}
+        </div>
+      </div>
+    </div>
   );
 }

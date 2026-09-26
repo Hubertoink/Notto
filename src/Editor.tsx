@@ -9,7 +9,7 @@ import {
 } from './note-tools';
 import { createPortal } from 'react-dom';
 import { AttachmentTitle } from './AttachmentTitle';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   WandSparkles,
@@ -47,7 +47,7 @@ import { applyRelation, type Relation } from './note-relations';
 import { eligible } from './intelligence';
 import { tagPopupPosition } from './tag-popup';
 import { NoteCommands } from './NoteCommands';
-import { noteCommands } from './note-command';
+import { noteCommands, withoutNoteCommands } from './note-command';
 import { readCloudConfig, syncNotes } from './cloud';
 import { serverRequest } from './backend';
 import { contentRevision } from './domain';
@@ -71,7 +71,9 @@ export function Editor({
   onClose?: () => void;
   aiBackgroundEnabled?: boolean;
 }) {
-  const { scope, notify, notes } = useNotto();
+  const { scope, notify, notes, sync } = useNotto();
+  const draftNote = useMemo(() => newNote(scope, ''), [scope]);
+  const [commandCount, setCommandCount] = useState(0);
   const collectionRecords = useKnowledgeRecords(scope);
   const knownCollections = collectionNames(notes || [], collectionRecords, scope);
   const [content, setContent] = useState(note?.content ?? '');
@@ -438,8 +440,19 @@ export function Editor({
     const previous = observedRevision.current;
     observedRevision.current = note?.revision;
     // A drop changes metadata only. Merge it without discarding an open text draft.
-    if (!note || previous === note.revision || base.current !== previous || note.content !== initial.current)
-      return;
+    if (!note || previous === note.revision || base.current !== previous) return;
+    if (note.content !== initial.current) {
+      const remaining = new Set(noteCommands(note.content).map((command) => command.prompt));
+      const removed = noteCommands(initial.current)
+        .map((command) => command.prompt)
+        .filter((prompt) => !remaining.has(prompt));
+      // Merge only the server's exact command-line cleanup into a live draft.
+      // A changed instruction or any unrelated user text remains untouched.
+      if (!removed.length || withoutNoteCommands(initial.current, removed) !== note.content) return;
+      initial.current = note.content;
+      textRef.current = withoutNoteCommands(textRef.current, removed);
+      setContent(textRef.current);
+    }
     const before = initialCollectionRef.current;
     const local = collectionRef.current;
     const removed = before.filter((name) => !local.includes(name));
@@ -551,9 +564,52 @@ export function Editor({
     JSON.stringify(collections) !== JSON.stringify(initialCollectionRef.current);
   const outgoing = linkedNotes(content, notes || [], scope);
   const incoming = note ? backlinks(note, notes || []) : [];
+  const commandsPanel = (
+    <NoteCommands
+      key={`${scope}:${note?.id || 'new'}`}
+      content={content}
+      onCount={setCommandCount}
+      onCompleted={sync}
+      noteId={note?.id}
+      scope={scope}
+      editing={!preview}
+      dirty={dirty}
+      onStart={async (prompt, id) => {
+        try {
+          const saved = dirty || !note ? await save() : note;
+          if (!saved)
+            throw new Error('Die Notiz konnte nicht gespeichert werden. Bitte den Hinweis im Editor prüfen.');
+          // An in-flight sync may have read the notebook before this save.
+          // Wait for it, then run a pass that includes the saved revision.
+          const conflicts = (await syncNotes(scope)) + (await syncNotes(scope));
+          if (conflicts)
+            throw new Error('Es gibt eine Konfliktkopie. Bitte zuerst die gewünschte Notizfassung öffnen.');
+          // Saving may already have queued this instruction on the server.
+          const queued = await serverRequest(readCloudConfig().url, `/commands?noteId=${saved.id}`);
+          const active = queued.commands.find(
+            (command: import('./note-command').NoteCommand) =>
+              command.prompt === prompt &&
+              (['pending', 'running'].includes(command.status) ||
+                ((dirty || !note) && command.revision === contentRevision(saved))),
+          );
+          if (active) return active;
+          const result = await serverRequest(readCloudConfig().url, `/commands/${id}`, {
+            noteId: saved.id,
+            revision: contentRevision(saved),
+            prompt,
+          });
+          return result.command;
+        } catch (error) {
+          // Saving a new note remounts this editor; keep failures visible.
+          notify(error instanceof Error ? error.message : 'Auftrag konnte nicht gestartet werden.');
+          throw error;
+        }
+      }}
+    />
+  );
   return (
     <section
-      className={`editor ${compact ? 'editor-compact' : ''} ${preview ? 'editor-reading' : ''} ${note && !compact ? 'editor-with-annotations' : ''}`}
+      className={`editor ${compact ? 'editor-compact' : ''} ${preview ? 'editor-reading' : ''} ${!compact ? 'editor-with-annotations' : ''}`}
       aria-label={note ? 'Notiz bearbeiten' : 'Neue Notiz'}
     >
       <div className="editor-heading">
@@ -900,51 +956,6 @@ export function Editor({
               })}
           </div>
         )}
-        {!compact && (
-          <NoteCommands
-            key={`${scope}:${note?.id || 'new'}`}
-            content={content}
-            noteId={note?.id}
-            scope={scope}
-            editing={!preview}
-            dirty={dirty}
-            onStart={async (prompt, id) => {
-              try {
-                const saved = dirty || !note ? await save() : note;
-                if (!saved)
-                  throw new Error(
-                    'Die Notiz konnte nicht gespeichert werden. Bitte den Hinweis im Editor prüfen.',
-                  );
-                // An in-flight sync may have read the notebook before this save.
-                // Wait for it, then run a pass that includes the saved revision.
-                const conflicts = (await syncNotes(scope)) + (await syncNotes(scope));
-                if (conflicts)
-                  throw new Error(
-                    'Es gibt eine Konfliktkopie. Bitte zuerst die gewünschte Notizfassung öffnen.',
-                  );
-                // Saving may already have queued this instruction on the server.
-                const queued = await serverRequest(readCloudConfig().url, `/commands?noteId=${saved.id}`);
-                const active = queued.commands.find(
-                  (command: import('./note-command').NoteCommand) =>
-                    command.prompt === prompt &&
-                    (['pending', 'running'].includes(command.status) ||
-                      ((dirty || !note) && command.revision === contentRevision(saved))),
-                );
-                if (active) return active;
-                const result = await serverRequest(readCloudConfig().url, `/commands/${id}`, {
-                  noteId: saved.id,
-                  revision: contentRevision(saved),
-                  prompt,
-                });
-                return result.command;
-              } catch (error) {
-                // Saving a new note remounts this editor; keep failures visible.
-                notify(error instanceof Error ? error.message : 'Auftrag konnte nicht gestartet werden.');
-                throw error;
-              }
-            }}
-          />
-        )}
         {tagsOf(content).length > 0 && (
           <div className="editor-tags">
             {tagsOf(content).map((tag) => (
@@ -1064,10 +1075,13 @@ export function Editor({
           </div>
         )}
       </div>
-      {note && !compact && (
+      {!compact && (
         <NoteAnnotations
-          key={note.id}
-          note={note}
+          key={note?.id || 'new'}
+          note={note || { ...draftNote, content }}
+          commands={commandsPanel}
+          commandCount={commandCount}
+          hasCommandDrafts={noteCommands(content).length > 0}
           hasUnsavedChanges={dirty}
           onRewrite={setRewriteRequest}
           onAcceptRelation={async (relation: Relation) => {

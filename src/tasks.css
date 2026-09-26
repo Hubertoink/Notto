@@ -82,11 +82,81 @@
   margin: 8px 0 18px;
   flex-shrink: 0;
 }
+.editor.editor-with-annotations {
+  flex: 1 0 auto;
+  min-width: 0;
+}
 .annotation-shell {
+  min-width: 0;
   border: 1px solid var(--nt-line);
   border-radius: 12px;
   overflow: hidden;
   max-width: 100%;
+}
+.annotation-shell [hidden] {
+  display: none !important;
+}
+.annotation-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--nt-line);
+  padding: 0 12px;
+}
+.annotation-tabs button {
+  padding: 10px 12px;
+  color: var(--nt-muted);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+}
+.annotation-tabs button[aria-selected='true'] {
+  color: var(--nt-text);
+  border-bottom-color: var(--nt-accent);
+  font-weight: 700;
+}
+.annotation-inline .annotation-panel {
+  max-height: none;
+  overflow: visible;
+}
+.annotation-panel[role='tabpanel'] {
+  min-width: 0;
+}
+.annotation-panel .markdown-table-scroll {
+  margin: 16px 0;
+  border: 1px solid light-dark(#aebdd4, #66758f);
+  border-radius: 6px;
+  background: light-dark(#f2f5fc, #222c3c);
+}
+.annotation-panel .markdown-table-scroll th {
+  background: light-dark(#dce5f5, #36465f);
+  color: light-dark(#172b4a, #f2f6ff);
+}
+.annotation-panel .markdown-table-scroll td {
+  background: light-dark(#f4f7fc, #253044);
+  color: light-dark(#21324b, #edf1fa);
+}
+.annotation-panel .markdown-table-scroll tr:nth-child(even) td {
+  background: light-dark(#e7edf7, #2d3a50);
+}
+.annotation-panel .markdown-table-scroll th,
+.annotation-panel .markdown-table-scroll td {
+  border-color: light-dark(#bdcadf, #53627a);
+  min-width: 10rem;
+  max-width: 22rem;
+}
+.annotation-panel .markdown {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+}
+.annotation-panel .markdown h1 {
+  font-size: 1.25rem;
+}
+.annotation-panel .markdown h2 {
+  font-size: 1.125rem;
+}
+.annotation-panel .markdown h3 {
+  font-size: 1rem;
 }
 .annotation-shell.annotation-open {
   background: light-dark(#eef2f8, #2a2d3c);
@@ -101,11 +171,27 @@
   background-size: cover;
 }
 .annotation-heading {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+.annotation-heading .annotation-toggle {
+  grid-column: 1;
+}
+.annotation-heading-indicators {
+  grid-column: 1;
+}
+.annotation-heading .annotation-close {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  margin-top: 8px;
+}
+.annotation-heading-indicators:empty {
+  display: none;
 }
 .annotation-heading-indicators {
   display: flex;
@@ -183,14 +269,14 @@
   font-size: 12px;
 }
 .annotation-review {
-  display: flex;
+  display: block;
   align-items: flex-start;
   gap: 9px;
-  margin: 7px 0 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--nt-line);
+  margin: 8px 0 12px;
+  padding: 0;
+  border: 0;
   border-radius: 9px;
-  background: var(--nt-paper);
+  background: transparent;
   font-size: 13px;
 }
 .annotation-review > svg {

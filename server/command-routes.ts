@@ -7,6 +7,7 @@ import { commandUrls, noteCommands } from '../src/note-command.js';
 import type { AIEnvironment } from './openai.js';
 import { limit, type Database } from './database.js';
 import { publicUrl } from './browser-network.js';
+import { cleanCompletedPrompts } from './command-cleanup.js';
 
 const fields = 'id,note_id,revision,prompt,status,stage,error,result,created_at';
 const fail = (message: string, statusCode: number): never => {
@@ -22,6 +23,17 @@ export async function queueSavedCommands(
   env: AIEnvironment,
 ) {
   if (note.deleted) return;
+  if (noteCommands(note.content).length) {
+    const completed = (
+      await client.query(
+        "SELECT prompt,result FROM note_commands WHERE user_id=$1 AND note_id=$2 AND status='done'",
+        [user, note.id],
+      )
+    ).rows
+      .filter((command) => command.result?.items?.length || command.result?.research)
+      .map((command) => command.prompt);
+    if (completed.length) note = (await cleanCompletedPrompts(client, user, note.id, completed)) || note;
+  }
   const prompts = [
     ...new Set(
       noteCommands(note.content)

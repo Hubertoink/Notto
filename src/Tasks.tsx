@@ -1,6 +1,18 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, useRef, type CSSProperties } from 'react';
-import { Sparkles, X, WandSparkles, RefreshCw, Globe, ListTodo, Link2, FileText } from 'lucide-react';
+import {
+  Sparkles,
+  X,
+  WandSparkles,
+  RefreshCw,
+  Globe,
+  ListTodo,
+  Link2,
+  FileText,
+  CircleCheck,
+  Clock3,
+  CircleAlert,
+} from 'lucide-react';
 import {
   analyze,
   research as researchNote,
@@ -164,7 +176,7 @@ export function NoteAnnotations({
   const [docked, setDocked] = useState(false);
   const [closing, setClosing] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('notto-ai-sidebar') !== 'closed');
-  const [updating, setUpdating] = useState(false);
+  const [updating, setUpdating] = useState<'analysis' | 'research' | null>(null);
   const [updateError, setUpdateError] = useState('');
   const [aiBackground, setAiBackground] = useState<string | null>(() =>
     aiBackgroundEnabled
@@ -200,7 +212,7 @@ export function NoteAnnotations({
   const reduced = useReducedMotion();
   const refresh = async (web = false) => {
     if (updating || hasUnsavedChanges) return;
-    setUpdating(true);
+    setUpdating(web ? 'research' : 'analysis');
     setUpdateError('');
     try {
       if (web)
@@ -214,10 +226,11 @@ export function NoteAnnotations({
     } catch (error) {
       setUpdateError(error instanceof Error ? error.message : String(error));
     } finally {
-      setUpdating(false);
+      setUpdating(null);
     }
   };
   const analysis = noteAnalysis(records, note);
+  const analysisCurrent = !!analysis && currentContent(note, analysis.revision);
   const insights =
     analysis && currentContent(note, analysis.revision)
       ? ((analysis.data as Analysis).suggestions || [])
@@ -284,6 +297,47 @@ export function NoteAnnotations({
     { Icon: Link2, count: acceptedLinks, label: 'Verlinkungen übernommen', state: 'complete' },
     { Icon: FileText, count: insights.length, label: 'PDF-Anmerkungen vorhanden', state: 'complete' },
   ].filter((indicator) => indicator.count > 0);
+  const annotationCount = tasks.length + insights.length + uniqueResearch.length + relations.length;
+  const reviewState = excluded
+    ? 'excluded'
+    : updating === 'analysis'
+      ? 'running'
+      : hasUnsavedChanges
+        ? 'unsaved'
+        : analysisCurrent
+          ? 'checked'
+          : analysis
+            ? 'outdated'
+            : 'pending';
+  const reviewLabel = {
+    excluded: 'KI-Prüfung ausgeschlossen',
+    running: 'KI prüft die Notiz …',
+    unsaved: 'Änderungen noch nicht geprüft',
+    checked: annotationCount ? 'KI-geprüft' : 'Geprüft · keine Hinweise',
+    outdated: 'Prüfung veraltet',
+    pending: 'Noch kein Prüfergebnis',
+  }[reviewState];
+  const reviewDescription = {
+    excluded: 'Für diese Notiz ist die KI-Prüfung ausgeschlossen.',
+    running: 'Die gespeicherte Textversion wird gerade geprüft.',
+    unsaved: 'Speichere deine Änderungen, damit die aktuelle Fassung geprüft werden kann.',
+    checked: analysis
+      ? `Diese Textversion wurde am ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(analysis.at))} geprüft.${annotationCount ? ` ${annotationCount} ${annotationCount === 1 ? 'Eintrag' : 'Einträge'} in den Anmerkungen.` : ' Keine offenen Hinweise.'}`
+      : '',
+    outdated:
+      'Die Notiz wurde seit der letzten KI-Prüfung geändert. Aktualisiere die Anmerkungen für diese Textversion.',
+    pending: config(note.scope).auto
+      ? 'Für diese Textversion liegt noch keine abgeschlossene Prüfung vor. Die automatische Prüfung ist eingeschaltet.'
+      : 'Für diese Textversion liegt noch keine abgeschlossene Prüfung vor. Du kannst sie mit „Aktualisieren“ prüfen.',
+  }[reviewState];
+  const ReviewIcon =
+    reviewState === 'checked'
+      ? CircleCheck
+      : reviewState === 'outdated' || reviewState === 'excluded'
+        ? CircleAlert
+        : reviewState === 'running'
+          ? RefreshCw
+          : Clock3;
   return (
     <motion.div
       layout={!reduced && !docked}
@@ -304,10 +358,13 @@ export function NoteAnnotations({
           onClick={() => {
             toggle(!expanded);
           }}
-          title="KI-Anmerkungen direkt in der Notiz anzeigen"
+          title={`${reviewLabel}. KI-Anmerkungen direkt in der Notiz anzeigen`}
         >
           <Sparkles size={17} />
           <span>KI-Anmerkungen</span>
+          <span className={`annotation-status annotation-status-${reviewState}`}>
+            <ReviewIcon size={14} aria-hidden="true" /> {reviewLabel}
+          </span>
           {indicators.map(({ Icon, count, label, state }) => (
             <span
               key={label}
@@ -344,6 +401,13 @@ export function NoteAnnotations({
             style={{ overflow: 'hidden' }}
           >
             <div className="annotation-panel">
+              <div className={`annotation-review annotation-review-${reviewState}`} role="status">
+                <ReviewIcon size={18} aria-hidden="true" />
+                <div>
+                  <strong>{reviewLabel}</strong>
+                  <p>{reviewDescription}</p>
+                </div>
+              </div>
               <div className="annotation-status-list" aria-label="Anmerkungen nach Kategorie">
                 {indicators.map(({ Icon, count, label, state }) => (
                   <span key={label} className={`annotation-indicator ${state}`}>
@@ -361,43 +425,34 @@ export function NoteAnnotations({
                 )}
                 <button
                   className="annotation-command annotation-command-secondary"
-                  disabled={updating || hasUnsavedChanges || !!excluded}
+                  disabled={!!updating || hasUnsavedChanges || !!excluded}
                   onClick={() => void refresh()}
                 >
-                  <RefreshCw size={15} />
-                  {updating ? 'Wird aktualisiert …' : 'Aktualisieren'}
+                  <RefreshCw size={15} className="annotation-refresh-icon" aria-hidden="true" />
+                  {updating === 'analysis' ? 'Wird aktualisiert …' : 'Aktualisieren'}
                 </button>
                 <button
                   className="annotation-command annotation-command-secondary"
-                  disabled={updating || hasUnsavedChanges || !!excluded}
+                  disabled={!!updating || hasUnsavedChanges || !!excluded}
                   onClick={() => void refresh(true)}
                 >
-                  <Globe size={15} /> Webrecherche starten
+                  <Globe size={15} /> {updating === 'research' ? 'Recherche läuft …' : 'Webrecherche starten'}
                 </button>
               </div>
               <p className="muted small">
                 Aktualisieren analysiert diese Notiz erneut. Webrecherche ergänzt Hintergrundwissen zu ihren
                 Themen und Links mit Quellen.
               </p>
-              {analysis && !currentContent(note, analysis.revision) && (
-                <p className="muted small">Anmerkungen zur früheren Textversion.</p>
-              )}
-              {hasUnsavedChanges && <p className="muted">Änderungen zuerst speichern, dann aktualisieren.</p>}
               {updateError && (
                 <p role="alert" className="inline-error">
                   {updateError}
                 </p>
               )}
-              {!excluded &&
-                !tasks.length &&
-                !insights.length &&
-                !uniqueResearch.length &&
-                !relations.length && (
-                  <p className="annotation-empty">
-                    Keine offenen Hinweise. Hier erscheinen passende Notizen, Aufgaben, PDF-Anmerkungen und
-                    Rechercheergebnisse.
-                  </p>
-                )}
+              {!excluded && analysisCurrent && !annotationCount && (
+                <p className="annotation-empty">
+                  Hier erscheinen künftig passende Notizen, Aufgaben, PDF-Anmerkungen und Rechercheergebnisse.
+                </p>
+              )}
               {tasks.map((task) => (
                 <TaskRow key={task.id} task={task} />
               ))}

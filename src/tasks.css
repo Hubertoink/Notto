@@ -137,6 +137,67 @@
   color: var(--nt-muted);
   border: 1px solid var(--nt-line);
 }
+.annotation-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: var(--nt-paper);
+  color: var(--nt-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.annotation-status-checked,
+.annotation-review-checked {
+  color: light-dark(#236347, #a5dfbd);
+}
+.annotation-status-outdated,
+.annotation-status-unsaved,
+.annotation-review-outdated,
+.annotation-review-unsaved {
+  color: light-dark(#875d21, #f2cb8a);
+}
+.annotation-count {
+  min-width: 18px;
+  text-align: center;
+  color: var(--nt-text);
+  font-size: 12px;
+}
+.annotation-review {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 7px 0 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--nt-line);
+  border-radius: 9px;
+  background: var(--nt-paper);
+  font-size: 13px;
+}
+.annotation-review > svg {
+  flex: 0 0 auto;
+}
+.annotation-review strong {
+  font-size: 13px;
+}
+.annotation-review p {
+  margin: 3px 0 0;
+  color: var(--nt-muted);
+  font-size: 12px;
+}
+.annotation-command:hover:not(:disabled) .annotation-refresh-icon,
+.annotation-command:focus-visible:not(:disabled) .annotation-refresh-icon {
+  transform: rotate(45deg);
+}
+.annotation-refresh-icon {
+  transition: transform 220ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .annotation-refresh-icon {
+    transition: none;
+  }
+}
 .annotation-toggle.has-annotations {
   color: var(--nt-text);
   background: var(--nt-paper);

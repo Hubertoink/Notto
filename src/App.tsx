@@ -27,6 +27,7 @@ import { useNotto } from './state';
 import { Action, Modal } from './components';
 import { BauhausComposition, GeometricMark, TagLabel, TagMark } from './Bauhaus';
 import { Editor } from './Editor';
+import { AnimatedTrashIcon } from './AnimatedTrashIcon';
 import { Settings } from './Settings';
 import { WebAccess } from './Login';
 import { Widget } from './Widget';
@@ -678,7 +679,7 @@ function Notebook({
           </nav>
         </div>
         <div className="sidebar-trash">
-          {nav('trash', 'Papierkorb', <Trash2 size={17} />, notes.filter((n) => n.deleted).length)}
+          {nav('trash', 'Papierkorb', <AnimatedTrashIcon size={17} />, notes.filter((n) => n.deleted).length)}
         </div>
         <div className="sidebar-bottom">
           <input
@@ -900,6 +901,7 @@ function Notebook({
                       <Action
                         label={selectedNote.pinned ? 'Loslösen' : 'Anheften'}
                         icon={<Pin size={16} />}
+                        className="note-action-pin"
                         isIconOnly
                         variant="ghost"
                         onClick={() => void patch(selectedNote, { pinned: !selectedNote.pinned })}
@@ -907,13 +909,15 @@ function Notebook({
                       <Action
                         label={selectedNote.archived ? 'Aus Archiv holen' : 'Archivieren'}
                         icon={<Archive size={16} />}
+                        className="note-action-archive"
                         isIconOnly
                         variant="ghost"
                         onClick={() => void patch(selectedNote, { archived: !selectedNote.archived })}
                       />
                       <Action
                         label="In den Papierkorb"
-                        icon={<Trash2 size={16} />}
+                        icon={<AnimatedTrashIcon size={16} />}
+                        className="note-action-trash"
                         isIconOnly
                         variant="ghost"
                         onClick={() => void patch(selectedNote, { deleted: true })}

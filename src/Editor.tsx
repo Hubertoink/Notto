@@ -567,6 +567,7 @@ export function Editor({
               <Action
                 label={rewriting ? 'Wird überarbeitet …' : 'Mit KI überarbeiten'}
                 icon={<WandSparkles size={17} />}
+                className="note-action-ai"
                 isIconOnly
                 variant="ghost"
                 isDisabled={rewriting || saving || !ready || !content.trim()}
@@ -590,6 +591,7 @@ export function Editor({
             <Action
               label={preview ? 'Bearbeiten' : 'Vorschau'}
               icon={preview ? <PenLine size={17} /> : <Eye size={17} />}
+              className={preview ? 'note-action-edit' : 'note-action-preview'}
               isIconOnly
               variant="ghost"
               onClick={() => setPreview(!preview)}
@@ -598,6 +600,7 @@ export function Editor({
               <Action
                 label="Versionshistorie"
                 icon={<History size={17} />}
+                className="note-action-history"
                 isIconOnly
                 variant="ghost"
                 onClick={() => setHistory(true)}
@@ -896,7 +899,7 @@ export function Editor({
           <div className="note-collections">
             <button
               type="button"
-              className="text-button"
+              className="text-button note-action-collections"
               aria-expanded={collectionsOpen}
               onClick={() => setCollectionsOpen(!collectionsOpen)}
             >
@@ -1072,6 +1075,7 @@ export function Editor({
               label="Bild oder PDF hinzufügen"
               tooltip="Bild oder PDF hinzufügen – Dateien kannst du auch in die Notiz ziehen"
               icon={<ImagePlus size={18} />}
+              className="note-action-image"
               isIconOnly
               variant="ghost"
               onClick={() => file.current?.click()}
@@ -1107,6 +1111,7 @@ export function Editor({
             tooltip="Notiz speichern (Strg + Enter)"
             variant="primary"
             icon={note && !dirty ? <Check size={16} /> : <Save size={16} />}
+            className="note-action-save"
             isDisabled={!ready || addingImages > 0 || !content.trim() || Boolean(note && !dirty)}
             isLoading={saving}
             onClick={() => void save()}

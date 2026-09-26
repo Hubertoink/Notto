@@ -23,7 +23,7 @@ await new Promise((done, reject) => {
 const { buildApp } = await import('../build-server/server/app.js');
 const { hashPassword } = await import('../build-server/server/security.js');
 const { newNote } = await import('../build-server/src/domain.js');
-const dir = resolve('.notto-dev');
+const dir = resolve(process.env.NOTTO_DEV_DIR || '.notto-dev');
 await mkdir(dir, { recursive: true });
 const pg = new PGlite(resolve(dir, 'database'));
 await pg.exec(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));

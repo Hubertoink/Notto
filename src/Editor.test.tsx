@@ -322,13 +322,40 @@ it('refreshes outdated annotations from the saved revision and closes through th
   );
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
-  await screen.findByText(/früheren Textversion/);
+  await waitFor(() => expect(screen.getAllByText('Prüfung veraltet')).toHaveLength(2));
   await user.click(screen.getByRole('button', { name: 'Aktualisieren' }));
   await waitFor(() => expect(analyze).toHaveBeenCalledWith(note));
-  await waitFor(() => expect(screen.queryByText(/früheren Textversion/)).toBeNull());
+  await waitFor(() => expect(screen.queryAllByText('Prüfung veraltet')).toHaveLength(0));
+  expect(screen.getAllByText(/Geprüft · keine Hinweise/).length).toBeGreaterThan(0);
   expect(await repo.get('local', note.id)).toEqual(note);
   await user.click(screen.getByRole('button', { name: 'Anmerkungen schließen' }));
   expect(screen.getByRole('button', { name: /KI-Anmerkungen/ }).getAttribute('aria-expanded')).toBe('false');
+});
+it('distinguishes an unreviewed note from a checked note without suggestions', async () => {
+  const note = newNote('local', 'Eine Notiz ohne offene Aufgaben');
+  await repo.put(note, null);
+  const view = render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  await userEvent.setup().click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
+  expect(screen.getAllByText('Noch kein Prüfergebnis')).toHaveLength(2);
+  expect(screen.queryByText('Geprüft · keine Hinweise')).toBeNull();
+  view.unmount();
+  await knowledge.append(note, 'analysis', { suggestions: [] });
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  await userEvent.setup().click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
+  expect(screen.getAllByText('Geprüft · keine Hinweise')).toHaveLength(2);
+  expect(screen.getByText(/Diese Textversion wurde am/)).toBeTruthy();
 });
 it('recovers an unfinished draft after closing and saves its exact text', async () => {
   const user = userEvent.setup();

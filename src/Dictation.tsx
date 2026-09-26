@@ -194,6 +194,7 @@ export function Dictation({ scope, onInsert }: { scope: string; onInsert: (text:
       <Action
         label="Notiz diktieren"
         icon={<Mic size={18} />}
+        className="note-action-mic"
         variant="ghost"
         isIconOnly
         onClick={() => setOpen(true)}

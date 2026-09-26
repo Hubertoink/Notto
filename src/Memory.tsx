@@ -7,6 +7,7 @@ import { saveMemory, suggestMemory } from './memory-client';
 import { config, eligible, knowledge } from './intelligence';
 import { contentRevision, titleOf } from './domain';
 import { Action, Modal } from './components';
+import { AnimatedTrashIcon } from './AnimatedTrashIcon';
 import './memory.css';
 
 const categories = {
@@ -265,30 +266,22 @@ export function MemorySettings() {
                       ) : (
                         <p className="muted">Von dir eingetragen.</p>
                       )}
-                      <button
-                        className="text-button"
-                        disabled={busy}
-                        onClick={() => {
-                          openEditor(category);
-                          setProject(entry.project ?? '');
-                          setSupersedes([entry.key]);
-                        }}
-                      >
-                        Durch neue Information ersetzen
-                      </button>
-                      <button
-                        className="text-button"
-                        disabled={busy}
-                        onClick={() =>
-                          void run(async () => {
-                            await saveMemory(scope, { ...entry, text: '', sources: [], status: 'forgotten' });
-                            return 'Wird für künftige KI-Anfragen nicht mehr verwendet.';
-                          })
-                        }
-                      >
-                        Vergessen
-                      </button>
                     </details>
+                    <button
+                      type="button"
+                      className="memory-forget note-action-trash"
+                      aria-label="Vergessen"
+                      title="Vergessen"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await saveMemory(scope, { ...entry, text: '', sources: [], status: 'forgotten' });
+                          return 'Wird für künftige KI-Anfragen nicht mehr verwendet.';
+                        })
+                      }
+                    >
+                      <AnimatedTrashIcon size={17} />
+                    </button>
                   </article>
                 ))}
                 {!entries.length && (

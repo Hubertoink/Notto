@@ -164,6 +164,26 @@
   padding-left: 10px;
   border-left: 2px solid var(--nt-accent);
 }
+.memory-forget {
+  justify-self: end;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--nt-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.memory-forget:is(:hover, :focus-visible):not(:disabled) {
+  color: var(--nt-error);
+  background: light-dark(#fff0ed, #3b2722);
+  border-color: color-mix(in srgb, var(--nt-error) 45%, transparent);
+}
+.memory-forget:disabled {
+  opacity: 0.45;
+}
 .memory-column footer {
   display: flex;
   flex-direction: column;

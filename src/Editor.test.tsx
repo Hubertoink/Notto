@@ -170,8 +170,11 @@ it('saves, edits and forgets personal instructions in the settings surface', asy
   await user.click(screen.getByRole('button', { name: 'Änderungen speichern' }));
   expect(await screen.findByText('Bitte sachlich antworten.')).toBeTruthy();
   expect(screen.queryByText('Bitte knapp antworten.')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Durch neue Information ersetzen' })).toBeNull();
+  const forget = screen.getByRole('button', { name: 'Vergessen' });
+  expect(forget.classList.contains('note-action-trash')).toBe(true);
   await user.click(screen.getByText('Details & Verwaltung'));
-  await user.click(screen.getByRole('button', { name: 'Vergessen' }));
+  await user.click(forget);
   await waitFor(() => expect(screen.queryByText('Bitte sachlich antworten.')).toBeNull());
   expect(memoryState(await knowledge.list('local'), 'local').entries).toEqual([]);
   await user.click(screen.getByRole('button', { name: 'Pausieren' }));

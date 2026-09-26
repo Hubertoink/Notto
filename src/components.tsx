@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { Button, type ButtonProps } from '@astryxdesign/core/Button';
 import { Dialog } from '@astryxdesign/core/Dialog';
 import { X, ImageOff, Globe, ChevronDown, Download, Trash2, Link2 } from 'lucide-react';
@@ -29,6 +29,11 @@ function NoteReferencePreview({
 }) {
   const { notes = [], notify } = useNotto();
   const [open, setOpen] = useState(false);
+  const [previewActive, setPreviewActive] = useState(false);
+  const [previewPosition, setPreviewPosition] = useState<{ left: number; top: number } | null>(null);
+  const anchor = useRef<HTMLSpanElement>(null);
+  const preview = useRef<HTMLSpanElement>(null);
+  const hidePreview = useRef<ReturnType<typeof setTimeout> | null>(null);
   const available = targets.flatMap((target) => {
     const note = notes.find((item) => item.id === target.id && item.scope === scope && !item.deleted);
     return note ? [{ ...target, note }] : [];
@@ -39,71 +44,168 @@ function NoteReferencePreview({
       void invoke('open_main', { noteId: id }).catch((error) => notify(String(error)));
     } else window.dispatchEvent(new CustomEvent('notto-open-note', { detail: { id, scope } }));
   };
+  const multiple = available.length > 1;
+  const previewVisible = open || previewActive;
+  const showPreview = () => {
+    if (hidePreview.current) clearTimeout(hidePreview.current);
+    setPreviewActive(true);
+  };
+  const schedulePreviewHide = () => {
+    if (hidePreview.current) clearTimeout(hidePreview.current);
+    hidePreview.current = setTimeout(() => setPreviewActive(false), 100);
+  };
+  useEffect(
+    () => () => {
+      if (hidePreview.current) clearTimeout(hidePreview.current);
+    },
+    [],
+  );
+  useLayoutEffect(() => {
+    if (!previewVisible) {
+      setPreviewPosition(null);
+      return;
+    }
+    const position = () => {
+      const origin = anchor.current?.getBoundingClientRect();
+      const floating = preview.current;
+      if (!origin || !floating) return;
+      const margin = 12;
+      const gap = 7;
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+      const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+      const width = Math.min(340, Math.max(180, viewportWidth - margin * 2));
+      floating.style.width = `${width}px`;
+      const height = Math.min(floating.scrollHeight, viewportHeight - margin * 2);
+      const left = Math.max(margin, Math.min(origin.left, viewportWidth - width - margin));
+      const below = origin.bottom + gap;
+      const above = origin.top - height - gap;
+      const top =
+        below + height <= viewportHeight - margin || above < margin
+          ? Math.max(margin, Math.min(below, viewportHeight - height - margin))
+          : above;
+      setPreviewPosition({ left, top });
+    };
+    const frame = requestAnimationFrame(position);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(position);
+    if (preview.current) observer?.observe(preview.current);
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+    };
+  }, [previewVisible, available.length]);
+  useEffect(() => {
+    if (!open || !multiple) return;
+    const frame = requestAnimationFrame(() => preview.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open, multiple]);
   if (!available.length)
     return (
       <span className="note-reference missing" title="Notiz gelöscht oder nicht verfügbar">
         {fallback || 'Nicht verfügbare Notiz'}
       </span>
     );
-  const multiple = available.length > 1;
   return (
-    <span
-      className={`note-reference-wrap ${multiple ? 'has-multiple' : ''}`}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') setOpen(false);
-      }}
-    >
-      {multiple ? (
-        <button
-          type="button"
-          className="note-reference note-reference-trigger"
-          aria-expanded={open}
-          aria-haspopup="menu"
-          onClick={() => setOpen((value) => !value)}
-        >
-          <Link2 size={14} /> {fallback || titleOf(available[0].note.content)}
-          <span className="note-reference-count">{available.length}</span>
-          <ChevronDown size={13} />
-        </button>
-      ) : (
-        <a
-          className="note-reference"
-          href={`#note-${available[0].id}`}
-          onClick={(event) => {
-            event.preventDefault();
-            openNote(available[0].id);
-          }}
-        >
-          ↗ {fallback || titleOf(available[0].note.content)}
-        </a>
-      )}
+    <>
       <span
-        className={`note-reference-preview ${open ? 'is-open' : ''}`}
-        role={multiple ? 'menu' : 'tooltip'}
+        ref={anchor}
+        className={`note-reference-wrap ${multiple ? 'has-multiple' : ''}`}
+        onPointerEnter={showPreview}
+        onPointerLeave={schedulePreviewHide}
+        onFocus={showPreview}
+        onBlur={(event) => {
+          const next = event.relatedTarget as Node | null;
+          if (!anchor.current?.contains(next) && !preview.current?.contains(next)) {
+            setOpen(false);
+            schedulePreviewHide();
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            setOpen(false);
+            setPreviewActive(false);
+          }
+        }}
       >
-        {available.map((target) => {
-          const preview = (
-            <>
-              <span className="note-reference-preview-title">{titleOf(target.note.content)}</span>
-              {target.relation && <small>{relationLabels[target.relation]}</small>}
-              <span>{excerptOf(target.note.content)}</span>
-            </>
-          );
-          return multiple ? (
-            <button type="button" role="menuitem" key={target.id} onClick={() => openNote(target.id)}>
-              {preview}
-            </button>
-          ) : (
-            <span className="note-reference-preview-card" key={target.id}>
-              {preview}
-            </span>
-          );
-        })}
+        {multiple ? (
+          <button
+            type="button"
+            className="note-reference note-reference-trigger"
+            aria-expanded={open}
+            aria-haspopup="menu"
+            onClick={() => setOpen((value) => !value)}
+          >
+            <Link2 size={14} /> {fallback || titleOf(available[0].note.content)}
+            <span className="note-reference-count">{available.length}</span>
+            <ChevronDown size={13} />
+          </button>
+        ) : (
+          <a
+            className="note-reference"
+            href={`#note-${available[0].id}`}
+            onClick={(event) => {
+              event.preventDefault();
+              openNote(available[0].id);
+            }}
+          >
+            ↗ {fallback || titleOf(available[0].note.content)}
+          </a>
+        )}
       </span>
-    </span>
+      {previewVisible &&
+        createPortal(
+          <span
+            ref={preview}
+            className="note-reference-preview"
+            role={multiple ? 'menu' : 'tooltip'}
+            style={{
+              left: previewPosition?.left || 0,
+              top: previewPosition?.top || 0,
+              visibility: previewPosition ? 'visible' : 'hidden',
+            }}
+            onPointerEnter={showPreview}
+            onPointerLeave={schedulePreviewHide}
+            onFocus={showPreview}
+            onBlur={(event) => {
+              const next = event.relatedTarget as Node | null;
+              if (!anchor.current?.contains(next) && !preview.current?.contains(next)) {
+                setOpen(false);
+                schedulePreviewHide();
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setOpen(false);
+                setPreviewActive(false);
+                anchor.current?.querySelector<HTMLElement>('a, button')?.focus();
+              }
+            }}
+          >
+            {available.map((target) => {
+              const card = (
+                <>
+                  <span className="note-reference-preview-title">{titleOf(target.note.content)}</span>
+                  {target.relation && <small>{relationLabels[target.relation]}</small>}
+                  <span>{excerptOf(target.note.content)}</span>
+                </>
+              );
+              return multiple ? (
+                <button type="button" role="menuitem" key={target.id} onClick={() => openNote(target.id)}>
+                  {card}
+                </button>
+              ) : (
+                <span className="note-reference-preview-card" key={target.id}>
+                  {card}
+                </span>
+              );
+            })}
+          </span>,
+          document.body,
+        )}
+    </>
   );
 }
 

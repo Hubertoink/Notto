@@ -97,7 +97,7 @@ export function excerptOf(content: string): string {
     .replace(/^\s*\|\s*/gm, '')
     .replace(/\s*\|\s*/g, ' · ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/\[[^\]\n]*\]\([^\n)]*\)/g, ' ')
+    .replace(/\[([^\]\n]*)\]\([^\n)]*\)/g, '$1')
     .replace(/<https?:\/\/[^>\n]+>/gi, ' ')
     .replace(/(?:https?:\/\/|www\.)[^\s<>)]+/gi, ' ')
     .replace(/[#*_`>]/g, '')

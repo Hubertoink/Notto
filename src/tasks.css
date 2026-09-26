@@ -90,7 +90,7 @@
   min-width: 0;
   border: 1px solid var(--nt-line);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   max-width: 100%;
 }
 .annotation-shell [hidden] {
@@ -312,6 +312,7 @@
   min-width: 0;
 }
 .annotation-indicator {
+  position: relative;
   background: transparent;
   cursor: pointer;
   display: inline-flex;
@@ -336,10 +337,49 @@
 }
 .annotation-indicator-label {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
+  z-index: 50;
+  left: 50%;
+  top: calc(100% + 7px);
+  width: max-content;
+  max-width: min(240px, calc(100dvw - 28px));
+  padding: 6px 8px;
+  color: var(--nt-paper);
+  background: var(--nt-text);
+  border: 1px solid var(--nt-line);
+  box-shadow: 0 8px 18px var(--nt-shadow);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -2px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+.annotation-indicator:hover .annotation-indicator-label,
+.annotation-indicator:focus-visible .annotation-indicator-label {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.annotation-heading-indicators .annotation-indicator:first-child .annotation-indicator-label {
+  left: 0;
+  transform: translate(0, -2px);
+}
+.annotation-heading-indicators .annotation-indicator:first-child:hover .annotation-indicator-label,
+.annotation-heading-indicators .annotation-indicator:first-child:focus-visible .annotation-indicator-label {
+  transform: translate(0, 0);
+}
+.annotation-heading-indicators .annotation-indicator:last-child .annotation-indicator-label {
+  right: 0;
+  left: auto;
+  transform: translate(0, -2px);
+}
+.annotation-heading-indicators .annotation-indicator:last-child:hover .annotation-indicator-label,
+.annotation-heading-indicators .annotation-indicator:last-child:focus-visible .annotation-indicator-label {
+  transform: translate(0, 0);
 }
 .annotation-panel {
   padding: 16px;

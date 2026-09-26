@@ -2128,22 +2128,17 @@ button.tags-heading {
   line-height: 1;
 }
 .note-reference-preview {
-  position: absolute;
-  z-index: 30;
-  left: 0;
-  top: calc(100% + 7px);
-  display: none;
-  width: min(340px, calc(100vw - 48px));
+  position: fixed;
+  z-index: 1000;
+  display: grid;
+  max-width: calc(100dvw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
   padding: 6px;
   color: var(--nt-text);
   background: var(--nt-paper);
   border: 1px solid var(--nt-accent);
   box-shadow: 0 12px 28px var(--nt-shadow);
-}
-.note-reference-wrap:hover .note-reference-preview,
-.note-reference-wrap:focus-within .note-reference-preview,
-.note-reference-preview.is-open {
-  display: grid;
 }
 .note-reference-preview button {
   display: grid;

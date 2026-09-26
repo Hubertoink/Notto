@@ -195,6 +195,8 @@ it('opens inline AI annotations and completes a task without changing the note',
   const annotations = await screen.findByRole('button', { name: /KI-Anmerkungen/ });
   await screen.findByRole('button', { name: 'Aufgaben offen: 1' });
   expect(screen.getByRole('button', { name: 'Recherche vorhanden: 1' })).toBeTruthy();
+  expect(screen.getByText('Offene Aufgaben anzeigen')).toBeTruthy();
+  expect(screen.getByText('Rechercheergebnisse anzeigen')).toBeTruthy();
   const collections = screen.getByRole('button', { name: /Sammlungen/ });
   const originalText = screen.getByText('Steam einrichten', { selector: 'p' });
   expect(collections.compareDocumentPosition(annotations) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

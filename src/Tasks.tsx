@@ -326,6 +326,7 @@ export function NoteAnnotations({
       Icon: Globe,
       count: uniqueResearch.length,
       label: 'Recherche vorhanden',
+      tooltip: 'Rechercheergebnisse anzeigen',
       state: 'complete',
     },
     {
@@ -333,6 +334,7 @@ export function NoteAnnotations({
       Icon: ListTodo,
       count: tasks.filter((t) => !t.done).length,
       label: 'Aufgaben offen',
+      tooltip: 'Offene Aufgaben anzeigen',
       state: 'pending',
     },
     {
@@ -340,6 +342,7 @@ export function NoteAnnotations({
       category: 'tasks-done',
       count: tasks.filter((t) => t.done).length,
       label: 'Aufgaben erledigt',
+      tooltip: 'Erledigte Aufgaben anzeigen',
       state: 'complete',
     },
     {
@@ -347,6 +350,7 @@ export function NoteAnnotations({
       Icon: Link2,
       count: relations.length,
       label: 'Verlinkungen offen',
+      tooltip: 'Vorgeschlagene Verlinkungen anzeigen',
       state: 'pending',
     },
     {
@@ -354,6 +358,7 @@ export function NoteAnnotations({
       Icon: Link2,
       count: acceptedLinks,
       label: 'Verlinkungen übernommen',
+      tooltip: 'Übernommene Verlinkungen anzeigen',
       state: 'complete',
     },
     {
@@ -361,6 +366,7 @@ export function NoteAnnotations({
       Icon: FileText,
       count: insights.length,
       label: 'PDF-Anmerkungen vorhanden',
+      tooltip: 'PDF-Anmerkungen anzeigen',
       state: 'complete',
     },
   ].filter((indicator) => indicator.count > 0);
@@ -443,9 +449,12 @@ export function NoteAnnotations({
               }}
             >
               <WandSparkles size={16} /> {commandCount || 1}
+              <span className="annotation-indicator-label" aria-hidden="true">
+                KI-Aufträge anzeigen
+              </span>
             </button>
           )}
-          {indicators.map(({ Icon, count, label, state, category }) => (
+          {indicators.map(({ Icon, count, label, tooltip, state, category }) => (
             <button
               type="button"
               onClick={() => jumpTo(category)}
@@ -455,7 +464,9 @@ export function NoteAnnotations({
               aria-label={`${label}: ${count}`}
             >
               <Icon size={16} aria-hidden="true" /> <span>{count}</span>
-              <span className="annotation-indicator-label">{label}</span>
+              <span className="annotation-indicator-label" aria-hidden="true">
+                {tooltip}
+              </span>
             </button>
           ))}
         </div>

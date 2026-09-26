@@ -23,7 +23,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
-it('keeps unsaved typing inert and explains automatic start on save', async () => {
+it('keeps unsaved typing inert and offers save and start without a repeated hint', async () => {
   vi.mocked(serverRequest).mockResolvedValue({ commands: [] });
   const onStart = vi.fn(async (prompt, id) => ({
     id,
@@ -48,7 +48,7 @@ it('keeps unsaved typing inert and explains automatic start on save', async () =
   );
   await waitFor(() => expect(serverRequest).toHaveBeenCalled());
   expect(onStart).not.toHaveBeenCalled();
-  expect(screen.getByText('Startet beim Speichern.')).toBeTruthy();
+  expect(screen.queryByText('Startet beim Speichern.')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Speichern & starten' }));
   await waitFor(() => expect(screen.getByText('Wartet')).toBeTruthy());
   expect(onStart).toHaveBeenCalledTimes(1);

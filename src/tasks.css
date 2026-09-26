@@ -389,6 +389,31 @@
   padding-left: 10px;
   border-left: 2px solid var(--nt-accent);
 }
+.relation-anchor {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--nt-accent);
+  background: color-mix(in srgb, var(--nt-accent) 13%, var(--nt-paper));
+}
+.relation-anchor > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--nt-accent);
+  font-size: 12px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+.relation-anchor strong {
+  overflow-wrap: anywhere;
+}
+.relation-anchor small {
+  grid-column: 2;
+  color: var(--nt-muted);
+}
 .relation-actions {
   display: flex;
   flex-wrap: wrap;

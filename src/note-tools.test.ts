@@ -8,6 +8,7 @@ import {
   formatText,
   normalizeCollections,
 } from './note-tools';
+import { noteLinkHref } from './note-links';
 
 it('links by identity across renames and excludes other accounts and deleted notes', () => {
   const target = newNote('alice', 'Unsere Grundsätze');
@@ -30,6 +31,13 @@ it('ignores examples in code and images when finding backlinks', () => {
   const link = noteLink(note);
   expect(noteReferenceIds(`${link}\n${link}`)).toEqual([note.id]);
   expect(noteReferenceIds(`\`${link}\`\n\`\`\`md\n${link}\n\`\`\`\n~~~\n${link}\n~~~\n!${link}`)).toEqual([]);
+});
+
+it('finds every target stored behind the same visible term', () => {
+  const first = newNote('local', 'Erstes Ziel');
+  const second = newNote('local', 'Zweites Ziel');
+  const href = noteLinkHref([{ id: first.id }, { id: second.id, relation: 'context' }]);
+  expect(noteReferenceIds(`[Gemeinsamer Begriff](${href})`)).toEqual([first.id, second.id]);
 });
 
 it('formats selections and removes formatting without losing surrounding text', () => {

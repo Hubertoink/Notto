@@ -1,4 +1,5 @@
 import { titleOf, type Note } from './domain';
+import { noteLinkRanges } from './note-links';
 
 export function noteLink(note: Note, label = titleOf(note.content)): string {
   const linkLabel = label.replace(/[\\[\]]/g, '\\$&');
@@ -6,14 +7,7 @@ export function noteLink(note: Note, label = titleOf(note.content)): string {
 }
 
 export function noteReferenceIds(content: string): string[] {
-  const text = content
-    .replace(/(^|\n)( {0,3})(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:\n\2\3[^\n]*(?=\n|$)|$)/g, '')
-    .replace(/(`+)[\s\S]*?\1/g, '');
-  return [
-    ...new Set(
-      [...text.matchAll(/(?<![!\\])\[(?:\\.|[^\]\\\n])*\]\(notes\/([a-f0-9-]{36})\)/g)].map((m) => m[1]),
-    ),
-  ];
+  return [...new Set(noteLinkRanges(content).flatMap((link) => link.targets.map((target) => target.id)))];
 }
 
 export function linkedNotes(content: string, notes: Note[], scope: string): Note[] {

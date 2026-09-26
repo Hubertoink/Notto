@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import { Button, type ButtonProps } from '@astryxdesign/core/Button';
 import { Dialog } from '@astryxdesign/core/Dialog';
-import { X, ImageOff, Globe, ChevronDown, Download, Trash2 } from 'lucide-react';
+import { X, ImageOff, Globe, ChevronDown, Download, Trash2, Link2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { save } from '@tauri-apps/plugin-dialog';
 import Markdown, { type Components } from 'react-markdown';
@@ -13,8 +13,98 @@ import { desktop } from './repository';
 import { useNotto } from './state';
 import { PdfAttachment } from './PdfAttachment';
 import { uniqueSources } from './knowledge-policy';
-import { titleOf } from './domain';
+import { excerptOf, titleOf } from './domain';
 import { imageLayout, noteImages, updateImageLayout } from './image-layout';
+import { parseNoteLink, relationLabels, type NoteLinkTarget } from './note-links';
+
+function NoteReferencePreview({
+  targets,
+  scope,
+  fallback,
+}: {
+  targets: NoteLinkTarget[];
+  scope: string;
+  fallback?: ReactNode;
+}) {
+  const { notes = [], notify } = useNotto();
+  const [open, setOpen] = useState(false);
+  const available = targets.flatMap((target) => {
+    const note = notes.find((item) => item.id === target.id && item.scope === scope && !item.deleted);
+    return note ? [{ ...target, note }] : [];
+  });
+  const openNote = (id: string) => {
+    setOpen(false);
+    if (desktop && new URLSearchParams(location.search).get('window') === 'widget') {
+      void invoke('open_main', { noteId: id }).catch((error) => notify(String(error)));
+    } else window.dispatchEvent(new CustomEvent('notto-open-note', { detail: { id, scope } }));
+  };
+  if (!available.length)
+    return (
+      <span className="note-reference missing" title="Notiz gelöscht oder nicht verfügbar">
+        {fallback || 'Nicht verfügbare Notiz'}
+      </span>
+    );
+  const multiple = available.length > 1;
+  return (
+    <span
+      className={`note-reference-wrap ${multiple ? 'has-multiple' : ''}`}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setOpen(false);
+      }}
+    >
+      {multiple ? (
+        <button
+          type="button"
+          className="note-reference note-reference-trigger"
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onClick={() => setOpen((value) => !value)}
+        >
+          <Link2 size={14} /> {fallback || titleOf(available[0].note.content)}
+          <span className="note-reference-count">{available.length}</span>
+          <ChevronDown size={13} />
+        </button>
+      ) : (
+        <a
+          className="note-reference"
+          href={`#note-${available[0].id}`}
+          onClick={(event) => {
+            event.preventDefault();
+            openNote(available[0].id);
+          }}
+        >
+          ↗ {fallback || titleOf(available[0].note.content)}
+        </a>
+      )}
+      <span
+        className={`note-reference-preview ${open ? 'is-open' : ''}`}
+        role={multiple ? 'menu' : 'tooltip'}
+      >
+        {available.map((target) => {
+          const preview = (
+            <>
+              <span className="note-reference-preview-title">{titleOf(target.note.content)}</span>
+              {target.relation && <small>{relationLabels[target.relation]}</small>}
+              <span>{excerptOf(target.note.content)}</span>
+            </>
+          );
+          return multiple ? (
+            <button type="button" role="menuitem" key={target.id} onClick={() => openNote(target.id)}>
+              {preview}
+            </button>
+          ) : (
+            <span className="note-reference-preview-card" key={target.id}>
+              {preview}
+            </span>
+          );
+        })}
+      </span>
+    </span>
+  );
+}
 
 export function NoteReferenceLink({
   id,
@@ -25,28 +115,7 @@ export function NoteReferenceLink({
   scope: string;
   fallback?: ReactNode;
 }) {
-  const { notes = [], notify } = useNotto();
-  const note = notes.find((n) => n.id === id && n.scope === scope && !n.deleted);
-  if (!note)
-    return (
-      <span className="note-reference missing" title="Notiz gelöscht oder nicht verfügbar">
-        {fallback || 'Nicht verfügbare Notiz'}
-      </span>
-    );
-  return (
-    <a
-      className="note-reference"
-      href={`#note-${id}`}
-      onClick={(e) => {
-        e.preventDefault();
-        if (desktop && new URLSearchParams(location.search).get('window') === 'widget') {
-          void invoke('open_main', { noteId: id }).catch((e) => notify(String(e)));
-        } else window.dispatchEvent(new CustomEvent('notto-open-note', { detail: { id, scope } }));
-      }}
-    >
-      ↗ {fallback || titleOf(note.content)}
-    </a>
-  );
+  return <NoteReferencePreview targets={[{ id }]} scope={scope} fallback={fallback} />;
 }
 
 export function WebLink({ href, children }: { href?: string; children: ReactNode }) {
@@ -599,8 +668,8 @@ export function NoteMarkdown({ content, scope }: { content: string; scope: strin
       ),
       img: ({ src, alt, title }) => <MarkdownImage src={src} alt={alt} title={title} scope={scope} />,
       a: ({ href, children }) =>
-        /^notes\/[a-f0-9-]{36}$/.test(href || '') ? (
-          <NoteReferenceLink scope={scope} id={href!.slice(6)} fallback={children} />
+        parseNoteLink(href).length ? (
+          <NoteReferencePreview targets={parseNoteLink(href)} scope={scope} fallback={children} />
         ) : /^attachments\/[a-f0-9-]+\.pdf$/.test(href || '') ? (
           <PdfAttachment scope={scope} id={href!.slice(12)}>
             {children}

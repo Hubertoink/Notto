@@ -4,6 +4,7 @@ import { type Note, titleOf } from './domain';
 import { type KnowledgeRecord, eligible, knowledge } from './intelligence';
 import { relationKey, visibleRelations, type Relation } from './note-relations';
 import { NoteReferenceLink } from './components';
+import { relationLabels } from './note-links';
 
 export function RelationSuggestions({
   note,
@@ -57,7 +58,13 @@ export function RelationSuggestions({
         <article key={relationKey(r)}>
           <NoteReferenceLink scope={note.scope} id={r.targetId} />
           <p>{r.reason}</p>
-          <p className="small">Verlinken: „{r.anchor}“</p>
+          <div className="relation-anchor">
+            <span>
+              <Link2 size={16} /> Verlinken
+            </span>
+            <strong>„{r.anchor}“</strong>
+            <small>{relationLabels[r.relation]}</small>
+          </div>
           <details>
             <summary>Belegstellen ansehen</summary>
             <small>Diese Notiz</small>

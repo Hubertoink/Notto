@@ -2071,14 +2071,91 @@ button.tags-heading {
 .note-reference {
   color: var(--nt-accent);
   text-decoration: none;
-  border-bottom: 1px solid var(--nt-line);
+  border: 0;
+  border-bottom: 2px solid currentColor;
+  background: color-mix(in srgb, var(--nt-accent) 12%, transparent);
+  padding: 1px 4px;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
 }
 .note-reference:hover {
-  border-color: var(--nt-accent);
+  background: color-mix(in srgb, var(--nt-accent) 22%, transparent);
 }
 .note-reference.missing {
   color: var(--nt-muted);
   border-bottom-style: dashed;
+}
+.note-reference-wrap {
+  position: relative;
+  display: inline;
+}
+.note-reference-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.note-reference-count {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--nt-paper);
+  background: var(--nt-accent);
+  font-size: 10px;
+  line-height: 1;
+}
+.note-reference-preview {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  top: calc(100% + 7px);
+  display: none;
+  width: min(340px, calc(100vw - 48px));
+  padding: 6px;
+  color: var(--nt-text);
+  background: var(--nt-paper);
+  border: 1px solid var(--nt-accent);
+  box-shadow: 0 12px 28px var(--nt-shadow);
+}
+.note-reference-wrap:hover .note-reference-preview,
+.note-reference-wrap:focus-within .note-reference-preview,
+.note-reference-preview.is-open {
+  display: grid;
+}
+.note-reference-preview button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 11px;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.note-reference-preview-card {
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+}
+.note-reference-preview button + button {
+  border-top: 1px solid var(--nt-line);
+}
+.note-reference-preview button:hover,
+.note-reference-preview button:focus-visible {
+  background: var(--nt-tint);
+}
+.note-reference-preview-title {
+  font-weight: 750;
+}
+.note-reference-preview small,
+.note-reference-preview button > span:last-child,
+.note-reference-preview-card > span:last-child {
+  color: var(--nt-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 .note-connections {
   display: flex;

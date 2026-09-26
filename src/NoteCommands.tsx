@@ -172,7 +172,6 @@ export function NoteCommands({
   return (
     <section className="note-commands" aria-label="KI-Aufträge">
       {!connected && <p>Für Hintergrundaufträge bitte mit deinem Noto-Server anmelden.</p>}
-      {connected && !!drafts.length && <p className="muted small">Startet beim Speichern.</p>}
       {drafts
         .filter((prompt) => !commands.some((command) => command.prompt === prompt))
         .map((prompt) => {

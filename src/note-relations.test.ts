@@ -43,7 +43,7 @@ it('verifies theoretical connections using both complete texts before offering a
   ]);
   expect(result.suggestions).toEqual([relation]);
   expect(applyRelation(source, target, relation)).toBe(
-    source.content.replace(relation.anchor, `[${relation.anchor}](notes/${target.id})`),
+    source.content.replace(relation.anchor, `[${relation.anchor}](notes/${target.id}?type=theory)`),
   );
 });
 it('does not accept invented evidence, target IDs, stale versions or ambiguous anchors', () => {
@@ -119,4 +119,24 @@ it('never inserts links into code, existing links or duplicate references', () =
       ]),
     ).toBe(false);
   }
+});
+
+it('adds a second typed target to the same complete linked term', () => {
+  const { source, target, relation } = fixture();
+  const firstTarget = newNote('local', 'Erste Theorie über ein gemeinsames Leitbild.');
+  const linked = reviseNote(source, {
+    content: source.content.replace(
+      relation.anchor,
+      `[${relation.anchor}](notes/${firstTarget.id}?type=theory)`,
+    ),
+  });
+  const secondRelation = {
+    ...relation,
+    sourceRevision: contentRevision(source),
+    sourceQuote: source.content,
+  };
+  expect(validRelation(secondRelation, [linked, target])).toBe(true);
+  const result = applyRelation(linked, target, secondRelation);
+  expect(result).toContain(`also=${target.id}%3Atheory`);
+  expect(result.match(/\[gemeinsames Leitbild\]/g)).toHaveLength(1);
 });

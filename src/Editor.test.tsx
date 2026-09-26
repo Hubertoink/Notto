@@ -338,7 +338,7 @@ it('accepts a supported theory link and exposes a backlink on the target note', 
   await user.click(await screen.findByRole('button', { name: 'Verknüpfung übernehmen' }));
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect((await repo.get('local', source.id))?.content).toBe(
-    `Unser Konzept braucht ein [gemeinsames Leitbild](notes/${target.id}).`,
+    `Unser Konzept braucht ein [gemeinsames Leitbild](notes/${target.id}?type=theory).`,
   );
   const updatedSource = (await repo.get('local', source.id))!;
   view.rerender(

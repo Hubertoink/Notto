@@ -376,6 +376,12 @@ afterAll(async () => {
   await pg.close();
   if (dir) await rm(dir, { recursive: true, force: true });
 });
+it('reports the deployed package version in the health endpoint', async () => {
+  const response = await app.inject({ method: 'GET', url: '/api/health' });
+  const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  expect(response.statusCode).toBe(200);
+  expect(response.json()).toEqual({ ok: true, version });
+});
 it('runs consented server jobs with quoted evidence without rewriting originals', async () => {
   await pg.exec('DELETE FROM jobs');
   const note = newNote(alice, 'Steam Families auf vier PCs einrichten');

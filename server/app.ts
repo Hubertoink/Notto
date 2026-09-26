@@ -41,6 +41,9 @@ const fail = (message: string, statusCode = 400) => {
   throw Object.assign(new Error(message), { statusCode });
 };
 export async function buildApp(db: Database, env: Environment) {
+  const { version } = JSON.parse(await readFile(resolve('package.json'), 'utf8')) as {
+    version: string;
+  };
   const app = Fastify({ bodyLimit: 20 * 1024 * 1024, logger: false, trustProxy: false });
   app.decorateRequest('nottoUser', null);
   app.decorateRequest('sessionHash', null);
@@ -106,7 +109,7 @@ export async function buildApp(db: Database, env: Environment) {
   });
   app.get('/api/health', async () => {
     await db.query('SELECT 1');
-    return { ok: true, version: '1.1.4' };
+    return { ok: true, version };
   });
   app.get('/api/auth/session', async (req) => ({ user: req.nottoUser }));
   const loginResult = async (

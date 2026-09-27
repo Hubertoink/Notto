@@ -483,7 +483,7 @@ export function NoteAnnotations({
           </button>
         )}
       </div>
-      <div hidden={!expanded}>
+      <div className="annotation-content" hidden={!expanded}>
         <div
           className="annotation-tabs"
           role="tablist"

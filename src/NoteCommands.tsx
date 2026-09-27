@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, CircleAlert, LoaderCircle, Play, Square } from 'lucide-react';
+import { Check, CircleAlert, LoaderCircle, Play, RotateCw, Square } from 'lucide-react';
 import { serverRequest } from './backend';
 import { ownBackend, readCloudConfig } from './cloud';
 import { Modal, NoteMarkdown, Sources, readableDate } from './components';
-import { noteCommands, type NoteCommand } from './note-command';
+import { commandThreads, noteCommands, type NoteCommand } from './note-command';
 import './note-commands.css';
 
 function CommandImage({ command, id, title }: { command: string; id: string; title: string }) {
@@ -76,6 +76,7 @@ export function NoteCommands({
   const drafts = [...new Set(noteCommands(content).map((command) => command.prompt))];
   const connected = scope !== 'local' && ownBackend();
   const [commands, setCommands] = useState<NoteCommand[]>([]);
+  const threads = commandThreads(commands);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -83,8 +84,8 @@ export function NoteCommands({
   const startLock = useRef(false);
   const syncedCompletions = useRef(new Set<string>());
   useEffect(() => {
-    onCount?.(commands.length);
-  }, [commands.length, onCount]);
+    onCount?.(threads.length);
+  }, [threads.length, onCount]);
   useEffect(() => {
     if (!onCompleted) return;
     const completed = commands.filter(
@@ -212,10 +213,12 @@ export function NoteCommands({
           {error || loadError}
         </p>
       )}
-      {commands.map((command) => {
+      {threads.map(({ command, resultCommand }) => {
         const active = ['pending', 'running'].includes(command.status);
+        const result = resultCommand?.result;
+        const previous = !!resultCommand && resultCommand.id !== command.id;
         return (
-          <article className={`command-run command-${command.status}`} key={command.id}>
+          <article className={`command-run command-${command.status}`} key={command.prompt}>
             <header>
               <span role="status">
                 {active ? (
@@ -238,27 +241,41 @@ export function NoteCommands({
                   Abbrechen
                 </button>
               )}
+              {!active && (
+                <button
+                  className="command-retry"
+                  type="button"
+                  aria-label="Auftrag erneut ausführen"
+                  title="Erneut ausführen – ersetzt das Ergebnis bei Erfolg"
+                  disabled={!!busy || !connected}
+                  onClick={() => void start(command.prompt)}
+                >
+                  {busy === command.prompt ? (
+                    <LoaderCircle size={16} className="command-spin" aria-hidden="true" />
+                  ) : (
+                    <RotateCw size={16} aria-hidden="true" />
+                  )}
+                </button>
+              )}
             </header>
             {active && <p className="command-request">{command.prompt}</p>}
             {command.error && <p className="command-error">{command.error}</p>}
-            {!active && (
-              <button
-                type="button"
-                disabled={!!busy || !connected}
-                onClick={() => void start(command.prompt)}
-              >
-                Erneut starten
-              </button>
+            {previous && (
+              <p className="command-previous">
+                {active
+                  ? 'Bisheriges Ergebnis · wird bei Erfolg ersetzt'
+                  : 'Bisheriges Ergebnis · kein neues Ergebnis übernommen'}
+              </p>
             )}
-            {command.result && (
+            {result && (
               <>
-                {!command.result.research && <p className="command-summary">{command.result.summary}</p>}
-                {command.result.research && <NoteMarkdown content={command.result.research} scope={scope} />}
+                {!result.research && <p className="command-summary">{result.summary}</p>}
+                {result.research && <NoteMarkdown content={result.research} scope={scope} />}
                 <div className="command-results">
-                  {command.result.items.map((item, index) => (
+                  {result.items.map((item, index) => (
                     <section className="command-card" key={index}>
                       {item.imageId && (
-                        <CommandImage command={command.id} id={item.imageId} title={item.title} />
+                        <CommandImage command={resultCommand!.id} id={item.imageId} title={item.title} />
                       )}
                       <div>
                         <h3>{item.title}</h3>
@@ -270,22 +287,22 @@ export function NoteCommands({
                     </section>
                   ))}
                 </div>
-                <Sources sources={command.result.sources} compact />
+                <Sources sources={result.sources} compact />
                 <details className="command-sources">
                   <summary>Auftrag & Details</summary>
                   <p>{command.prompt}</p>
-                  {!!command.result.warnings.length && (
+                  {!!result.warnings.length && (
                     <ul className="command-warnings">
-                      {command.result.warnings.map((warning, index) => (
+                      {result.warnings.map((warning, index) => (
                         <li key={index}>{warning}</li>
                       ))}
                     </ul>
                   )}
-                  {!!command.result.searchQueries?.length && (
+                  {!!result.searchQueries?.length && (
                     <details className="command-sources">
                       <summary>Durchgeführte Suchanfragen</summary>
                       <ul>
-                        {command.result.searchQueries.map((query, index) => (
+                        {result.searchQueries.map((query, index) => (
                           <li key={index}>{query}</li>
                         ))}
                       </ul>

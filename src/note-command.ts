@@ -29,6 +29,29 @@ export function commandUrls(text: string) {
   ];
 }
 
+/** Retries update one visible request; keep its last usable result until replaced. */
+export function commandThreads(commands: NoteCommand[]) {
+  const threads = new Map<string, { command: NoteCommand; resultCommand?: NoteCommand }>();
+  for (const command of [...commands].sort((a, b) => b.created_at.localeCompare(a.created_at))) {
+    const key = JSON.stringify([command.note_id, command.prompt.trim()]);
+    let thread = threads.get(key);
+    if (!thread) {
+      thread = { command };
+      threads.set(key, thread);
+    }
+    if (
+      !thread.resultCommand &&
+      command.status === 'done' &&
+      (command.result?.items.length || command.result?.research)
+    )
+      thread.resultCommand = command;
+  }
+  return [...threads.values()].map((thread) => ({
+    ...thread,
+    resultCommand: thread.resultCommand || (thread.command.result ? thread.command : undefined),
+  }));
+}
+
 export function withoutNoteCommands(content: string, prompts?: readonly string[]) {
   return noteCommands(content)
     .filter((command) => !prompts || prompts.includes(command.prompt))

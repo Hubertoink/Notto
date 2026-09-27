@@ -3,11 +3,13 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NoteCommands } from './NoteCommands';
 import { serverRequest } from './backend';
+import type { NoteCommand } from './note-command';
 vi.mock('./backend', () => ({ serverRequest: vi.fn() }));
 vi.mock('./cloud', () => ({ ownBackend: () => true, readCloudConfig: () => ({ url: 'https://noto.test' }) }));
 vi.mock('./components', () => ({
   readableDate: () => 'Heute',
   Modal: ({ children }: any) => <div>{children}</div>,
+  NoteMarkdown: ({ content }: any) => <p>{content}</p>,
   Sources: ({ sources }: any) => (
     <details>
       <summary>Quellen</summary>
@@ -90,3 +92,93 @@ it('loads completed results again after reopening the note', async () => {
   fireEvent.click(screen.getAllByText('Quellen')[0]);
   expect(screen.getByRole('link', { name: 'Archiv' }).getAttribute('href')).toBe('https://example.com');
 });
+
+const previous: NoteCommand = {
+  id: 'old',
+  note_id: 'note',
+  revision: 'r',
+  prompt: 'Lesempfehlungen zu Brooks',
+  status: 'done',
+  stage: 'Fertig',
+  error: null,
+  created_at: '2026-09-27T10:00:00Z',
+  result: {
+    summary: 'Altes Ergebnis',
+    items: [{ title: 'Alter Titel', detail: 'Bisheriger Inhalt' }],
+    sources: [],
+    warnings: [],
+  },
+};
+
+it('puts the retry icon in the date row and keeps one request with its previous result while restarting', async () => {
+  vi.mocked(serverRequest).mockResolvedValue({ commands: [previous] });
+  const onCount = vi.fn();
+  const onStart = vi.fn(async (prompt, id) => ({
+    ...previous,
+    id,
+    prompt,
+    status: 'pending' as const,
+    stage: 'Wartet',
+    result: null,
+    created_at: '2026-09-27T11:00:00Z',
+  }));
+  render(
+    <NoteCommands
+      scope="user"
+      noteId="note"
+      content="Brooks"
+      editing={false}
+      dirty={false}
+      onStart={onStart}
+      onCount={onCount}
+    />,
+  );
+  const retry = await screen.findByRole('button', { name: 'Auftrag erneut ausführen' });
+  expect(retry.closest('header')?.querySelector('time')).toBeTruthy();
+  expect(retry.textContent).toBe('');
+  fireEvent.click(retry);
+  await screen.findByText('Wartet');
+  expect(screen.getByText('Altes Ergebnis')).toBeTruthy();
+  expect(screen.getByText('Bisheriges Ergebnis · wird bei Erfolg ersetzt')).toBeTruthy();
+  expect(document.querySelectorAll('.command-run')).toHaveLength(1);
+  expect(onCount).toHaveBeenLastCalledWith(1);
+  expect(screen.queryByRole('button', { name: 'Auftrag erneut ausführen' })).toBeNull();
+});
+
+it.each(['done', 'failed', 'cancelled', 'empty'] as const)(
+  'shows only the newest usable result after reopening: %s',
+  async (outcome) => {
+    const latest: NoteCommand = {
+      ...previous,
+      id: 'new',
+      created_at: '2026-09-27T11:00:00Z',
+      status: outcome === 'empty' ? 'done' : outcome,
+      error: outcome === 'failed' ? 'Websuche fehlgeschlagen' : null,
+      result:
+        outcome === 'done'
+          ? {
+              ...previous.result!,
+              summary: 'Neues Ergebnis',
+              items: [{ title: 'Neuer Titel', detail: 'Neue Empfehlung' }],
+            }
+          : outcome === 'empty'
+            ? { summary: 'Keine Quellen gefunden', items: [], sources: [], warnings: [] }
+            : null,
+    };
+    vi.mocked(serverRequest).mockResolvedValue({ commands: [previous, latest] });
+    render(
+      <NoteCommands
+        scope="user"
+        noteId="note"
+        content="Brooks"
+        editing={false}
+        dirty={false}
+        onStart={vi.fn()}
+      />,
+    );
+    await screen.findByText(outcome === 'done' ? 'Neues Ergebnis' : 'Altes Ergebnis');
+    expect(document.querySelectorAll('.command-run')).toHaveLength(1);
+    if (outcome === 'done') expect(screen.queryByText('Altes Ergebnis')).toBeNull();
+    else expect(screen.getByText('Bisheriges Ergebnis · kein neues Ergebnis übernommen')).toBeTruthy();
+  },
+);

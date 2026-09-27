@@ -1,3 +1,4 @@
+import { DesktopFrame } from './DesktopFrame';
 import { collectionNames, createCollection, addNoteToCollection, NOTE_DRAG_TYPE } from './collections';
 import { flushSync } from 'react-dom';
 import { useSidebarDisclosure } from './sidebar-disclosure';
@@ -137,18 +138,20 @@ export default function App() {
   }, [widget]);
   return (
     <Theme theme={bauhausTheme} mode={mode}>
-      <WebAccess>
-        {widget ? (
-          <Widget />
-        ) : (
-          <Notebook
-            mode={mode}
-            setMode={setMode}
-            noteBackground={noteBackgroundId}
-            setNoteBackground={setNoteBackground}
-          />
-        )}
-      </WebAccess>
+      <DesktopFrame enabled={desktop && !widget}>
+        <WebAccess>
+          {widget ? (
+            <Widget />
+          ) : (
+            <Notebook
+              mode={mode}
+              setMode={setMode}
+              noteBackground={noteBackgroundId}
+              setNoteBackground={setNoteBackground}
+            />
+          )}
+        </WebAccess>
+      </DesktopFrame>
     </Theme>
   );
 }
@@ -702,9 +705,13 @@ function Notebook({
             {user?.email?.charAt(0).toUpperCase() || 'N'}
           </button>
           <button
-            className={`sync-indicator ${syncState === 'error' ? 'sync-error' : ''}`}
+            className={`sync-indicator ${syncState === 'error' || syncState === 'offline' ? 'sync-error' : ''}`}
             onClick={() => (user ? void sync() : setSettings(true))}
-            title={syncError || undefined}
+            title={
+              syncState === 'offline'
+                ? 'Änderungen werden lokal gespeichert und bei Verbindung automatisch synchronisiert.'
+                : syncError || undefined
+            }
           >
             {syncState === 'local' ? (
               <CloudOff size={15} />
@@ -719,7 +726,7 @@ function Notebook({
               {
                 {
                   local: 'Lokal gespeichert',
-                  offline: 'Offline · lokal gespeichert',
+                  offline: 'Derzeit offline',
                   syncing: 'Synchronisiert …',
                   synced: 'Synchronisiert',
                   error: 'Synchronisation prüfen',

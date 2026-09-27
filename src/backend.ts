@@ -1,3 +1,4 @@
+import { networkFetch } from './connection';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 export interface ServerUser {
@@ -30,7 +31,7 @@ export function createNottoClient(url: string): SupabaseClient {
     if (options.body) headers.set('Content-Type', 'application/json');
     if (desktop) headers.set('X-Notto-Client', 'desktop');
     if (sessionToken) headers.set('Authorization', `Bearer ${sessionToken}`);
-    const response = await fetch(`${base}/api${path}`, {
+    const response = await networkFetch(`${base}/api${path}`, {
       ...options,
       headers,
       credentials: 'include',
@@ -58,8 +59,12 @@ export function createNottoClient(url: string): SupabaseClient {
     return data.user ? { user: data.user } : null;
   }
   const notify = async () => {
-    const value = await session().catch(() => null);
-    listeners.forEach((fn) => fn(value ? 'SIGNED_IN' : 'SIGNED_OUT', value));
+    try {
+      const value = await session();
+      listeners.forEach((fn) => fn(value ? 'SIGNED_IN' : 'SIGNED_OUT', value));
+    } catch {
+      // A connection failure is not a sign-out. Keep the local account.
+    }
   };
   bus?.addEventListener('message', () => {
     loaded = false;
@@ -186,7 +191,7 @@ export async function serverRequest(url: string, path: string, body?: unknown, b
     if (secret) headers.Authorization = `Bearer ${secret}`;
     headers['X-Notto-Client'] = 'desktop';
   }
-  const response = await fetch(`${url.replace(/\/$/, '')}/api${path}`, {
+  const response = await networkFetch(`${url.replace(/\/$/, '')}/api${path}`, {
     method: body === undefined ? 'GET' : 'PUT',
     headers,
     credentials: 'include',

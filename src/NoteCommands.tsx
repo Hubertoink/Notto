@@ -1,3 +1,4 @@
+import { isConnectionError } from './connection';
 import { useEffect, useRef, useState } from 'react';
 import { Check, CircleAlert, LoaderCircle, Play, RotateCw, Square } from 'lucide-react';
 import { serverRequest } from './backend';
@@ -107,7 +108,7 @@ export function NoteCommands({
     setError('');
     setLoadError('');
     const load = async () => {
-      if (!connected || !noteId || fetching) return;
+      if (!connected || !noteId || fetching || !navigator.onLine) return;
       fetching = true;
       try {
         const result = await serverRequest(
@@ -119,7 +120,14 @@ export function NoteCommands({
           setLoadError('');
         }
       } catch (e) {
-        if (alive) setLoadError(e instanceof Error ? e.message : 'Aufträge konnten nicht geladen werden.');
+        if (alive)
+          setLoadError(
+            isConnectionError(e)
+              ? ''
+              : e instanceof Error
+                ? e.message
+                : 'Aufträge konnten nicht geladen werden.',
+          );
       } finally {
         fetching = false;
       }
@@ -127,9 +135,11 @@ export function NoteCommands({
     refresh.current = load;
     void load();
     const timer = setInterval(() => void load(), 5000);
+    window.addEventListener('online', load);
     return () => {
       alive = false;
       clearInterval(timer);
+      window.removeEventListener('online', load);
     };
   }, [scope, noteId, connected]);
   async function start(prompt: string) {

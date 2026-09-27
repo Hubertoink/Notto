@@ -182,3 +182,29 @@ it.each(['done', 'failed', 'cancelled', 'empty'] as const)(
     else expect(screen.getByText('Bisheriges Ergebnis · kein neues Ergebnis übernommen')).toBeTruthy();
   },
 );
+
+it('keeps the last result during a network outage and refreshes on reconnect without a fetch error', async () => {
+  vi.mocked(serverRequest)
+    .mockResolvedValueOnce({ commands: [previous] })
+    .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    .mockResolvedValue({
+      commands: [{ ...previous, result: { ...previous.result!, summary: 'Aktuelles Ergebnis' } }],
+    });
+  render(
+    <NoteCommands
+      scope="user"
+      noteId="note"
+      content="Titel"
+      editing={false}
+      dirty={false}
+      onStart={vi.fn()}
+    />,
+  );
+  await screen.findByText('Altes Ergebnis');
+  fireEvent(window, new Event('online'));
+  await waitFor(() => expect(serverRequest).toHaveBeenCalledTimes(2));
+  expect(screen.getByText('Altes Ergebnis')).toBeTruthy();
+  expect(screen.queryByText(/Failed to fetch/)).toBeNull();
+  fireEvent(window, new Event('online'));
+  await screen.findByText('Aktuelles Ergebnis');
+});

@@ -1,3 +1,4 @@
+import { isConnectionError } from './connection';
 import { researchCandidates } from './research-policy';
 import { AttachmentTitle } from './AttachmentTitle';
 import { findNoteRelations } from './relation-client';
@@ -61,6 +62,7 @@ export function IntelligenceWorker() {
         await knowledge.sync(scope);
         lastError = '';
       } catch (e) {
+        if (isConnectionError(e)) return;
         const message = String(e);
         if (message !== lastError) {
           notify(`Wissen-Sync: ${message}`);
@@ -92,15 +94,18 @@ export function IntelligenceWorker() {
       failed.current.clear();
       setTick((x) => x + 1);
     };
+    window.addEventListener('online', change);
     window.addEventListener('notto-ai-config', change);
     return () => {
       clearInterval(timer);
+      window.removeEventListener('online', change);
       window.removeEventListener('notto-ai-config', change);
     };
   }, []);
   useEffect(() => {
     const c = config(scope);
-    if (!c.enabled || !c.auto || running.current || (scope !== 'local' && ownBackend())) return;
+    if (!navigator.onLine || !c.enabled || !c.auto || running.current || (scope !== 'local' && ownBackend()))
+      return;
     let cancelled = false;
     const run = async () => {
       running.current = true;
@@ -132,6 +137,7 @@ export function IntelligenceWorker() {
             try {
               await findNoteRelations(pendingRelations);
             } catch (e) {
+              if (isConnectionError(e)) return;
               failed.current.add(`relations:${pendingRelations.revision}`);
               notify(`Notizverbindungen konnten nicht geprüft werden: ${String(e)}`);
             }
@@ -157,6 +163,7 @@ export function IntelligenceWorker() {
               try {
                 await research(next.note, next.item, true);
               } catch (e) {
+                if (isConnectionError(e)) return;
                 failed.current.add(decisionKey(next.note.id, next.item));
                 notify(`Recherche pausiert: ${String(e)}`);
               }
@@ -168,6 +175,7 @@ export function IntelligenceWorker() {
         try {
           await analyze(note);
         } catch (e) {
+          if (isConnectionError(e)) return;
           failed.current.add(note.revision);
           notify(`KI pausiert für diese Fassung: ${String(e)}`);
         }

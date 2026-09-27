@@ -81,6 +81,29 @@ try {
       assert.equal(mode, 'flex', 'Narrow layouts must put annotations below the note');
     }
   }
+  // The desktop title bar reserves height instead of pushing the notebook below the viewport.
+  for (const size of [
+    { width: 1740, height: 1010 },
+    { width: 1460, height: 600 },
+  ]) {
+    await page.setViewportSize(size);
+    await page.setContent(fixture());
+    await page.evaluate(() => {
+      const notebook = document.querySelector('.notebook');
+      const frame = document.createElement('div');
+      frame.className = 'desktop-frame';
+      notebook.before(frame);
+      frame.innerHTML = '<header class="desktop-titlebar">NOTO</header>';
+      frame.append(notebook);
+    });
+    const geometry = await measure();
+    assert.equal(geometry.outerOverflow, 0);
+    assert.equal(geometry.noteOverflow, 0);
+    assert.ok(geometry.contained);
+    assert.ok(
+      await page.locator('.notebook').evaluate((el) => el.getBoundingClientRect().bottom <= innerHeight),
+    );
+  }
   await mkdir(new URL('../test-results/', import.meta.url), { recursive: true });
   await page.screenshot({
     path: new URL('../test-results/annotation-layout.png', import.meta.url).pathname.replace(

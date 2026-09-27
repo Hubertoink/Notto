@@ -1,3 +1,4 @@
+import { isConnectionError } from './connection';
 import { useReducedMotion } from 'motion/react';
 import { useEffect, useState, useRef, useId, type ReactNode, type CSSProperties } from 'react';
 import { withoutNoteCommands, commandEvidence } from './note-command';
@@ -252,7 +253,7 @@ export function NoteAnnotations({
         });
       else await analyze(note);
     } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : String(error));
+      setUpdateError(isConnectionError(error) ? '' : error instanceof Error ? error.message : String(error));
     } finally {
       setUpdating(null);
     }

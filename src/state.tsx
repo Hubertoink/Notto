@@ -1,3 +1,4 @@
+import { connectionOffline, isConnectionError } from './connection';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import type { User } from '@supabase/supabase-js';
@@ -46,7 +47,7 @@ function useStore() {
     let active = true;
     c.auth.getSession().then(({ data, error }) => {
       if (!active) return;
-      if (error) notify(error.message);
+      if (error && !isConnectionError(error)) notify(error.message);
       setUser(data.session?.user ?? null);
       setAuthReady(true);
     });
@@ -94,7 +95,7 @@ function useStore() {
       setSyncState('offline');
       return;
     }
-    setSyncState('syncing');
+    if (!connectionOffline()) setSyncState('syncing');
     try {
       const conflicts = await syncNotes(scope);
       if (scope !== currentScope.current) return;
@@ -105,7 +106,7 @@ function useStore() {
       if (conflicts) notify(`${conflicts} Konfliktkopie(n) angelegt. Beide Fassungen sind erhalten.`);
     } catch (e) {
       if (scope !== currentScope.current) return;
-      setSyncState('error');
+      setSyncState(isConnectionError(e) || !navigator.onLine ? 'offline' : 'error');
       setSyncError(e instanceof Error ? e.message : String(e));
     }
   }, [scope, reload, notify]);
@@ -115,10 +116,15 @@ function useStore() {
     const timer = setInterval(() => void sync(), 30000);
     const online = () => void sync();
     const offline = () => setSyncState(scope === 'local' ? 'local' : 'offline');
+    const connection = () => {
+      if (connectionOffline()) offline();
+    };
+    window.addEventListener('notto-connection', connection);
     window.addEventListener('online', online);
     window.addEventListener('offline', offline);
     return () => {
       clearInterval(timer);
+      window.removeEventListener('notto-connection', connection);
       window.removeEventListener('online', online);
       window.removeEventListener('offline', offline);
     };

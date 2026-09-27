@@ -701,3 +701,66 @@
     font-size: 12px;
   }
 }
+.desktop-frame {
+  --nt-titlebar-height: 34px;
+}
+.desktop-frame .notebook {
+  height: calc(100dvh - var(--nt-titlebar-height));
+}
+.desktop-frame .notebook[data-note-overview='true'] .floating-search-trigger {
+  top: calc(24px + var(--nt-titlebar-height));
+}
+.desktop-titlebar {
+  height: var(--nt-titlebar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--nt-sidebar);
+  color: var(--nt-text);
+  border-bottom: 1px solid var(--nt-line);
+  user-select: none;
+}
+.desktop-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+}
+.desktop-brand i,
+.desktop-brand b {
+  width: 12px;
+  height: 12px;
+  background: var(--bauhaus-blue);
+}
+.desktop-brand b {
+  border-radius: 50%;
+  background: var(--bauhaus-red);
+  margin-right: 5px;
+}
+.desktop-window-controls {
+  display: flex;
+  height: 100%;
+}
+.desktop-window-controls button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.desktop-window-controls button:hover {
+  background: var(--nt-tint);
+}
+.desktop-window-controls .desktop-close:hover {
+  background: #c42b1c;
+  color: white;
+}
+.sidebar .sync-indicator.sync-error {
+  color: var(--nt-error);
+}

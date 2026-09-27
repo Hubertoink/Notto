@@ -134,7 +134,9 @@ export const knowledge = {
     if (!c || scope === 'local') return;
     const {
       data: { user },
+      error,
     } = await c.auth.getUser();
+    if (error) throw error;
     if (user?.id !== scope) throw new Error('Bitte erneut anmelden.');
     const local = await this.list(scope);
     const marker = `notto-knowledge-uploaded:${scope}`;

@@ -316,6 +316,131 @@ it('resumes jobs deferred by the removed daily quota without waiting until tomor
     await pg.query('DELETE FROM rate_limits WHERE key=$1', [`ai:${alice}`]);
   }
 });
+it.each(['success', 'disabled', 'dismissed', 'duplicate', 'no-sources', 'revoked'])(
+  'researches Brooks background topics with consent and deduplication: %s',
+  async (mode) => {
+    await pg.exec('DELETE FROM jobs');
+    const note = newNote(
+      alice,
+      'Frederick P. Brooks Gedanken zur Essentiellen Komplexität scheinen interessant.',
+    );
+    const settings = {
+      enabled: true,
+      auto: true,
+      autoResearch: mode !== 'disabled',
+      model: 'gpt-4.1-mini',
+      excludedNotes: [],
+      excludedTags: '',
+    };
+    await pg.query(
+      'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
+      [alice, JSON.stringify(settings)],
+    );
+    await app.inject({
+      method: 'POST',
+      url: '/api/notes/push',
+      headers: headers(aToken),
+      payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
+    });
+    const key = `${note.id}:topic:${note.content.toLocaleLowerCase('de')}`;
+    if (mode === 'dismissed' || mode === 'duplicate') {
+      const id = crypto.randomUUID();
+      await pg.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3)', [
+        alice,
+        id,
+        JSON.stringify({
+          id,
+          scope: alice,
+          noteId: note.id,
+          revision: note.revision,
+          at: new Date().toISOString(),
+          kind: mode === 'duplicate' ? 'research' : 'decision',
+          data: { key, status: 'dismissed' },
+        }),
+      ]);
+    }
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.tools) {
+        expect(body.tool_choice).toBe('required');
+        expect(JSON.parse(body.input).notizausschnitt).toBe(note.content);
+        expect(body.instructions).toContain('höchstens zwei konkrete Vertiefungen');
+        if (mode === 'revoked')
+          await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+            alice,
+            JSON.stringify({ ...settings, autoResearch: false }),
+          ]);
+        return new Response(
+          JSON.stringify({
+            status: 'completed',
+            output: [
+              { type: 'web_search_call', status: 'completed' },
+              {
+                content: [
+                  {
+                    type: 'output_text',
+                    text: 'Einordnung mit Quelle.',
+                    annotations:
+                      mode === 'no-sources'
+                        ? []
+                        : [{ type: 'url_citation', title: 'Brooks', url: 'https://example.com/brooks' }],
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [
+            {
+              content: [
+                {
+                  type: 'output_text',
+                  text: JSON.stringify({
+                    suggestions: [
+                      {
+                        kind: 'topic',
+                        title: 'Brooks: essentielle Komplexität',
+                        detail: 'Einordnung und Einstiegstext',
+                        quote: note.content,
+                      },
+                    ],
+                  }),
+                },
+              ],
+            },
+          ],
+        }),
+      );
+    });
+    try {
+      const env = { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 };
+      await workOnce(adapter, env);
+      await pg.query("DELETE FROM jobs WHERE kind NOT LIKE 'research:%'");
+      await workOnce(adapter, env);
+      const rows = (
+        await pg.query<any>(
+          "SELECT document FROM knowledge WHERE document->>'noteId'=$1 AND document->>'kind'='research'",
+          [note.id],
+        )
+      ).rows;
+      expect(rows).toHaveLength(mode === 'success' || mode === 'duplicate' ? 1 : 0);
+      expect(fetch).toHaveBeenCalledTimes(['disabled', 'dismissed', 'duplicate'].includes(mode) ? 1 : 2);
+      if (mode === 'success')
+        expect(rows[0].document.data.sources).toEqual([
+          { title: 'Brooks', url: 'https://example.com/brooks' },
+        ]);
+    } finally {
+      fetch.mockRestore();
+      await pg.exec('DELETE FROM jobs');
+      await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+    }
+  },
+);
+
 it('allows desktop attachment upload preflight including PUT', async () => {
   for (const origin of ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost']) {
     const response = await app.inject({

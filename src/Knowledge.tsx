@@ -1,3 +1,4 @@
+import { researchCandidates } from './research-policy';
 import { AttachmentTitle } from './AttachmentTitle';
 import { findNoteRelations } from './relation-client';
 import { pairKey, linkedTo, type RelationBatch } from './note-relations';
@@ -140,9 +141,9 @@ export function IntelligenceWorker() {
             const candidates = notes
               .filter(eligible)
               .flatMap((n) =>
-                ((latest(records, 'analysis', n)?.data as Analysis)?.suggestions || [])
-                  .filter((item) => item.kind === 'task' || item.kind === 'contact')
-                  .map((item) => ({ note: n, item })),
+                researchCandidates((latest(records, 'analysis', n)?.data as Analysis)?.suggestions || []).map(
+                  ({ item }) => ({ note: n, item }),
+                ),
               );
             const next = candidates.find(({ note: n, item }) => {
               const key = decisionKey(n.id, item);
@@ -154,7 +155,7 @@ export function IntelligenceWorker() {
             });
             if (next)
               try {
-                await research(next.note, next.item);
+                await research(next.note, next.item, true);
               } catch (e) {
                 failed.current.add(decisionKey(next.note.id, next.item));
                 notify(`Recherche pausiert: ${String(e)}`);
@@ -631,7 +632,8 @@ export function Knowledge({
               checked={settings.autoResearch}
               onChange={(e) => update({ autoResearch: e.target.checked })}
             />{' '}
-            Aufgaben und Kontaktkandidaten nach der Hintergrundanalyse automatisch im Web recherchieren
+            Automatische Webrecherche: Gedanken mit Hintergrundwissen erweitern sowie Aufgaben und
+            Kontaktkandidaten recherchieren
           </label>
           <label>
             Ausgeschlossene Tags

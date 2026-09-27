@@ -349,6 +349,67 @@ it('saves without AI consent but records why the command cannot start', async ()
   expect(openai).not.toHaveBeenCalled();
 });
 
+it('researches reading recommendations from the Brooks note without requiring supplied articles', async () => {
+  await start();
+  const prompt = 'Ich brauche zum Einstieg Artikel und Lesempfehlungen zu seinen Theorien.';
+  const content =
+    'Essentielle Komplexität\nFrederick P. Brooks Gedanken zur Essentiellen Komplexität scheinen interessant.';
+  await pg.query('UPDATE note_commands SET prompt=$1,note_content=$2', [prompt, content]);
+  const text = 'Zum Einstieg: No Silver Bullet. [1]';
+  vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) => {
+    if (!body.tools) {
+      expect(JSON.parse(body.input as string)).toMatchObject({ auftrag: prompt, notiz: content });
+      return {
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  queries: ['Frederick P. Brooks essential complexity No Silver Bullet reading'],
+                }),
+              },
+            ],
+          },
+        ],
+      };
+    }
+    expect(body).toMatchObject({ tools: [{ type: 'web_search' }], tool_choice: 'required' });
+    return {
+      status: 'completed',
+      output: [
+        { type: 'web_search_call', status: 'completed' },
+        {
+          type: 'message',
+          content: [
+            {
+              type: 'output_text',
+              text,
+              annotations: [
+                {
+                  type: 'url_citation',
+                  start_index: text.indexOf('[1]'),
+                  end_index: text.length,
+                  title: 'No Silver Bullet',
+                  url: 'https://example.com/brooks',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  });
+  await workCommandOnce(adapter, env);
+  expect(openai).toHaveBeenCalledTimes(2);
+  const job: any = (await pg.query('SELECT status,result FROM note_commands')).rows[0];
+  expect(job.status).toBe('done');
+  expect(job.result.searched).toBe(true);
+  expect(job.result.research).toContain('[No Silver Bullet](https://example.com/brooks)');
+  expect(job.result.sources).toContainEqual({ title: 'No Silver Bullet', url: 'https://example.com/brooks' });
+});
+
 it('really searches for reviews, verifies recency and preserves clickable citations without screenshots', async () => {
   await start();
   await pg.query(

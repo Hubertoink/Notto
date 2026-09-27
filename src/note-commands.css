@@ -60,6 +60,8 @@
   font-size: 14px;
 }
 .command-run time {
+  font-size: 0.75rem;
+  font-weight: 400;
   opacity: 0.6;
 }
 .command-run header button {
@@ -82,10 +84,18 @@
   font-size: 12px;
   margin: 12px 0 6px;
 }
-.command-request {
-  font-weight: 600;
+.command-run .command-request {
+  margin: 8px 0 14px;
+  padding: 2px 0 2px 12px;
+  border: 0;
+  border-left: 2px solid var(--nt-line);
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--nt-muted);
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
-  margin-bottom: 6px;
 }
 .command-run > small {
   color: var(--nt-muted);

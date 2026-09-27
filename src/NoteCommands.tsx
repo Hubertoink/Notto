@@ -258,7 +258,7 @@ export function NoteCommands({
                 </button>
               )}
             </header>
-            {active && <p className="command-request">{command.prompt}</p>}
+            {active && <blockquote className="command-request">„{command.prompt}“</blockquote>}
             {command.error && <p className="command-error">{command.error}</p>}
             {previous && (
               <p className="command-previous">
@@ -290,7 +290,7 @@ export function NoteCommands({
                 <Sources sources={result.sources} compact />
                 <details className="command-sources">
                   <summary>Auftrag & Details</summary>
-                  <p>{command.prompt}</p>
+                  <blockquote className="command-request">„{command.prompt}“</blockquote>
                   {!!result.warnings.length && (
                     <ul className="command-warnings">
                       {result.warnings.map((warning, index) => (

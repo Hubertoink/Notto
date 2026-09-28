@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { openai } from './openai';
-import { verifiedResearch } from './command-verification';
+import { correctResearchText, verifiedResearch } from './command-verification';
 import type { Database } from './database';
 
 vi.mock('./openai', () => ({ openai: vi.fn() }));
@@ -14,7 +14,7 @@ const job = {
   user_id: 'test',
   model: 'test',
   prompt: 'Gib mir fünf weitere ähnliche Spiele für Jugendliche ab 12.',
-  note_content: 'Bluff, Beasty Bar, Challengers!',
+  note_content: 'Bluff, Beasty Bar, Challengers!\n#jugendarbeit #spiele',
 };
 const original = {
   text: 'Vergleich der drei Spiele',
@@ -29,15 +29,17 @@ const json = (value: unknown) => ({
 });
 const good = {
   fulfilled: true,
-  deliveredItems: ['Just One', 'Top Ten', 'So Kleever', 'Wavelength', 'Dixit'],
+  deliveredItems: ['Just One', 'Top Ten', 'So Kleever', 'Codenames', 'Dixit'],
   issues: [],
+  corrections: [],
+  criterionChecks: [],
 };
 beforeEach(() => vi.mocked(openai).mockReset());
 
 it('rejects the three-example comparison even when the reviewer incorrectly approves it, then researches again', async () => {
   vi.mocked(openai)
     .mockResolvedValueOnce(json(plan))
-    .mockResolvedValueOnce(json({ fulfilled: true, deliveredItems: plan.excludedExamples, issues: [] }))
+    .mockResolvedValueOnce(json({ ...good, deliveredItems: plan.excludedExamples }))
     .mockResolvedValueOnce(json(good));
   const repaired = { ...original, text: good.deliveredItems.join(', ') };
   const research = vi.fn().mockResolvedValueOnce(original).mockResolvedValueOnce(repaired);
@@ -64,8 +66,81 @@ it('rejects the three-example comparison even when the reviewer incorrectly appr
     expect(JSON.parse(call[3].input as string)).toMatchObject({
       auftrag: job.prompt,
       notiz: job.note_content,
+      tags: ['jugendarbeit', 'spiele'],
     });
   }
+});
+
+it('finishes a useful answer with younger age recommendations and fixes a minor count without new research', async () => {
+  const text =
+    'Vier Spiele sind unter 12 empfohlen.\nJust One: ab 8. Top Ten: ab 12. So Kleever: ab 10. Codenames: ab 12. Dixit: ab 8. [Regeln](https://example.com/rules)';
+  // Age suitability is interpreted by the reviewer; the orchestration must not
+  // turn an editorial correction or a stale partial flag into a blocking issue.
+  vi.mocked(openai)
+    .mockResolvedValueOnce(json(plan))
+    .mockResolvedValueOnce(
+      json({
+        ...good,
+        corrections: [
+          { before: 'Vier Spiele sind unter 12 empfohlen.', after: 'Drei Spiele sind unter 12 empfohlen.' },
+        ],
+      }),
+    );
+  const research = vi.fn().mockResolvedValue({ ...original, text, partial: true });
+  const warnings: string[] = [];
+  const result = await verifiedResearch(
+    {} as Database,
+    { models: [] },
+    job,
+    warnings,
+    new AbortController().signal,
+    research,
+  );
+  expect(research).toHaveBeenCalledTimes(1);
+  expect(result.partial).toBe(false);
+  expect(result.text).toContain('Drei Spiele sind unter 12 empfohlen.');
+  expect(result.text).toContain('[Regeln](https://example.com/rules)');
+  expect(warnings).toEqual([]);
+});
+
+it('ignores ambiguous editorial changes and preserves source URLs', () => {
+  const text = 'Wort Wort. [Quelle](https://example.com/rules)';
+  expect(
+    correctResearchText(text, [
+      { before: 'Wort', after: 'Andere Aussage' },
+      { before: 'https://example.com/rules', after: 'https://invented.example/rules' },
+      { before: 'Nicht vorhanden', after: 'Erfundene Aussage' },
+    ]),
+  ).toBe(text);
+});
+
+it('still rejects a material suitability gap even if the overall verdict says fulfilled', async () => {
+  vi.mocked(openai)
+    .mockResolvedValueOnce(json(plan))
+    .mockResolvedValue(
+      json({
+        ...good,
+        criterionChecks: [
+          {
+            criterion: 'Für Zwölfjährige geeignet',
+            satisfied: false,
+            reason: 'Ein Vorschlag ist ab 14 empfohlen, ohne die Eignung für jüngere Spieler zu erklären.',
+          },
+        ],
+      }),
+    );
+  const research = vi.fn().mockResolvedValue(original);
+  const result = await verifiedResearch(
+    {} as Database,
+    { models: [] },
+    job,
+    [],
+    new AbortController().signal,
+    research,
+  );
+  expect(research).toHaveBeenCalledTimes(3);
+  expect(result.partial).toBe(true);
+  expect(result.summary).toContain('ab 14');
 });
 
 it('keeps unresolved criteria visible as a partial result after two repairs', async () => {

@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import { tagsOf } from './domain.js';
+
+/** Tags belong to this note's context, not to a separate user profile. */
+export function commandContext(content: string) {
+  return { notiz: content, tags: tagsOf(content) };
+}
 
 export function noteCommands(content: string) {
   const commands: { prompt: string; start: number; end: number }[] = [];

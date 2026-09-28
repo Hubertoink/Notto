@@ -32,7 +32,7 @@ try {
   const note = newNote(
     user,
     games
-      ? `Spiele für die Jugendarbeit. Mögliche Neuanschaffungen: Bluff, Beasty Bar, Challengers.\n/ki ${prompt}`
+      ? `Mögliche Neuanschaffungen: Bluff, Beasty Bar, Challengers.\n#jugendarbeit #spiele\n/ki ${prompt}`
       : research
         ? `## Mouhanad Khorchide\nInteressante Gedanken zum Islam und der Form der Barmherzigkeit. Welche Auswirkungen könnte das für Jugendarbeit in Mannheim haben?\n/Ki ${prompt}\n[Zeit.de_Portrait](https://www.zeit.de/2026/40/mouhanad-khorchide-islamische-theologie-uni-muenster)`
         : `Noto-Komponenten\nhttps://www.shad-table.dev/animated-icons-table\n/ki ${prompt}`,

@@ -87,7 +87,7 @@ function verificationResponse(
     name === 'research_plan'
       ? { objective: 'Originalauftrag erfüllen', requestedCount: count, criteria: [], excludedExamples: [] }
       : name === 'research_review'
-        ? { fulfilled: true, deliveredItems: items, issues: [] }
+        ? { fulfilled: true, deliveredItems: items, issues: [], corrections: [], criterionChecks: [] }
         : undefined;
   return value
     ? { status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(value) }] }] }

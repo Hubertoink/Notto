@@ -108,7 +108,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
     if (needsSearch) {
       await progress('Websuche läuft · weitere Quellen werden gesucht');
       try {
-        search = await searchCommand(db, env, job, warnings, controller.signal);
+        search = await searchCommand(db, env, job, warnings, controller.signal, progress);
         await permitted();
         if (wantsImages)
           for (const source of search.sources) {
@@ -157,6 +157,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
         {
           model: job.model,
           memory: false,
+          purpose: 'note_command',
           instructions,
           input: JSON.stringify({
             auftrag: job.prompt,
@@ -280,7 +281,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
             job.id,
             image.bytes,
           ]);
-      if (updated.rowCount && (result.items.length || result.research))
+      if (updated.rowCount && !result.partial && (result.items.length || result.research))
         await cleanCompletedPrompts(client, job.user_id, job.note_id, [job.prompt]);
       await client.query('COMMIT');
     } catch (error) {

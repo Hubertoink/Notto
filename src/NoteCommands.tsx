@@ -279,7 +279,7 @@ export function NoteCommands({
             )}
             {result && (
               <>
-                {!result.research && <p className="command-summary">{result.summary}</p>}
+                {(!result.research || result.partial) && <p className="command-summary">{result.summary}</p>}
                 {result.research && <NoteMarkdown content={result.research} scope={scope} />}
                 <div className="command-results">
                   {result.items.map((item, index) => (

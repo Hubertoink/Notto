@@ -1,5 +1,5 @@
 import { memoryContext } from '../src/memory-policy.js';
-import { knowledgeRole } from '../src/knowledge-policy.js';
+import { commandRole, knowledgeRole } from '../src/knowledge-policy.js';
 import { z } from 'zod';
 import { type Database } from './database.js';
 import { availableModels } from './models.js';
@@ -80,7 +80,7 @@ export async function openai(
             );
       Object.assign(clean, {
         store: false,
-        instructions: `${knowledgeRole}\n${body.instructions ?? ''}${context}`,
+        instructions: `${body.purpose === 'note_command' ? commandRole : knowledgeRole}\n${body.instructions ?? ''}${context}`,
         text: body.text,
         max_output_tokens: 4000,
         max_tool_calls: web && body.max_tool_calls === 6 ? 6 : 2,

@@ -77,6 +77,22 @@ const response = () => ({
     },
   ],
 });
+function verificationResponse(
+  body: Record<string, unknown>,
+  count: number | null = null,
+  items: string[] = [],
+) {
+  const name = (body.text as any)?.format?.name;
+  const value =
+    name === 'research_plan'
+      ? { objective: 'Originalauftrag erfüllen', requestedCount: count, criteria: [], excludedExamples: [] }
+      : name === 'research_review'
+        ? { fulfilled: true, deliveredItems: items, issues: [] }
+        : undefined;
+  return value
+    ? { status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(value) }] }] }
+    : undefined;
+}
 async function start(id = randomUUID(), owner = user, revision = note.revision) {
   return app.inject({
     method: 'PUT',
@@ -357,6 +373,8 @@ it('researches reading recommendations from the Brooks note without requiring su
   await pg.query('UPDATE note_commands SET prompt=$1,note_content=$2', [prompt, content]);
   const text = 'Zum Einstieg: No Silver Bullet. [1]';
   vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) => {
+    const verification = verificationResponse(body);
+    if (verification) return verification;
     if (!body.tools) {
       expect(JSON.parse(body.input as string)).toMatchObject({ auftrag: prompt, notiz: content });
       return {
@@ -402,7 +420,7 @@ it('researches reading recommendations from the Brooks note without requiring su
     };
   });
   await workCommandOnce(adapter, env);
-  expect(openai).toHaveBeenCalledTimes(2);
+  expect(openai).toHaveBeenCalledTimes(4);
   const job: any = (await pg.query('SELECT status,result FROM note_commands')).rows[0];
   expect(job.status).toBe('done');
   expect(job.result.searched).toBe(true);
@@ -440,33 +458,35 @@ it('really searches for reviews, verifies recency and preserves clickable citati
       },
     ],
   };
-  vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) =>
-    body.tools
-      ? searched
-      : {
-          status: 'completed',
-          output: [
-            {
-              content: [
-                {
-                  type: 'output_text',
-                  text: JSON.stringify(
-                    (body.text as any)?.format?.name === 'research_result'
-                      ? {
-                          summary: 'Eine Rezension belegt',
-                          text: '[Rezension](https://example.com/review)',
-                          partial: true,
-                        }
-                      : { queries: ['Mouhanad Khorchide Rezension'] },
-                  ),
-                },
-              ],
-            },
-          ],
-        },
+  vi.mocked(openai).mockImplementation(
+    async (_db, _user, _endpoint, body) =>
+      verificationResponse(body, 3, ['Buch eins']) ??
+      (body.tools
+        ? searched
+        : {
+            status: 'completed',
+            output: [
+              {
+                content: [
+                  {
+                    type: 'output_text',
+                    text: JSON.stringify(
+                      (body.text as any)?.format?.name === 'research_result'
+                        ? {
+                            summary: 'Eine Rezension belegt',
+                            text: '[Rezension](https://example.com/review)',
+                            partial: true,
+                          }
+                        : { queries: ['Mouhanad Khorchide Rezension'] },
+                    ),
+                  },
+                ],
+              },
+            ],
+          }),
   );
   await workCommandOnce(adapter, env);
-  expect(openai).toHaveBeenCalledTimes(5);
+  expect(openai).toHaveBeenCalledTimes(13);
   for (const call of vi.mocked(openai).mock.calls.filter((call) => call[3].tools)) {
     expect(call[3]).toMatchObject({ tools: [{ type: 'web_search' }], tool_choice: 'required' });
     expect(JSON.parse(call[3].input as string)).toMatchObject({
@@ -478,6 +498,7 @@ it('really searches for reviews, verifies recency and preserves clickable citati
   const job: any = (await pg.query('SELECT result FROM note_commands')).rows[0];
   expect(job.result.research).toContain('[Rezension](https://example.com/review)');
   expect(job.result.searched).toBe(true);
+  expect(job.result.partial).toBe(true);
   expect((await pg.query('SELECT id FROM command_images')).rows).toHaveLength(0);
 });
 
@@ -489,6 +510,8 @@ it('researches the complete games request and preserves every criterion beyond t
   await pg.query('UPDATE note_commands SET prompt=$1,note_content=$2', [prompt, content]);
   vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) => {
     expect(JSON.parse(body.input as string)).toMatchObject({ auftrag: prompt, notiz: content });
+    const verification = verificationResponse(body, 5, ['A', 'B', 'C', 'D', 'E']);
+    if (verification) return verification;
     if (!body.tools)
       return {
         status: 'completed',
@@ -534,7 +557,7 @@ it('researches the complete games request and preserves every criterion beyond t
   expect(job.status).toBe('done');
   expect(job.result.searched).toBe(true);
   expect(job.result.research).toContain('[Spielregeln](https://example.com/games)');
-  expect(openai).toHaveBeenCalledTimes(2);
+  expect(openai).toHaveBeenCalledTimes(4);
 });
 
 it('marks an unavailable search as failed instead of completing an empty task', async () => {

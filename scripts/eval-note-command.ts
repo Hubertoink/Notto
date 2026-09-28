@@ -25,7 +25,7 @@ try {
   const games = process.argv.includes('--games');
   const research = games || process.argv.includes('--research');
   const prompt = games
-    ? 'Gib mir fünf Gemeinschaftsspiele, die einfach zu erlernen, für Jugendliche ab 12 geeignet und kommunikativ sind und sich in einen spielerischen Abend integrieren lassen.'
+    ? 'Gib mir fünf weitere Gemeinschaftsspiele in einer ähnlichen spielerischen Richtung wie die drei in der Notiz. Sie sollen einfach zu erlernen, für Jugendliche ab 12 geeignet und kommunikativ sein und sich in einen spielerischen Abend integrieren lassen.'
     : research
       ? 'Suche Rezensionen zu den letzten drei Veröffentlichungen von Khorchide'
       : 'Wähle fünf für Noto passende Icons oder Komponenten von dieser Seite aus. Erkläre ihren Nutzen kurz und zeige jeweils einen Screenshot. Verwende die Demo-Komponenten, nicht die Seitennavigation.';
@@ -77,6 +77,7 @@ try {
     await writeFile(`output/command-eval/${image.id}.jpg`, Buffer.from(image.bytes));
   console.log(`Saved ${images.length} real screenshots.`);
   if (job.status !== 'done' || (research ? !job.result?.research : !images.length)) process.exitCode = 1;
+  if (games && job.result?.partial) process.exitCode = 1;
 } finally {
   await pg.close();
 }

@@ -100,7 +100,10 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
     const wantsImages = /\b(bild\w*|bilder\w*|screenshot\w*|visuell\w*|icon\w*|komponente\w*)\b/i.test(
       job.prompt,
     );
-    const needsSearch = commandNeedsSearch(job.prompt) || (urls.length > 0 && !sources.length);
+    const needsSearch = commandNeedsSearch(
+      job.prompt,
+      sources.some((source) => !!source.url),
+    );
     let search: Awaited<ReturnType<typeof searchCommand>> | undefined;
     if (needsSearch) {
       await progress('Websuche läuft · weitere Quellen werden gesucht');
@@ -114,6 +117,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
           }
       } catch (error) {
         controller.signal.throwIfAborted();
+        if (!wantsImages) throw error;
         warnings.push(error instanceof Error ? error.message : 'Websuche fehlgeschlagen.');
       }
     }

@@ -22,15 +22,20 @@ try {
   await pg.exec(await readFile(new URL('../server/schema.sql', import.meta.url), 'utf8'));
   const user = randomUUID(),
     id = randomUUID();
-  const research = process.argv.includes('--research');
-  const prompt = research
-    ? 'Suche Rezensionen zu den letzten drei Veröffentlichungen von Khorchide'
-    : 'Wähle fünf für Noto passende Icons oder Komponenten von dieser Seite aus. Erkläre ihren Nutzen kurz und zeige jeweils einen Screenshot. Verwende die Demo-Komponenten, nicht die Seitennavigation.';
+  const games = process.argv.includes('--games');
+  const research = games || process.argv.includes('--research');
+  const prompt = games
+    ? 'Gib mir fünf Gemeinschaftsspiele, die einfach zu erlernen, für Jugendliche ab 12 geeignet und kommunikativ sind und sich in einen spielerischen Abend integrieren lassen.'
+    : research
+      ? 'Suche Rezensionen zu den letzten drei Veröffentlichungen von Khorchide'
+      : 'Wähle fünf für Noto passende Icons oder Komponenten von dieser Seite aus. Erkläre ihren Nutzen kurz und zeige jeweils einen Screenshot. Verwende die Demo-Komponenten, nicht die Seitennavigation.';
   const note = newNote(
     user,
-    research
-      ? `## Mouhanad Khorchide\nInteressante Gedanken zum Islam und der Form der Barmherzigkeit. Welche Auswirkungen könnte das für Jugendarbeit in Mannheim haben?\n/Ki ${prompt}\n[Zeit.de_Portrait](https://www.zeit.de/2026/40/mouhanad-khorchide-islamische-theologie-uni-muenster)`
-      : `Noto-Komponenten\nhttps://www.shad-table.dev/animated-icons-table\n/ki ${prompt}`,
+    games
+      ? `Spiele für die Jugendarbeit. Mögliche Neuanschaffungen: Bluff, Beasty Bar, Challengers.\n/ki ${prompt}`
+      : research
+        ? `## Mouhanad Khorchide\nInteressante Gedanken zum Islam und der Form der Barmherzigkeit. Welche Auswirkungen könnte das für Jugendarbeit in Mannheim haben?\n/Ki ${prompt}\n[Zeit.de_Portrait](https://www.zeit.de/2026/40/mouhanad-khorchide-islamische-theologie-uni-muenster)`
+        : `Noto-Komponenten\nhttps://www.shad-table.dev/animated-icons-table\n/ki ${prompt}`,
   );
   await pg.query('INSERT INTO users(id,email,password_hash) VALUES($1,$2,$3)', [
     user,
@@ -62,7 +67,7 @@ try {
     .rows[0];
   await mkdir('output/command-eval', { recursive: true });
   await writeFile(
-    `output/command-eval/${research ? 'research' : 'result'}.json`,
+    `output/command-eval/${games ? 'games' : research ? 'research' : 'result'}.json`,
     JSON.stringify(job, null, 2),
   );
   console.log(JSON.stringify(job, null, 2));

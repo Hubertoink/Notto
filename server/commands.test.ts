@@ -469,10 +469,84 @@ it('really searches for reviews, verifies recency and preserves clickable citati
   expect(openai).toHaveBeenCalledTimes(5);
   for (const call of vi.mocked(openai).mock.calls.filter((call) => call[3].tools)) {
     expect(call[3]).toMatchObject({ tools: [{ type: 'web_search' }], tool_choice: 'required' });
-    expect(call[3].input).toBe('Mouhanad Khorchide Rezension');
+    expect(JSON.parse(call[3].input as string)).toMatchObject({
+      auftrag: 'Suche Rezensionen zu den letzten drei Veröffentlichungen',
+      notiz: 'Mouhanad Khorchide',
+      suchanfrage: 'Mouhanad Khorchide Rezension',
+    });
   }
   const job: any = (await pg.query('SELECT result FROM note_commands')).rows[0];
   expect(job.result.research).toContain('[Rezension](https://example.com/review)');
   expect(job.result.searched).toBe(true);
   expect((await pg.query('SELECT id FROM command_images')).rows).toHaveLength(0);
+});
+
+it('researches the complete games request and preserves every criterion beyond the search query', async () => {
+  await start();
+  const prompt =
+    'gib mir fünf Gemeinschaftsspiele, die auch einfach zu erlernen sind, für jugendliche ab 12 Jahre geeignet sind. Sich einfach in einen spielerischen Abend integrieren lassen und kommunikativ sind';
+  const content = 'Mögliche Neuanschaffungen: Bluff, Beasty Bar und Challengers';
+  await pg.query('UPDATE note_commands SET prompt=$1,note_content=$2', [prompt, content]);
+  vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) => {
+    expect(JSON.parse(body.input as string)).toMatchObject({ auftrag: prompt, notiz: content });
+    if (!body.tools)
+      return {
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({ queries: ['kommunikative Gemeinschaftsspiele'] }),
+              },
+            ],
+          },
+        ],
+      };
+    expect(JSON.parse(body.input as string).suchanfrage).toBe('kommunikative Gemeinschaftsspiele');
+    const text = 'Fünf passende Spiele mit Begründung. [1]';
+    return {
+      status: 'completed',
+      output: [
+        { type: 'web_search_call', status: 'completed' },
+        {
+          content: [
+            {
+              type: 'output_text',
+              text,
+              annotations: [
+                {
+                  type: 'url_citation',
+                  start_index: text.indexOf('[1]'),
+                  end_index: text.length,
+                  title: 'Spielregeln',
+                  url: 'https://example.com/games',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  });
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,result FROM note_commands')).rows[0];
+  expect(job.status).toBe('done');
+  expect(job.result.searched).toBe(true);
+  expect(job.result.research).toContain('[Spielregeln](https://example.com/games)');
+  expect(openai).toHaveBeenCalledTimes(2);
+});
+
+it('marks an unavailable search as failed instead of completing an empty task', async () => {
+  await start();
+  await pg.query("UPDATE note_commands SET prompt='Gib mir fünf Gemeinschaftsspiele',note_content='Bluff'");
+  vi.mocked(openai).mockRejectedValueOnce(new Error('Websuche nicht verfügbar'));
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,result,error FROM note_commands')).rows[0];
+  expect(job.status).toBe('failed');
+  expect(job.result).toBeNull();
+  expect(job.error).toContain('Websuche nicht verfügbar');
+  expect((await pg.query('SELECT document FROM notes WHERE id=$1', [note.id])).rows[0].document).toEqual(
+    note,
+  );
 });

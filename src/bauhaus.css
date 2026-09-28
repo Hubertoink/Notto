@@ -704,6 +704,10 @@
 .desktop-frame {
   --nt-titlebar-height: 34px;
 }
+.desktop-frame .floating-search-trigger {
+  top: calc(var(--nt-titlebar-height) + 10px);
+  bottom: auto;
+}
 .desktop-frame .notebook {
   height: calc(100dvh - var(--nt-titlebar-height));
 }

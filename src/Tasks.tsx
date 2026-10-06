@@ -30,7 +30,12 @@ import { addTask, checkTask, newest, noteAnalysis, tasksFor, type Task } from '.
 import { useNotto } from './state';
 import { Sources, NoteMarkdown } from './components';
 import type { Note } from './domain';
-import { attachmentIds, currentContent, titleOf } from './domain';
+import { attachmentIds, titleOf } from './domain';
+import { currentAnalysis } from './analysis-current';
+import { analysisJob } from './analysis-status';
+import type { BackgroundJob } from './AIActivity';
+import { ownBackend, readCloudConfig } from './cloud';
+import { serverRequest } from './backend';
 import { aiAnnotationBackgrounds } from './note-backgrounds';
 import { compactParenthesizedLines } from './annotation-markdown';
 import './tasks.css';
@@ -62,6 +67,41 @@ export function useKnowledgeRecords(scope: string) {
     };
   }, [scope, notify]);
   return state.scope === scope ? state.records : [];
+}
+function useAnalysisJob(note: Note, active: boolean) {
+  const [state, setState] = useState<{ scope: string; noteId: string; jobs: BackgroundJob[] }>({
+    scope: note.scope,
+    noteId: note.id,
+    jobs: [],
+  });
+  useEffect(() => {
+    if (!active || note.scope === 'local' || !ownBackend()) return;
+    let alive = true;
+    let loading = false;
+    setState({ scope: note.scope, noteId: note.id, jobs: [] });
+    const refresh = async () => {
+      if (loading) return;
+      loading = true;
+      try {
+        const result = await serverRequest(readCloudConfig().url, '/ai/jobs');
+        if (alive) setState({ scope: note.scope, noteId: note.id, jobs: result.jobs });
+      } catch {
+        /* The stale review remains visible; connection status is handled centrally. */
+        if (alive) setState({ scope: note.scope, noteId: note.id, jobs: [] });
+      } finally {
+        loading = false;
+      }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 10000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [active, note.scope, note.id, note.revision]);
+  return active && state.scope === note.scope && state.noteId === note.id
+    ? analysisJob(note, state.jobs)
+    : undefined;
 }
 export function TaskRow({
   task,
@@ -263,9 +303,10 @@ export function NoteAnnotations({
     }
   };
   const analysis = noteAnalysis(records, note);
-  const analysisCurrent = !!analysis && currentContent(note, analysis.revision);
+  const analysisCurrent = !!analysis && currentAnalysis(note, analysis.revision);
+  const job = useAnalysisJob(note, !analysisCurrent && !excluded && config(note.scope).auto);
   const insights =
-    analysis && currentContent(note, analysis.revision)
+    analysis && currentAnalysis(note, analysis.revision)
       ? ((analysis.data as Analysis).suggestions || [])
           .filter((item) => item.kind === 'insight')
           .map((item) => ({
@@ -378,15 +419,19 @@ export function NoteAnnotations({
   const annotationCount = tasks.length + insights.length + uniqueResearch.length + relations.length;
   const reviewState = excluded
     ? 'excluded'
-    : updating === 'analysis'
+    : updating === 'analysis' || job?.status === 'running'
       ? 'running'
       : hasUnsavedChanges
         ? 'unsaved'
         : analysisCurrent
           ? 'checked'
-          : analysis
-            ? 'outdated'
-            : 'pending';
+          : job?.status === 'failed'
+            ? 'failed'
+            : job?.status === 'pending'
+              ? 'queued'
+              : analysis
+                ? 'outdated'
+                : 'pending';
   const reviewLabel = {
     excluded: 'KI-Prüfung ausgeschlossen',
     running: 'KI prüft die Notiz …',
@@ -394,16 +439,24 @@ export function NoteAnnotations({
     checked: annotationCount ? 'KI-geprüft' : 'Geprüft · keine Hinweise',
     outdated: 'Prüfung veraltet',
     pending: 'Noch kein Prüfergebnis',
+    queued: job?.error ? 'Wiederholung vorgesehen' : 'Prüfung vorgemerkt',
+    failed: 'Prüfung fehlgeschlagen',
   }[reviewState];
   const reviewDescription = {
     excluded: 'Für diese Notiz ist die KI-Prüfung ausgeschlossen.',
     running: 'Die gespeicherte Textversion wird gerade geprüft.',
     unsaved: 'Speichere deine Änderungen, damit die aktuelle Fassung geprüft werden kann.',
     checked: analysis
-      ? `Diese Textversion wurde am ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(analysis.at))} geprüft.${annotationCount ? ` ${annotationCount} ${annotationCount === 1 ? 'Eintrag' : 'Einträge'} in den Anmerkungen.` : ' Keine offenen Hinweise.'}`
+      ? `Der aktuelle Inhalt wurde am ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(analysis.at))} geprüft.${annotationCount ? ` ${annotationCount} ${annotationCount === 1 ? 'Eintrag' : 'Einträge'} in den Anmerkungen.` : ' Keine offenen Hinweise.'}`
       : '',
-    outdated:
-      'Die Notiz wurde seit der letzten KI-Prüfung geändert. Aktualisiere die Anmerkungen für diese Textversion.',
+    outdated: config(note.scope).auto
+      ? 'Der Inhalt wurde seit der letzten KI-Prüfung geändert. Die automatische Prüfung ist eingeschaltet. Den Hintergrundstatus findest du unter „Wissen & KI“; mit „Aktualisieren“ kannst du die Prüfung direkt erneut starten.'
+      : 'Der Inhalt wurde seit der letzten KI-Prüfung geändert. Die automatische Prüfung ist ausgeschaltet. Mit „Aktualisieren“ kannst du diese Fassung prüfen.',
+    queued: job?.error
+      ? 'Die automatische Prüfung konnte noch nicht abgeschlossen werden. Eine Wiederholung ist vorgesehen.'
+      : 'Diese Fassung wartet auf die automatische KI-Prüfung.',
+    failed:
+      'Die automatische Prüfung konnte nicht abgeschlossen werden. Es läuft keine weitere Wiederholung. Mit „Aktualisieren“ kannst du einen neuen Versuch starten.',
     pending: config(note.scope).auto
       ? 'Für diese Textversion liegt noch keine abgeschlossene Prüfung vor. Die automatische Prüfung ist eingeschaltet.'
       : 'Für diese Textversion liegt noch keine abgeschlossene Prüfung vor. Du kannst sie mit „Aktualisieren“ prüfen.',
@@ -411,7 +464,7 @@ export function NoteAnnotations({
   const ReviewIcon =
     reviewState === 'checked'
       ? CircleCheck
-      : reviewState === 'outdated' || reviewState === 'excluded'
+      : reviewState === 'outdated' || reviewState === 'excluded' || reviewState === 'failed'
         ? CircleAlert
         : reviewState === 'running'
           ? RefreshCw
@@ -558,6 +611,7 @@ export function NoteAnnotations({
             <ReviewIcon size={18} aria-hidden="true" />
             <div>
               <p>{reviewDescription}</p>
+              {job?.error && <p className="command-error">{job.error}</p>}
             </div>
           </details>
           <div className="annotation-status-list" aria-label="Anmerkungen nach Kategorie">

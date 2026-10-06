@@ -7,6 +7,7 @@ import { db, desktop, repo } from './repository';
 import { cloud, fetchAttachment, ownBackend, readCloudConfig } from './cloud';
 import { serverRequest } from './backend';
 import { attachmentIds, contentRevision, currentContent, titleOf, type Note } from './domain';
+import { analysisContent, currentAnalysis } from './analysis-current';
 import { withoutNoteCommands, commandEvidence } from './note-command';
 import { diverseHits, lexicalScore, splitEvidence } from './retrieval';
 import {
@@ -239,7 +240,10 @@ export function latest(records: KnowledgeRecord[], kind: KnowledgeRecord['kind']
   return records
     .filter(
       (r) =>
-        r.kind === kind && r.scope === note.scope && r.noteId === note.id && currentContent(note, r.revision),
+        r.kind === kind &&
+        r.scope === note.scope &&
+        r.noteId === note.id &&
+        (kind === 'analysis' ? currentAnalysis(note, r.revision) : currentContent(note, r.revision)),
     )
     .sort((a, b) => b.at.localeCompare(a.at) || b.id.localeCompare(a.id))[0];
 }
@@ -285,7 +289,9 @@ export async function analyze(note: Note) {
     if (!records.some((r) => r.kind === 'extraction' && r.noteId === note.id && (r.data as any).id === id))
       await extract(note, id);
   }
-  const sources = await evidence(note);
+  const sources = (await evidence(note)).map((source) =>
+    source.attachment ? source : { ...source, text: analysisContent(source.text) },
+  );
   if (sources.reduce((s, p) => s + p.text.length, 0) > 60000)
     throw new Error('Diese Notiz ist für eine einzelne Analyse zu lang (maximal 60.000 Zeichen).');
   const result = await structured(note.scope, analysisInstructions, sources, suggestionSchema);
@@ -303,7 +309,7 @@ export async function analyze(note: Note) {
   )
     throw new Error('Analyse verworfen: Ein Beleg stimmt nicht mit der Quelle überein.');
   const current = await repo.get(note.scope, note.id);
-  if (!current || !eligible(current) || !currentContent(current, contentRevision(note))) return;
+  if (!current || !eligible(current) || !currentAnalysis(current, contentRevision(note))) return;
   await knowledge.append({ ...note, revision: contentRevision(note) }, 'analysis', result);
   await (await import('./relation-client')).findNoteRelations(note);
   if (config(note.scope).autoResearch)

@@ -492,7 +492,7 @@ it('distinguishes an unreviewed note from a checked note without suggestions', a
   );
   await userEvent.setup().click(await screen.findByRole('button', { name: /KI-Anmerkungen/ }));
   expect(screen.getAllByText('Geprüft · keine Hinweise')).toHaveLength(2);
-  expect(screen.getByText(/Diese Textversion wurde am/)).toBeTruthy();
+  expect(screen.getByText(/Der aktuelle Inhalt wurde am/)).toBeTruthy();
 });
 it('recovers an unfinished draft after closing and saves its exact text', async () => {
   const user = userEvent.setup();

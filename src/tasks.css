@@ -257,8 +257,12 @@
   color: light-dark(#236347, #a5dfbd);
 }
 .annotation-status-outdated,
+.annotation-status-failed,
+.annotation-status-queued,
 .annotation-status-unsaved,
 .annotation-review-outdated,
+.annotation-review-failed,
+.annotation-review-queued,
 .annotation-review-unsaved {
   color: light-dark(#875d21, #f2cb8a);
 }

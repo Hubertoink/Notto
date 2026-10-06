@@ -26,6 +26,83 @@ const headers = (secret?: string) => ({
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
 });
+it('reuses analysis after internal linking without a model call and checks real edits again', async () => {
+  await pg.exec('DELETE FROM jobs');
+  const note = newNote(alice, 'Ownership über Projekte und Prozesse.');
+  const linked = reviseNote(note, {
+    content: '[Ownership über Projekte und Prozesse](notes/11111111-1111-4111-8111-111111111111).',
+  });
+  await pg.query(
+    'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
+    [
+      alice,
+      JSON.stringify({
+        enabled: true,
+        auto: true,
+        autoResearch: false,
+        model: 'gpt-4.1-mini',
+        excludedTags: '',
+        excludedNotes: [],
+      }),
+    ],
+  );
+  const record = {
+    id: crypto.randomUUID(),
+    scope: alice,
+    noteId: note.id,
+    revision: note.revision,
+    kind: 'analysis',
+    at: new Date().toISOString(),
+    data: { suggestions: [] },
+  };
+  await pg.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3)', [
+    alice,
+    record.id,
+    JSON.stringify(record),
+  ]);
+  const push = (n: typeof note, base: string | null) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/notes/push',
+      headers: headers(aToken),
+      payload: { p_id: n.id, p_revision: n.revision, p_base_revision: base, p_document: n },
+    });
+  expect((await push(linked, null)).statusCode).toBe(200);
+  const fetch = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [{ content: [{ type: 'output_text', text: '{"suggestions":[]}' }] }],
+        }),
+      ),
+    );
+  try {
+    const env = { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 };
+    expect(await workOnce(adapter, env)).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(
+      (await pg.query("SELECT status FROM jobs WHERE note_id=$1 AND kind='analysis'", [note.id])).rows[0]
+        .status,
+    ).toBe('done');
+    await pg.exec('DELETE FROM jobs');
+    const changed = reviseNote(linked, { content: linked.content + ' Neue Aufgaben für die Leitung.' });
+    expect((await push(changed, linked.revision)).statusCode).toBe(200);
+    await workOnce(adapter, env);
+    expect(fetch).toHaveBeenCalledOnce();
+    const records = await pg.query(
+      "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'noteId'=$2 AND document->>'kind'='analysis'",
+      [alice, note.id],
+    );
+    expect(records.rows).toHaveLength(2);
+    expect(records.rows.some((r: any) => r.document.revision === changed.revision)).toBe(true);
+  } finally {
+    fetch.mockRestore();
+    await pg.exec('DELETE FROM jobs');
+    await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+  }
+});
 it('defaults command web research on and preserves a global opt-out when an older client saves settings', async () => {
   const settings = {
     enabled: true,

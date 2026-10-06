@@ -1,5 +1,5 @@
 import type { Note } from './domain';
-import { currentContent } from './domain';
+import { currentAnalysis } from './analysis-current';
 import { commandEvidence } from './note-command';
 import {
   decisionKey,
@@ -22,9 +22,10 @@ export function newest(records: KnowledgeRecord[]) {
   return [...records].sort((a, b) => b.at.localeCompare(a.at) || b.id.localeCompare(a.id));
 }
 export function noteAnalysis(records: KnowledgeRecord[], note: Note) {
-  return newest(
+  const candidates = newest(
     records.filter((r) => r.scope === note.scope && r.noteId === note.id && r.kind === 'analysis'),
-  )[0];
+  );
+  return candidates.find((record) => currentAnalysis(note, record.revision)) ?? candidates[0];
 }
 export function tasksFor(notes: Note[], records: KnowledgeRecord[], scope: string): Task[] {
   const scoped = newest(records.filter((r) => r.scope === scope));
@@ -38,7 +39,7 @@ export function tasksFor(notes: Note[], records: KnowledgeRecord[], scope: strin
   for (const note of notes.filter((n) => n.scope === scope && !n.deleted)) {
     const analysis = noteAnalysis(scoped, note);
     const current =
-      analysis && currentContent(note, analysis.revision) ? (analysis.data as Analysis).suggestions : [];
+      analysis && currentAnalysis(note, analysis.revision) ? (analysis.data as Analysis).suggestions : [];
     const retained = scoped
       .filter((r) => r.kind === 'analysis' && r.noteId === note.id)
       .flatMap((r) => (r.data as Analysis).suggestions)

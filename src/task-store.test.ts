@@ -2,13 +2,35 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { db, repo } from './repository';
-import { newNote } from './domain';
+import { newNote, reviseNote } from './domain';
 import { knowledge, evidence, type KnowledgeRecord } from './intelligence';
-import { addTask, checkTask, tasksFor } from './task-store';
+import { addTask, checkTask, tasksFor, noteAnalysis } from './task-store';
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 beforeEach(async () => {
   await db.knowledge.clear();
   await db.notes.clear();
+});
+it('retains unaccepted suggestions after link-only edits and prefers an applicable review', async () => {
+  const note = newNote('local', 'Ownership im Team klären');
+  await knowledge.append(note, 'analysis', {
+    suggestions: [{ kind: 'task', title: note.content, detail: '', quote: note.content }],
+  });
+  const linked = reviseNote(note, {
+    content: '[Ownership](notes/11111111-1111-4111-8111-111111111111) im Team klären',
+  });
+  const records = await knowledge.list('local');
+  expect(tasksFor([linked], records, 'local')).toHaveLength(1);
+  const unrelated = reviseNote(linked, { content: 'Anderer Inhalt' });
+  records.push({
+    ...records[0],
+    id: 'late-old-response',
+    revision: unrelated.revision,
+    at: '2099-01-01T00:00:00Z',
+  });
+  expect(noteAnalysis(records, linked)?.revision).toBe(note.revision);
+  expect(
+    tasksFor([reviseNote(linked, { content: 'Ownership im Team geklärt' })], records.slice(0, 1), 'local'),
+  ).toHaveLength(0);
 });
 it('excludes command instructions from local analysis and old AI task suggestions', async () => {
   const note = newNote('local', 'Gedanken\n/ki Suche Rezensionen');

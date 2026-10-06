@@ -4,6 +4,7 @@ import { workCommandOnce } from './command-worker.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { contentRevision, currentContent } from '../src/domain.js';
+import { analysisContent, currentAnalysis } from '../src/analysis-current.js';
 import { analysisSchema, analysisInstructions, noteAllowed } from '../src/evidence-policy.js';
 import { splitEvidence } from '../src/retrieval.js';
 import { sourceTexts } from './sources.js';
@@ -40,7 +41,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
     if (
       !row ||
       !withoutNoteCommands(n.content).trim() ||
-      !currentContent(n, job.revision) ||
+      !(job.kind === 'analysis' ? currentAnalysis(n, job.revision) : currentContent(n, job.revision)) ||
       n.deleted ||
       !c?.enabled ||
       !c.auto ||
@@ -67,7 +68,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
       );
     if (
       job.kind === 'analysis' &&
-      records.some((r) => r.kind === 'analysis' && currentContent(n, r.revision))
+      records.some((r) => r.kind === 'analysis' && currentAnalysis(n, r.revision))
     ) {
       await db.query(
         'INSERT INTO jobs(id,user_id,note_id,revision,kind) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
@@ -75,7 +76,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
       );
       if (c.autoResearch) {
         const existing = records
-          .filter((r) => r.kind === 'analysis' && currentContent(n, r.revision))
+          .filter((r) => r.kind === 'analysis' && currentAnalysis(n, r.revision))
           .sort((a, b) => b.at.localeCompare(a.at))[0];
         for (const { index } of researchCandidates(existing.data.suggestions))
           await db.query(
@@ -86,7 +87,11 @@ export async function workOnce(db: Database, env: AIEnvironment) {
       await db.query("UPDATE jobs SET status='done',lease_until=NULL WHERE id=$1", [job.id]);
       return true;
     }
-    const evidence = await sourceTexts(db, job.user_id, n, records, env.dataDir);
+    const evidence = (await sourceTexts(db, job.user_id, n, records, env.dataDir)).map((source) =>
+      job.kind === 'analysis' && !source.attachment
+        ? { ...source, text: analysisContent(source.text) }
+        : source,
+    );
     const sources = evidence.map((source) => source.text);
     const fresh = (
       await db.query(
@@ -99,7 +104,9 @@ export async function workOnce(db: Database, env: AIEnvironment) {
       !fresh.settings.enabled ||
       !fresh.settings.auto ||
       !noteAllowed(fresh.document, fresh.settings) ||
-      !currentContent(fresh.document, contentRevision(n)) ||
+      !(job.kind === 'analysis'
+        ? currentAnalysis(fresh.document, contentRevision(n))
+        : currentContent(fresh.document, contentRevision(n))) ||
       (job.kind.startsWith('research:') && !fresh.settings.autoResearch)
     ) {
       await db.query("UPDATE jobs SET status='skipped',lease_until=NULL WHERE id=$1", [job.id]);
@@ -214,7 +221,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         return true;
       }
       const a = records
-        .filter((r) => r.kind === 'analysis' && currentContent(n, r.revision))
+        .filter((r) => r.kind === 'analysis' && currentAnalysis(n, r.revision))
         .sort((a, b) => b.at.localeCompare(a.at))[0];
       const index = Number(job.kind.split(':')[1]),
         item = a?.data?.suggestions?.[index];
@@ -276,7 +283,9 @@ export async function workOnce(db: Database, env: AIEnvironment) {
     );
     if (
       check.rows[0] &&
-      currentContent(check.rows[0].document, contentRevision(n)) &&
+      (kind === 'analysis'
+        ? currentAnalysis(check.rows[0].document, contentRevision(n))
+        : currentContent(check.rows[0].document, contentRevision(n))) &&
       check.rows[0].settings.enabled &&
       check.rows[0].settings.auto &&
       noteAllowed(check.rows[0].document, check.rows[0].settings) &&

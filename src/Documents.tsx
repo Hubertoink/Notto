@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Action, readableDate, WebLink } from './components';
 import { PdfAttachment } from './PdfAttachment';
 import { DocumentAttachment } from './DocumentAttachment';
+import { AttachmentDownload } from './AttachmentDownload';
 import { attachmentIds, newNote, reviseNote, tagsOf, titleOf, type Note } from './domain';
 import { createDocument, documentContent, documentPages, replaceDocument } from './document-store';
 import { repo } from './repository';
@@ -358,6 +359,7 @@ export function DocumentDetail({
             {document.name} öffnen
           </DocumentAttachment>
         )}
+        <AttachmentDownload scope={note.scope} id={document.attachmentId} name={document.name} />
         <Action
           label="Neue Fassung hochladen"
           isDisabled={busy}

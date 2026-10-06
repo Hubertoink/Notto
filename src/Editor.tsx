@@ -47,13 +47,16 @@ import { NoteAnnotations, useKnowledgeRecords } from './Tasks';
 import { collectionNames, createCollection } from './collections';
 import { rewriteNote } from './rewrite';
 import { applyRelation, type Relation } from './note-relations';
-import { eligible } from './intelligence';
+import { eligible, config, knowledge } from './intelligence';
 import { tagPopupPosition } from './tag-popup';
 import { NoteCommands } from './NoteCommands';
 import { noteCommands, withoutNoteCommands } from './note-command';
-import { readCloudConfig, syncNotes } from './cloud';
+import { readCloudConfig, syncNotes, ownBackend } from './cloud';
 import { serverRequest } from './backend';
 import { contentRevision } from './domain';
+import { type AIContext } from './domain';
+import { ContextPicker } from './ContextPicker';
+import { defaultContext } from './source-context';
 
 export function Editor({
   note,
@@ -81,6 +84,13 @@ export function Editor({
   const knownCollections = collectionNames(notes || [], collectionRecords, scope);
   const [content, setContent] = useState(note?.content ?? '');
   const [collections, setCollections] = useState(note?.collections || initialCollections);
+  const [aiContext, setAIContext] = useState<AIContext>(
+    note?.aiContext ?? defaultContext({ collections: note?.collections || initialCollections }),
+  );
+  const contextRef = useRef(aiContext);
+  const initialContextRef = useRef(aiContext);
+  const [aiQuestion, setAIQuestion] = useState<string | null>(null);
+  const [contextOpen, setContextOpen] = useState(false);
   const collectionRef = useRef(collections);
   const initialCollectionRef = useRef(collections);
   const [collectionInput, setCollectionInput] = useState('');
@@ -361,6 +371,10 @@ export function Editor({
         setContent(restored);
         const restoredCollections = d?.collections || note?.collections || initialCollections;
         setCollections(restoredCollections);
+        const restoredContext =
+          d?.aiContext ?? note?.aiContext ?? defaultContext({ collections: restoredCollections });
+        setAIContext(restoredContext);
+        contextRef.current = restoredContext;
         collectionRef.current = restoredCollections;
         initialCollectionRef.current = note?.collections || initialCollections;
         textRef.current = restored;
@@ -409,6 +423,7 @@ export function Editor({
         noteId: draftId,
         content: value,
         collections: collectionRef.current,
+        aiContext: contextRef.current,
         baseRevision: base.current,
         updatedAt: new Date().toISOString(),
       };
@@ -474,13 +489,15 @@ export function Editor({
     )
       change(textRef.current);
   }, [note?.revision, change]);
-  async function save(asCopy = false, overwrite = false) {
-    if (saving || imageOperations.current > 0 || !ready || !content.trim()) return;
+  async function save(asCopy = false, overwrite = false, contentOverride?: string) {
+    const savedContent = contentOverride ?? content;
+    if (saving || imageOperations.current > 0 || !ready || !savedContent.trim()) return;
     setSaving(true);
     setError('');
     setSaveConflict(false);
     try {
       await queue.current;
+      if (scope !== 'local' && ownBackend() && noteCommands(savedContent).length) await knowledge.sync(scope);
       let saved: Note;
       if (note && !asCopy) {
         const current = await repo.get(scope, note.id);
@@ -491,15 +508,18 @@ export function Editor({
             'Es gibt eine neuere Fassung. Dein Entwurf ist gesichert. Übernimm deinen Text als aktuelle Version oder sichere ihn als neue Notiz.',
           );
         }
-        saved = reviseNote(current, { content, collections });
+        saved = reviseNote(current, { content: savedContent, collections, aiContext });
         await repo.put(saved, current.revision);
       } else {
-        saved = { ...newNote(scope, content), collections };
+        saved = { ...newNote(scope, savedContent), collections, aiContext };
         await repo.put(saved, null);
       }
       await repo.removeDraft(scope, draftId);
       base.current = saved.revision;
-      initial.current = content;
+      initial.current = savedContent;
+      textRef.current = savedContent;
+      setContent(savedContent);
+      initialContextRef.current = aiContext;
       initialCollectionRef.current = collections;
       setDraftStatus('Gespeichert');
       ++editGeneration.current;
@@ -554,12 +574,18 @@ export function Editor({
     setError('');
     try {
       const markdown = [];
-      for (const f of files)
+      for (const f of files) {
+        if (/\.(docx|txt|md)$/i.test(f.name)) {
+          const document = await repo.addDocument(scope, f);
+          markdown.push(`[${f.name.replace(/[\[\]\\\n]/g, '')}](attachments/${document.id})`);
+          continue;
+        }
         markdown.push(
           await (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
             ? repo.addPdf(scope, f)
             : repo.addImage(scope, f)),
         );
+      }
       const el = input.current;
       const position = el ? el.selectionStart + offsetOf(el) : textRef.current.length;
       const current = textRef.current;
@@ -598,6 +624,7 @@ export function Editor({
   }
   const dirty =
     content !== initial.current ||
+    JSON.stringify(aiContext) !== JSON.stringify(initialContextRef.current) ||
     JSON.stringify(collections) !== JSON.stringify(initialCollectionRef.current);
   const outgoing = linkedNotes(content, notes || [], scope);
   const incoming = note ? backlinks(note, notes || []) : [];
@@ -611,6 +638,10 @@ export function Editor({
       scope={scope}
       editing={!preview}
       dirty={dirty}
+      onInsert={(text) => {
+        change(`${textRef.current.trimEnd()}\n\n${text}`);
+        setPreview(false);
+      }}
       onStart={async (prompt, id) => {
         try {
           const saved = dirty || !note ? await save() : note;
@@ -662,6 +693,17 @@ export function Editor({
             </button>
           )}
           <div className="toolbar">
+            {!compact && (
+              <Action
+                label="KI fragen"
+                variant="ghost"
+                isDisabled={saving || !ready}
+                onClick={() => {
+                  const el = input.current;
+                  setAIQuestion(el?.value.slice(el.selectionStart, el.selectionEnd).trim() || '');
+                }}
+              />
+            )}
             {!compact && (
               <Action
                 label={rewriting ? 'Wird überarbeitet …' : 'Mit KI überarbeiten'}
@@ -724,6 +766,81 @@ export function Editor({
           </div>
         )}
       </div>
+      {!compact && (
+        <details className="context-controls" onToggle={(e) => setContextOpen(e.currentTarget.open)}>
+          <summary>
+            KI-Kontext ·{' '}
+            {aiContext.mode === 'note'
+              ? 'Notiz und Anhänge'
+              : aiContext.mode === 'collection'
+                ? aiContext.collection
+                : aiContext.mode === 'selected'
+                  ? 'Ausgewählte Quellen'
+                  : 'Gesamtes Notizbuch'}
+          </summary>
+          {contextOpen && (
+            <ContextPicker
+              names={knownCollections}
+              value={aiContext}
+              current={{ ...(note ?? draftNote), collections }}
+              notes={notes || []}
+              disabled={saving}
+              onChange={(value) => {
+                setAIContext(value);
+                contextRef.current = value;
+                change(textRef.current);
+              }}
+            />
+          )}
+        </details>
+      )}
+      {aiQuestion !== null && (
+        <Modal title="KI fragen" onClose={() => setAIQuestion(null)}>
+          <label className="document-form">
+            Deine Frage oder dein Auftrag
+            <textarea
+              rows={4}
+              maxLength={4000}
+              value={aiQuestion}
+              onChange={(e) => setAIQuestion(e.target.value)}
+              placeholder="Fasse unsere Konzeption zur Beteiligung zusammen und mache einen Vorschlag für diese Notiz."
+            />
+          </label>
+          <ContextPicker
+            names={knownCollections}
+            value={aiContext}
+            current={{ ...(note ?? draftNote), collections }}
+            notes={notes || []}
+            disabled={saving}
+            onChange={(value) => {
+              setAIContext(value);
+              contextRef.current = value;
+              change(textRef.current);
+            }}
+          />
+          <Action
+            label="Auftrag starten"
+            variant="primary"
+            isDisabled={
+              saving || !aiQuestion.trim() || scope === 'local' || !ownBackend() || !config(scope).enabled
+            }
+            onClick={() => {
+              const request = aiQuestion.trim().replace(/\r?\n/g, ' ');
+              void (async () => {
+                const saved = await save(false, false, `${textRef.current.trimEnd()}\n\n/ki ${request}`);
+                if (!saved) return;
+                setAIQuestion(null);
+                await syncNotes(scope);
+                await syncNotes(scope);
+              })().catch((e) => notify(e instanceof Error ? e.message : String(e)));
+            }}
+          />
+          {scope === 'local' && (
+            <p className="muted">Für KI-Aufträge bitte mit deinem Noto-Server anmelden.</p>
+          )}
+          {!config(scope).enabled && <p className="muted">KI zuerst unter „Wissen & KI“ aktivieren.</p>}
+        </Modal>
+      )}
       {rewriteRequest !== null && (
         <Modal title="Notiz überarbeiten" className="rewrite-dialog" onClose={() => setRewriteRequest(null)}>
           <p className="rewrite-intro">Was möchtest du verbessern?</p>
@@ -1190,8 +1307,8 @@ export function Editor({
               }}
             />
             <Action
-              label="Bild oder PDF hinzufügen"
-              tooltip="Bild oder PDF hinzufügen – Dateien kannst du auch in die Notiz ziehen"
+              label="Bild oder Dokument hinzufügen"
+              tooltip="Bild oder Dokument hinzufügen – PDF, DOCX, TXT und Markdown auch per Drag-and-drop"
               icon={<ImagePlus size={18} />}
               className="note-action-image"
               isIconOnly
@@ -1203,7 +1320,7 @@ export function Editor({
               type="file"
               hidden
               multiple
-              accept="image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf,.pdf"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/avif,application/pdf,.pdf,.docx,.txt,.md"
               onChange={(e) => {
                 void addFiles(Array.from(e.target.files ?? []));
                 e.target.value = '';

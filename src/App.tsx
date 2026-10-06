@@ -28,6 +28,7 @@ import { useNotto } from './state';
 import { Action, Modal } from './components';
 import { BauhausComposition, GeometricMark, TagLabel, TagMark } from './Bauhaus';
 import { Editor } from './Editor';
+import { DocumentDetail, DocumentUpload, CollectionQuestion } from './Documents';
 import { AnimatedTrashIcon } from './AnimatedTrashIcon';
 import { Settings } from './Settings';
 import { WebAccess } from './Login';
@@ -49,7 +50,7 @@ import {
   positionNoteDragPreview,
 } from './note-drag';
 
-type View = 'all' | 'pinned' | 'archive' | 'trash';
+type View = 'all' | 'pinned' | 'archive' | 'trash' | 'documents';
 function noteDate(note: Note) {
   return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(
     new Date(note.updatedAt),
@@ -85,7 +86,7 @@ function navigationFromUrl() {
   const candidate = params.get('view');
   return {
     view:
-      candidate === 'pinned' || candidate === 'archive' || candidate === 'trash'
+      candidate === 'pinned' || candidate === 'archive' || candidate === 'trash' || candidate === 'documents'
         ? candidate
         : ('all' as View),
     tag: params.get('tag'),
@@ -320,6 +321,11 @@ function Notebook({
             (view === 'trash' ? n.deleted : !n.deleted) &&
             (view === 'archive' ? n.archived : view === 'trash' ? true : !n.archived) &&
             (view === 'pinned' ? n.pinned : true) &&
+            (view === 'documents'
+              ? !!n.document
+              : view === 'all' && !tag && !collection
+                ? !n.document
+                : true) &&
             (!tag || tagsOf(n.content).includes(tag)) &&
             (!collection || n.collections?.includes(collection)),
         )
@@ -341,8 +347,11 @@ function Notebook({
               ? 'Archiv'
               : view === 'trash'
                 ? 'Papierkorb'
-                : 'Alle Notizen';
+                : view === 'documents'
+                  ? 'Dokumente'
+                  : 'Alle Notizen';
   const openNew = () => {
+    if (view === 'documents') setView('all');
     setDraftSource(undefined);
     setKnowledgeOpen(false);
     setTasksOpen(false);
@@ -481,7 +490,13 @@ function Notebook({
         </div>
         <div className="sidebar-scroll">
           <nav aria-label="Notizbücher">
-            {nav('all', 'Alle Notizen', <GeometricMark shape="circle" tone="red" />, active.length)}
+            {nav(
+              'all',
+              'Alle Notizen',
+              <GeometricMark shape="circle" tone="red" />,
+              active.filter((n) => !n.document).length,
+            )}
+            {nav('documents', 'Dokumente', <FileText size={18} />, active.filter((n) => !!n.document).length)}
             {nav(
               'pinned',
               'Angeheftet',
@@ -789,7 +804,10 @@ function Notebook({
               <div>
                 <FittingListTitle title={title} />
                 <p>
-                  {filtered.length} {filtered.length === 1 ? 'Notiz' : 'Notizen'}
+                  {filtered.filter((n) => !n.document).length}{' '}
+                  {filtered.filter((n) => !n.document).length === 1 ? 'Notiz' : 'Notizen'} ·{' '}
+                  {filtered.filter((n) => n.document).length}{' '}
+                  {filtered.filter((n) => n.document).length === 1 ? 'Dokument' : 'Dokumente'}
                   {visibleDrafts.length > 0 &&
                     ` · ${visibleDrafts.length} ${visibleDrafts.length === 1 ? 'Entwurf' : 'Entwürfe'}`}
                 </p>
@@ -803,6 +821,20 @@ function Notebook({
                 onClick={openNew}
               />
             </div>
+            {(view === 'documents' || collection) && (
+              <DocumentUpload
+                key={`${scope}:${collection ?? ''}`}
+                collection={collection}
+                onOpen={openTaskNote}
+              />
+            )}
+            {collection && (
+              <CollectionQuestion
+                key={`${scope}:${collection}`}
+                collection={collection}
+                onOpen={openTaskNote}
+              />
+            )}
             <div className="note-list">
               {visibleDrafts.map((draft) => (
                 <button
@@ -833,12 +865,16 @@ function Notebook({
                         ? 'Diese Sammlung ist noch leer'
                         : view === 'archive'
                           ? 'Noch nichts archiviert'
-                          : 'Hier beginnt dein Notizbuch'}
+                          : view === 'documents'
+                            ? 'Deine Dokumentbibliothek'
+                            : 'Hier beginnt dein Notizbuch'}
                   </strong>
                   <p>
                     {collection
                       ? 'Ziehe Notizen auf die Sammlung oder lege hier eine neue Notiz an.'
-                      : 'Halte einen Gedanken fest. Die Ordnung kann später kommen.'}
+                      : view === 'documents'
+                        ? 'Lade Dokumente hoch und verwende sie als Quellen für deine Notizen.'
+                        : 'Halte einen Gedanken fest. Die Ordnung kann später kommen.'}
                   </p>
                   {view === 'all' && (
                     <Action label="Erste Notiz schreiben" icon={<Plus size={16} />} onClick={openNew} />
@@ -953,6 +989,16 @@ function Notebook({
                   onClick={() => void patch(selectedNote, { deleted: false })}
                 />
               </div>
+            ) : selectedNote?.document && !creating ? (
+              <DocumentDetail
+                key={`${scope}:${selectedNote.id}`}
+                note={selectedNote}
+                onBack={() => setSelected(null)}
+                onOpen={(id) => {
+                  if (view === 'documents') setView('all');
+                  openTaskNote(id);
+                }}
+              />
             ) : creating || selectedNote ? (
               <Editor
                 key={`${scope}:${creating ? (draftSource ?? 'new') : selectedNote!.id}`}

@@ -16,6 +16,7 @@ import { openai, type AIEnvironment } from './openai.js';
 import { selectableModels } from './models.js';
 import { validNote, type Note } from '../src/domain.js';
 import { withoutNoteCommands } from '../src/note-command.js';
+import { documentMimes, documentText, isTextDocument } from '../src/document-text.js';
 declare module 'fastify' {
   interface FastifyRequest {
     nottoUser: { id: string; email: string } | null;
@@ -38,7 +39,7 @@ const credentials = z.object({
   invite: z.string().max(256).optional(),
 });
 const uuid = z.string().uuid();
-const attachmentId = z.string().regex(/^[a-f0-9-]{36}\.(png|jpg|webp|gif|avif|pdf)$/);
+const attachmentId = z.string().regex(/^[a-f0-9-]{36}\.(png|jpg|webp|gif|avif|pdf|docx|txt|md)$/);
 const fail = (message: string, statusCode = 400) => {
   throw Object.assign(new Error(message), { statusCode });
 };
@@ -252,6 +253,9 @@ export async function buildApp(db: Database, env: Environment) {
             'image/gif',
             'image/avif',
             'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain',
+            'text/markdown',
           ]),
           base64: z.string().max(17 * 1024 * 1024),
         })
@@ -260,6 +264,16 @@ export async function buildApp(db: Database, env: Environment) {
     if (bytes.length > 12 * 1024 * 1024) fail('Anhang zu groß.', 413);
     if (id.endsWith('.pdf') && (p.mime !== 'application/pdf' || bytes.subarray(0, 5).toString() !== '%PDF-'))
       fail('Ungültiges PDF.');
+    const extension = id.split('.').at(-1)!;
+    if (documentMimes[extension] && p.mime !== documentMimes[extension])
+      fail('Dokumentformat und Dateiendung stimmen nicht überein.');
+    if (isTextDocument(id)) {
+      try {
+        documentText(id, new Uint8Array(bytes));
+      } catch (error) {
+        fail(error instanceof Error ? error.message : 'Ungültiges Dokument.', 400);
+      }
+    }
     const user = req.nottoUser!.id,
       checksum = digest(bytes),
       dir = join(env.dataDir, user);

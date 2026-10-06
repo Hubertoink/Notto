@@ -317,6 +317,9 @@ fn put_attachment(attachment: Attachment, store: State<Store>) -> Result<()> {
         "image/gif",
         "image/avif",
         "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+        "text/markdown",
     ]
     .contains(&attachment.mime.as_str())
     {

@@ -18,9 +18,20 @@ export interface Note {
   deleted: boolean;
   conflictOf?: string;
   collections?: string[];
+  /** Standalone library source, using the same revision/sync envelope as notes. */
+  document?: { attachmentId: string; name: string; mime: string; version: number };
+  aiContext?: AIContext;
   history: Revision[];
 }
+export interface AIContext {
+  mode: 'note' | 'collection' | 'selected' | 'notebook';
+  collection?: string;
+  sourceIds?: string[];
+  tags?: string[];
+  web?: boolean;
+}
 export interface Draft {
+  aiContext?: AIContext;
   collections?: string[];
   key: string;
   scope: Scope;
@@ -124,7 +135,9 @@ export function newNote(scope: Scope, content: string, now = new Date().toISOStr
 }
 export function reviseNote(
   note: Note,
-  patch: Partial<Pick<Note, 'content' | 'pinned' | 'archived' | 'deleted' | 'collections'>>,
+  patch: Partial<
+    Pick<Note, 'content' | 'pinned' | 'archived' | 'deleted' | 'collections' | 'document' | 'aiContext'>
+  >,
   now = new Date().toISOString(),
 ): Note {
   const revision = crypto.randomUUID();
@@ -153,7 +166,9 @@ export function conflictCopy(note: Note): Note {
 export function attachmentIds(content: string): string[] {
   return [
     ...new Set(
-      [...content.matchAll(/attachments\/([a-f0-9-]+\.(?:png|jpg|webp|gif|avif|pdf))/g)].map((m) => m[1]),
+      [...content.matchAll(/attachments\/([a-f0-9-]+\.(?:png|jpg|webp|gif|avif|pdf|docx|txt|md))/g)].map(
+        (m) => m[1],
+      ),
     ),
   ];
 }
@@ -186,6 +201,17 @@ export function validNote(value: unknown): value is Note {
     typeof n.pinned === 'boolean' &&
     typeof n.archived === 'boolean' &&
     typeof n.deleted === 'boolean' &&
+    (n.document === undefined ||
+      (typeof n.document === 'object' &&
+        n.document !== null &&
+        typeof n.document.name === 'string' &&
+        n.document.name.length <= 255 &&
+        typeof n.document.mime === 'string' &&
+        /^[a-f0-9-]{36}\.(pdf|docx|txt|md)$/.test(n.document.attachmentId) &&
+        Number.isInteger(n.document.version) &&
+        n.document.version > 0 &&
+        attachmentIds(n.content).includes(n.document.attachmentId))) &&
+    (n.aiContext === undefined || validAIContext(n.aiContext)) &&
     (n.collections === undefined ||
       (Array.isArray(n.collections) &&
         n.collections.length <= 30 &&
@@ -204,5 +230,24 @@ export function validNote(value: unknown): value is Note {
     typeof n.updatedAt === 'string' &&
     Number.isFinite(Date.parse(n.createdAt)) &&
     Number.isFinite(Date.parse(n.updatedAt))
+  );
+}
+
+export function validAIContext(value: unknown): value is AIContext {
+  if (!value || typeof value !== 'object') return false;
+  const c = value as AIContext;
+  return (
+    ['note', 'collection', 'selected', 'notebook'].includes(c.mode) &&
+    (c.collection === undefined || (typeof c.collection === 'string' && c.collection.length <= 60)) &&
+    (c.mode !== 'collection' || !!c.collection?.trim()) &&
+    (c.sourceIds === undefined ||
+      (Array.isArray(c.sourceIds) &&
+        c.sourceIds.length <= 30 &&
+        c.sourceIds.every((id) => typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id)))) &&
+    (c.tags === undefined ||
+      (Array.isArray(c.tags) &&
+        c.tags.length <= 30 &&
+        c.tags.every((tag) => typeof tag === 'string' && tag.length <= 60))) &&
+    (c.web === undefined || typeof c.web === 'boolean')
   );
 }

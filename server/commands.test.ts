@@ -124,6 +124,8 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await pg.exec('DELETE FROM command_images; DELETE FROM note_commands; DELETE FROM rate_limits');
+  await pg.query('DELETE FROM notes WHERE id<>$1', [note.id]);
+  await pg.exec('DELETE FROM knowledge');
   await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
     note.id,
     JSON.stringify(note),
@@ -572,4 +574,288 @@ it('marks an unavailable search as failed instead of completing an empty task', 
   expect((await pg.query('SELECT document FROM notes WHERE id=$1', [note.id])).rows[0].document).toEqual(
     note,
   );
+});
+
+async function startDocumentCommand() {
+  const attachment = `${randomUUID()}.pdf`;
+  const live = reviseNote(note, {
+    content: `Konzeption Jugendhaus\n[Konzeption](attachments/${attachment})\n/ki Fasse die Konzeption zusammen`,
+    aiContext: { mode: 'note', web: false },
+  });
+  await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
+    note.id,
+    JSON.stringify(live),
+    live.revision,
+  ]);
+  const extraction = {
+    id: randomUUID(),
+    scope: user,
+    noteId: note.id,
+    revision: live.revision,
+    kind: 'extraction',
+    at: new Date().toISOString(),
+    data: {
+      id: attachment,
+      pages: [
+        {
+          noteId: note.id,
+          revision: live.revision,
+          attachment,
+          page: 7,
+          text: 'Jugendliche bestimmen das Programm gemeinsam.',
+        },
+      ],
+    },
+  };
+  await pg.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3)', [
+    user,
+    extraction.id,
+    JSON.stringify(extraction),
+  ]);
+  const started = await app.inject({
+    method: 'PUT',
+    url: `/api/commands/${randomUUID()}`,
+    headers: headers(),
+    payload: { noteId: note.id, revision: live.revision, prompt: 'Fasse die Konzeption zusammen' },
+  });
+  expect(started.statusCode).toBe(200);
+  return { live, attachment };
+}
+function documentResponse(quote = 'Jugendliche bestimmen das Programm gemeinsam.') {
+  return {
+    status: 'completed',
+    output: [
+      {
+        content: [
+          {
+            type: 'output_text',
+            text: JSON.stringify({
+              summary: 'Beteiligung ist vorgesehen.',
+              items: [
+                {
+                  title: 'Beteiligung',
+                  detail: 'Jugendliche bestimmen das Programm gemeinsam.',
+                  kind: 'fact',
+                  source: 1,
+                  target: null,
+                  quote,
+                },
+              ],
+              followLinks: [],
+            }),
+          },
+        ],
+      },
+    ],
+  };
+}
+it('supplies attached PDF text to a command and persists a clickable page citation without web search', async () => {
+  const { attachment } = await startDocumentCommand();
+  vi.mocked(openai).mockResolvedValue(documentResponse());
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,result FROM note_commands')).rows[0];
+  expect(job.status).toBe('done');
+  const input = JSON.parse(vi.mocked(openai).mock.calls[0][3].input as string);
+  expect(input.sources[1]).toMatchObject({
+    text: 'Jugendliche bestimmen das Programm gemeinsam.',
+    evidence: { attachment, page: 7 },
+  });
+  expect(job.result.items[0].citation).toMatchObject({
+    noteId: note.id,
+    attachment,
+    page: 7,
+    quote: 'Jugendliche bestimmen das Programm gemeinsam.',
+  });
+  expect(openai).toHaveBeenCalledTimes(1);
+  expect(job.result.searched).toBeUndefined();
+});
+it('discards invented PDF quotes instead of retaining an unsupported summary', async () => {
+  await startDocumentCommand();
+  vi.mocked(openai).mockResolvedValue(documentResponse('Nicht im Dokument enthalten.'));
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,result FROM note_commands')).rows[0];
+  expect(job.result.items).toEqual([]);
+  expect(job.result.summary).not.toBe('Beteiligung ist vorgesehen.');
+  expect(job.result.warnings.join(' ')).toContain('Quellenbeleg fehlt');
+});
+
+it('marks results with unreadable attached pages as partial and keeps the instruction retryable', async () => {
+  const { live, attachment } = await startDocumentCommand();
+  const extraction: any = (
+    await pg.query("SELECT id,document FROM knowledge WHERE document->>'noteId'=$1", [note.id])
+  ).rows[0];
+  extraction.document.data.pages.push({
+    noteId: note.id,
+    revision: live.revision,
+    attachment,
+    page: 8,
+    text: '[Kein Text erkannt. OCR erforderlich.]',
+  });
+  await pg.query('UPDATE knowledge SET document=$2 WHERE id=$1', [
+    extraction.id,
+    JSON.stringify(extraction.document),
+  ]);
+  vi.mocked(openai).mockResolvedValue(documentResponse());
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT stage,result FROM note_commands')).rows[0];
+  expect(job.stage).toBe('Teilergebnis');
+  expect(job.result.partial).toBe(true);
+  expect(job.result.warnings.join(' ')).toContain('Seite 8');
+  expect(
+    (await pg.query('SELECT document FROM notes WHERE id=$1', [note.id])).rows[0].document.content,
+  ).toContain('/ki Fasse die Konzeption zusammen');
+});
+it('rejects document results if the user revokes source permission during generation', async () => {
+  await startDocumentCommand();
+  vi.mocked(openai).mockImplementation(async () => {
+    await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+      user,
+      JSON.stringify({ ...settings, excludedNotes: [note.id] }),
+    ]);
+    return documentResponse();
+  });
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,result,error FROM note_commands')).rows[0];
+  expect(job.status).toBe('failed');
+  expect(job.result).toBeNull();
+  expect(job.error).toContain('Freigabe');
+});
+
+async function startLibraryCommand() {
+  const attachment = `${randomUUID()}.docx`;
+  const library = {
+    ...newNote(user, `Konzeption Jugendhaus\n[Konzeption](attachments/${attachment})`),
+    collections: ['Jugendhaus'],
+    document: {
+      attachmentId: attachment,
+      name: 'Konzeption.docx',
+      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      version: 2,
+    },
+  };
+  const current = reviseNote(note, { aiContext: { mode: 'selected', sourceIds: [library.id], web: false } });
+  await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
+    note.id,
+    JSON.stringify(current),
+    current.revision,
+  ]);
+  await pg.query('INSERT INTO notes(user_id,id,revision,document) VALUES($1,$2,$3,$4)', [
+    user,
+    library.id,
+    library.revision,
+    JSON.stringify(library),
+  ]);
+  const extraction = {
+    id: randomUUID(),
+    scope: user,
+    noteId: library.id,
+    revision: library.revision,
+    kind: 'extraction',
+    at: new Date().toISOString(),
+    data: {
+      id: attachment,
+      pages: [
+        {
+          noteId: library.id,
+          revision: library.revision,
+          attachment,
+          text: 'Der Jugendrat entscheidet gemeinsam über das Programm.',
+        },
+      ],
+    },
+  };
+  await pg.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3)', [
+    user,
+    extraction.id,
+    JSON.stringify(extraction),
+  ]);
+  expect((await start(randomUUID(), user, current.revision)).statusCode).toBe(200);
+  await pg.query("UPDATE note_commands SET prompt='Mache einen Vorschlag auf Basis der Konzeption'");
+  return { library, attachment };
+}
+it('uses a standalone library document from another note and labels new proposals', async () => {
+  const { library, attachment } = await startLibraryCommand();
+  vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) => {
+    const input = JSON.parse(body.input as string);
+    const source = input.sources.findIndex((source: any) => source.evidence?.attachment === attachment);
+    expect(source).toBeGreaterThanOrEqual(0);
+    return {
+      status: 'completed',
+      output: [
+        {
+          content: [
+            {
+              type: 'output_text',
+              text: JSON.stringify({
+                summary: 'Vorschlag für Beteiligung.',
+                items: [
+                  {
+                    title: 'Monatliche Jugendratssitzung',
+                    detail: 'Vorschlag: Plant einen regelmäßigen Termin.',
+                    kind: 'proposal',
+                    source,
+                    target: null,
+                    quote: 'Der Jugendrat entscheidet gemeinsam über das Programm.',
+                  },
+                ],
+                followLinks: [],
+              }),
+            },
+          ],
+        },
+      ],
+    };
+  });
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,result FROM note_commands')).rows[0];
+  expect(job.status).toBe('done');
+  expect(job.result.items[0]).toMatchObject({
+    kind: 'proposal',
+    citation: { noteId: library.id, attachment, title: 'Konzeption Jugendhaus · Version 2' },
+  });
+  expect(openai).toHaveBeenCalledTimes(1);
+});
+it('rejects an answer when a separately selected document changes during generation', async () => {
+  const { library } = await startLibraryCommand();
+  vi.mocked(openai).mockImplementation(async () => {
+    const changed = reviseNote(library, {
+      content: `Geänderte Konzeption\n[Konzeption](attachments/${library.document.attachmentId})`,
+    });
+    await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
+      library.id,
+      JSON.stringify(changed),
+      changed.revision,
+    ]);
+    return {
+      status: 'completed',
+      output: [
+        {
+          content: [
+            {
+              type: 'output_text',
+              text: JSON.stringify({
+                summary: 'Überholt',
+                items: [
+                  {
+                    title: 'Jugendrat',
+                    detail: 'Beteiligung',
+                    kind: 'fact',
+                    source: 1,
+                    target: null,
+                    quote: 'Der Jugendrat entscheidet gemeinsam über das Programm.',
+                  },
+                ],
+                followLinks: [],
+              }),
+            },
+          ],
+        },
+      ],
+    };
+  });
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,result,error FROM note_commands')).rows[0];
+  expect(job.status).toBe('failed');
+  expect(job.result).toBeNull();
+  expect(job.error).toContain('Quelle wurde geändert');
 });

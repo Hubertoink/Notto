@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
+import { documentMimes, documentText } from './document-text';
 import {
   type Attachment,
   type Draft,
@@ -110,6 +111,20 @@ export const repo = {
     const id = `${crypto.randomUUID()}.pdf`;
     await this.putAttachment({ scope, id, name: file.name, mime: 'application/pdf', bytes });
     return `[${file.name.replace(/[\[\]\\\n]/g, '')}](attachments/${id})`;
+  },
+  async addDocument(scope: Scope, file: File): Promise<Attachment> {
+    const extension = file.name.split('.').at(-1)?.toLowerCase() ?? '';
+    const mime = documentMimes[extension];
+    if (!mime) throw new Error('Bitte PDF, DOCX, TXT oder Markdown auswählen.');
+    if (file.size > MAX_IMAGE_BYTES) throw new Error('Eine Datei darf höchstens 12 MB groß sein.');
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const id = `${crypto.randomUUID()}.${extension}`;
+    if (extension === 'pdf') {
+      if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('Ungültiges PDF.');
+    } else documentText(id, bytes);
+    const attachment = { scope, id, name: file.name, mime, bytes };
+    await this.putAttachment(attachment);
+    return attachment;
   },
 };
 

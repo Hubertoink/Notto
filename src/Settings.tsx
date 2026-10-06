@@ -111,6 +111,7 @@ export function Settings({
   async function copyLocal() {
     if (!user) return;
     const local = (await repo.list('local')).filter((n) => !n.deleted);
+    const copiedIds = new Map(local.map((note) => [note.id, crypto.randomUUID()]));
     for (const n of local) {
       for (const id of allAttachmentIds(n)) {
         const a = await repo.attachment('local', id);
@@ -118,6 +119,17 @@ export function Settings({
       }
       const copy = {
         ...newNote(scope, n.content),
+        id: copiedIds.get(n.id)!,
+        collections: n.collections,
+        document: n.document,
+        aiContext: n.aiContext
+          ? {
+              ...n.aiContext,
+              sourceIds: n.aiContext.sourceIds?.flatMap((id) =>
+                copiedIds.has(id) ? [copiedIds.get(id)!] : [],
+              ),
+            }
+          : undefined,
         pinned: n.pinned,
         archived: n.archived,
         history: n.history,
@@ -126,7 +138,7 @@ export function Settings({
       await repo.put(copy, null);
     }
     setMessage(
-      `${local.length} lokale Notizen in dein Konto kopiert. Die lokalen Originale bleiben erhalten.`,
+      `${local.length} lokale Notizen und Dokumente in dein Konto kopiert. Die lokalen Originale bleiben erhalten.`,
     );
     await sync();
   }

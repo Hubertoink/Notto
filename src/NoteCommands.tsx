@@ -6,6 +6,7 @@ import { ownBackend, readCloudConfig } from './cloud';
 import { Modal, NoteMarkdown, Sources, readableDate } from './components';
 import { commandThreads, noteCommands, type NoteCommand } from './note-command';
 import './note-commands.css';
+import { CitationLink } from './CommandCitation';
 
 function CommandImage({ command, id, title }: { command: string; id: string; title: string }) {
   const [url, setUrl] = useState('');
@@ -64,6 +65,7 @@ export function NoteCommands({
   onStart,
   onCount,
   onCompleted,
+  onInsert,
 }: {
   content: string;
   noteId?: string;
@@ -73,6 +75,7 @@ export function NoteCommands({
   onStart: (prompt: string, id: string) => Promise<NoteCommand>;
   onCount?: (count: number) => void;
   onCompleted?: () => Promise<void>;
+  onInsert?: (text: string) => void;
 }) {
   const drafts = [...new Set(noteCommands(content).map((command) => command.prompt))];
   const connected = scope !== 'local' && ownBackend();
@@ -288,16 +291,62 @@ export function NoteCommands({
                         <CommandImage command={resultCommand!.id} id={item.imageId} title={item.title} />
                       )}
                       <div>
+                        {item.kind && (
+                          <small>
+                            {item.kind === 'fact'
+                              ? 'Aus den Quellen'
+                              : item.kind === 'inference'
+                                ? 'Schlussfolgerung'
+                                : 'Vorschlag'}
+                          </small>
+                        )}
                         <h3>{item.title}</h3>
                         {item.imageCaption && <small>{item.imageCaption}</small>}
                         <p>{item.detail}</p>
                         {item.imageError && <small>Screenshot nicht verfügbar: {item.imageError}</small>}
                         {item.url && <Sources sources={[{ title: item.title, url: item.url }]} compact />}
+                        {item.citation && <CitationLink citation={item.citation} scope={scope} />}
                       </div>
                     </section>
                   ))}
                 </div>
                 <Sources sources={result.sources} compact />
+                {onInsert && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onInsert(
+                        [
+                          result.research || result.summary,
+                          ...result.items.map(
+                            (item) =>
+                              `### ${item.title}\n\n${item.kind === 'proposal' ? 'Vorschlag: ' : item.kind === 'inference' ? 'Schlussfolgerung: ' : ''}${item.detail}${item.citation ? `\n\nQuelle: [${item.citation.title}](notes/${item.citation.noteId})${item.citation.page ? `, Seite ${item.citation.page}` : ''}${item.citation.quote ? `\n\n> ${item.citation.quote.replace(/\n/g, '\n> ')}` : ''}` : ''}`,
+                          ),
+                        ].join('\n\n'),
+                      )
+                    }
+                  >
+                    In Notiz übernehmen
+                  </button>
+                )}
+                {!!result.contextSources?.length && (
+                  <details className="command-sources">
+                    <summary>Verwendeter Notiz- und Dokumentkontext</summary>
+                    {result.contextSources
+                      .filter(
+                        (source, index, all) =>
+                          all.findIndex(
+                            (other) =>
+                              other.noteId === source.noteId &&
+                              other.attachment === source.attachment &&
+                              other.page === source.page,
+                          ) === index,
+                      )
+                      .map((source, index) => (
+                        <CitationLink key={index} citation={source} scope={scope} />
+                      ))}
+                  </details>
+                )}
                 <details className="command-sources">
                   <summary>Auftrag & Details</summary>
                   <blockquote className="command-request">„{command.prompt}“</blockquote>

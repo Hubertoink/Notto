@@ -34,6 +34,20 @@ export function splitEvidence<T extends SearchChunk>(sources: T[]): T[] {
     return chunks;
   });
 }
+
+/** Paginate extracted text without losing which page/file each passage came from. */
+export function sliceEvidence<T extends SearchChunk>(sources: T[], offset: number, length: number): T[] {
+  const result: T[] = [];
+  let position = 0;
+  for (const source of sources) {
+    const start = Math.max(0, offset - position);
+    const end = Math.min(source.text.length, offset + length - position);
+    if (end > start) result.push({ ...source, text: source.text.slice(start, end) });
+    position += source.text.length;
+    if (position >= offset + length) break;
+  }
+  return result;
+}
 export function diverseHits<T extends SearchChunk & { score: number }>(hits: T[], limit = 12): T[] {
   const ranked = [...hits].sort((a, b) => b.score - a.score);
   const selected: T[] = [];

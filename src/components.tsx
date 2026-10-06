@@ -12,6 +12,7 @@ import { fetchAttachment } from './cloud';
 import { desktop } from './repository';
 import { useNotto } from './state';
 import { PdfAttachment } from './PdfAttachment';
+import { DocumentAttachment } from './DocumentAttachment';
 import { uniqueSources } from './knowledge-policy';
 import { excerptOf, titleOf } from './domain';
 import { imageLayout, noteImages, updateImageLayout } from './image-layout';
@@ -99,7 +100,9 @@ function NoteReferencePreview({
   }, [previewVisible, available.length]);
   useEffect(() => {
     if (!open || !multiple) return;
-    const frame = requestAnimationFrame(() => preview.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus());
+    const frame = requestAnimationFrame(() =>
+      preview.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus(),
+    );
     return () => cancelAnimationFrame(frame);
   }, [open, multiple]);
   if (!available.length)
@@ -788,6 +791,10 @@ export function NoteMarkdown({
           <PdfAttachment scope={scope} id={href!.slice(12)}>
             {children}
           </PdfAttachment>
+        ) : /^attachments\/[a-f0-9-]+\.(docx|txt|md)$/.test(href || '') ? (
+          <DocumentAttachment scope={scope} id={href!.slice(12)}>
+            {children}
+          </DocumentAttachment>
         ) : (
           <WebLink href={href}>{children}</WebLink>
         ),

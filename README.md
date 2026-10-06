@@ -1,6 +1,6 @@
 # Noto
 
-**Aktuelle Version: 1.4.2.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.4.2](docs/releases/1.4.2.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
+**Aktuelle Version: 1.5.0.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.0](docs/releases/1.5.0.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 Eine lokale Windows- und Linux-Notizapp mit Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 1.0 enthält PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
 
@@ -85,10 +85,22 @@ Quellenlinks werden dedupliziert und in der Desktop-App über den Standardbrowse
 - Widget am Griff verschieben. Nach dem Loslassen dockt es links oder rechts am aktuellen Monitor an. Der Arbeitsbereich berücksichtigt Taskleiste und Skalierung.
 - Ein Klick hält die Hover-Vorschau offen. Während der Eingabe schließt sie sich nicht beim Verlassen mit der Maus.
 - Das Hauptfenster schließt in den Tray. Über das Tray-Menü lässt sich Notto vollständig beenden oder das Widget ausblenden.
-- Bilder und PDFs über die Anhangschaltfläche oder Drag-and-drop hinzufügen. Bilder können auch aus der Zwischenablage eingefügt werden. Unterstützt: PNG, JPEG, WebP, GIF, AVIF und PDF bis 12 MB je Datei. PDF-Links öffnen eine Vorschau.
+- Bilder und Dokumente über die Anhangschaltfläche oder Drag-and-drop hinzufügen. Bilder können auch aus der Zwischenablage eingefügt werden. Unterstützt: PNG, JPEG, WebP, GIF, AVIF, PDF, DOCX, TXT und Markdown bis 12 MB je Datei. PDF-Links öffnen eine Seitenvorschau; DOCX und Textdateien eine Textvorschau.
 - „Wissen & KI“ enthält Aufgaben, Kontakte, Themen, Recherche, semantische Suche und Notizbuchfragen. Über das Mikrofon im Editor lässt sich diktieren. Diese Funktionen benötigen eine eigene KI-Verbindung; lokale PDF-Textextraktion funktioniert ohne API-Schlüssel.
 - Suche kombiniert Wörter, `"exakte Wortgruppen"` und `#tags`. Tags sind unabhängig von Groß-/Kleinschreibung; Überschriften und Codeblöcke erzeugen keine Tags.
 - Papierkorb und Archiv sind reversibel. Historische Textfassungen können als neuer Entwurf übernommen werden.
+
+## Dokumente und Projekt-Notebooks
+
+„Dokumente“ in der Seitenleiste ist eine eigenständige Bibliothek. Dateien lassen sich hochladen, benennen, taggen und mehreren Sammlungen zuordnen. Bestehende Notizanhänge können ohne erneuten Upload übernommen werden. „Neue Fassung hochladen“ erhält die Dokumentidentität, Tags und Zuordnungen; frühere Originaldateien bleiben in der Versionsansicht und im ZIP-Export erhalten. PDF-, DOCX- und Textauslesung benötigt keinen API-Schlüssel. DOCX-Vorschauen lesen den Haupttext und Tabellen; eingebettete Bilder, Kommentare und das ursprüngliche Seitenlayout werden nicht ausgelesen. TXT/Markdown müssen UTF-8 sein.
+
+Sammlungen zeigen Notizen und Dokumente gemeinsam. „Frage zu dieser Sammlung“ legt einen KI-Auftrag als Notiz in der Sammlung ab. „Mit diesem Dokument arbeiten“ erstellt eine Notiz mit genau diesem Dokument als ausgewählter Quelle.
+
+In einer Notiz öffnet „KI fragen“ einen Auftrag mit sichtbarer Kontextauswahl. Alternativ eine Zeile wie `/ki Fasse die Konzeption zur Beteiligung zusammen und mache einen Vorschlag für den offenen Treff` schreiben und speichern. Unter „KI-Kontext“ stehen diese Notiz mit Anhängen, eine Sammlung, ausgewählte Dokumente/Notizen/Tags oder das gesamte Notizbuch zur Verfügung. Neue Notizen verwenden zunächst ihre erste Sammlung oder nur die eigenen Anhänge; Webquellen sind separat zuschaltbar. Bestehende Notizen ohne gespeicherte Kontextauswahl behalten ihr bisheriges Rechercheverhalten.
+
+Direkt ausgewählte Dokumente und Anhänge werden vollständig gelesen, bis insgesamt 120.000 Zeichen. Darüber wird der Auftrag mit einer Meldung angehalten; Dateien aufteilen oder weniger Quellen auswählen. Im weiteren Kontext werden passende Textstellen gesucht. Antworten unterscheiden Quellenangaben, Schlussfolgerungen und Vorschläge und zeigen klickbare Belege, bei PDFs mit Seitenzahl. „In Notiz übernehmen“ fügt das Ergebnis als bearbeitbaren Entwurf ein. KI-Aufträge benötigen ein angemeldetes Konto mit eingerichtetem Noto-KI-Server.
+
+PDFs bleiben auf 100 Seiten begrenzt. Nicht lesbare Seiten werden kenntlich gemacht; Antworten mit Lücken erscheinen als „Teilergebnis“. OCR wird ausdrücklich gestartet und bleibt auf fünf gescannte PDF-Seiten begrenzt. Die KI verwendet die aktuelle Dokumentfassung. Papierkorb, ausgeschlossene Tags und einzeln ausgeschlossene Quellen gelten auch für Bibliotheksdokumente. Änderungen oder ein Entzug der Freigabe während eines Auftrags verhindern die Übernahme veralteter Quellen.
 
 ## Speicherung und Originale
 

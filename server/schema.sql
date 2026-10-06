@@ -11,4 +11,5 @@ CREATE TABLE IF NOT EXISTS jobs(id uuid PRIMARY KEY,user_id uuid NOT NULL REFERE
 CREATE INDEX IF NOT EXISTS pending_jobs ON jobs(status,available_at);
 CREATE TABLE IF NOT EXISTS note_commands(id uuid PRIMARY KEY,user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,note_id uuid NOT NULL,revision uuid NOT NULL,prompt text NOT NULL,note_content text NOT NULL,model text NOT NULL,status text NOT NULL DEFAULT 'pending',stage text NOT NULL DEFAULT 'Wartet',error text,result jsonb,run_token uuid,lease_until timestamptz,attempts integer NOT NULL DEFAULT 0,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),FOREIGN KEY(user_id,note_id) REFERENCES notes(user_id,id) ON DELETE CASCADE);
 CREATE INDEX IF NOT EXISTS pending_commands ON note_commands(status,created_at);
+ALTER TABLE note_commands ADD COLUMN IF NOT EXISTS context jsonb;
 CREATE TABLE IF NOT EXISTS command_images(id uuid PRIMARY KEY,command_id uuid NOT NULL REFERENCES note_commands(id) ON DELETE CASCADE,bytes bytea NOT NULL);

@@ -67,3 +67,21 @@ it('uses the newest extracted attachment and ignores detached attachments', asyn
     1,
   );
 });
+
+it('keeps extraction provenance separate when a note attachment is adopted by the library', async () => {
+  const id = `${crypto.randomUUID()}.pdf`;
+  const original = newNote('alice', `[Quelle](attachments/${id})`);
+  const library = newNote('alice', `[Quelle](attachments/${id})`);
+  const records = [library, original].map((note, index) => ({
+    id: crypto.randomUUID(),
+    noteId: note.id,
+    kind: 'extraction',
+    at: String(index),
+    data: {
+      id,
+      pages: [{ noteId: note.id, revision: note.revision, attachment: id, page: 1, text: note.id }],
+    },
+  }));
+  const result = await sourceTexts({} as Database, 'alice', library, records);
+  expect(result[1]).toMatchObject({ noteId: library.id, text: library.id, extractionId: records[0].id });
+});

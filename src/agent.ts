@@ -20,9 +20,9 @@ import {
   type Evidence,
   type KnowledgeRecord,
 } from './intelligence';
-import { contentRevision, reviseNote, titleOf } from './domain';
+import { reviseNote, titleOf } from './domain';
 import { evidenceCurrent } from './evidence-policy';
-import { diverseHits, lexicalScore, splitEvidence } from './retrieval';
+import { diverseHits, lexicalScore, splitEvidence, sliceEvidence } from './retrieval';
 import { noteReferenceIds, normalizeCollections } from './note-tools';
 import { repo } from './repository';
 
@@ -165,7 +165,15 @@ export async function organizeNotebook(
         if (call.name === 'search_notes') {
           const { query } = toolArguments.search_notes.parse(JSON.parse(call.arguments));
           const chunks: Evidence[] = [];
-          for (const note of notes) chunks.push(...splitEvidence(await evidence(note, records)));
+          for (const note of notes)
+            chunks.push(
+              ...splitEvidence(
+                (await evidence(note, records)).filter(
+                  (source) =>
+                    (!note.document || !!source.attachment) && !source.text.startsWith('[Kein Text erkannt.'),
+                ),
+              ),
+            );
           output = {
             sources: add(
               diverseHits(
@@ -208,18 +216,15 @@ export async function organizeNotebook(
                     : [];
                 });
               });
+            const readable = (await evidence(note, records)).filter(
+              (source) =>
+                (!note.document || !!source.attachment) && !source.text.startsWith('[Kein Text erkannt.'),
+            );
+            const textLength = readable.reduce((length, source) => length + source.text.length, 0);
             output = {
               title: titleOf(note.content),
-              sources: add(
-                splitEvidence([
-                  {
-                    noteId,
-                    revision: contentRevision(note),
-                    text: note.content.slice(offset, offset + 6000),
-                  },
-                ]),
-              ),
-              nextOffset: offset + 6000 < note.content.length ? offset + 6000 : null,
+              sources: add(splitEvidence(sliceEvidence(readable, offset, 6000))),
+              nextOffset: offset + 6000 < textLength ? offset + 6000 : null,
               links: noteReferenceIds(note.content)
                 .flatMap((id) =>
                   notes.filter((n) => n.id === id).map((n) => ({ id: n.id, title: titleOf(n.content) })),

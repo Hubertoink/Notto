@@ -8,6 +8,7 @@ import type { AIEnvironment } from './openai.js';
 import { limit, type Database } from './database.js';
 import { publicUrl } from './browser-network.js';
 import { cleanCompletedPrompts } from './command-cleanup.js';
+import { defaultContext } from '../src/source-context.js';
 
 const fields = 'id,note_id,revision,prompt,status,stage,error,result,created_at';
 const fail = (message: string, statusCode: number): never => {
@@ -22,7 +23,7 @@ export async function queueSavedCommands(
   note: Note,
   env: AIEnvironment,
 ) {
-  if (note.deleted) return;
+  if (note.deleted || note.document) return;
   if (noteCommands(note.content).length) {
     const completed = (
       await client.query(
@@ -78,7 +79,7 @@ export async function queueSavedCommands(
       error = e instanceof Error ? e.message : 'Ungültiger Link.';
     }
     await client.query(
-      'INSERT INTO note_commands(id,user_id,note_id,revision,prompt,note_content,model,status,stage,error) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      'INSERT INTO note_commands(id,user_id,note_id,revision,prompt,note_content,model,status,stage,error,context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
       [
         randomUUID(),
         user,
@@ -90,6 +91,7 @@ export async function queueSavedCommands(
         error ? 'failed' : 'pending',
         error ? 'Nicht gestartet' : 'Wartet',
         error,
+        JSON.stringify(note.aiContext ?? { ...defaultContext(note), web: true }),
       ],
     );
   }
@@ -163,7 +165,7 @@ export function commandRoutes(app: FastifyInstance, db: Database, env: AIEnviron
       ).rows[0].count;
       if (recent >= 12) fail('Maximal zwölf Aufträge pro Stunde. Bitte später erneut starten.', 429);
       await client.query(
-        'INSERT INTO note_commands(id,user_id,note_id,revision,prompt,note_content,model) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING',
+        'INSERT INTO note_commands(id,user_id,note_id,revision,prompt,note_content,model,context) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING',
         [
           id,
           user,
@@ -172,6 +174,7 @@ export function commandRoutes(app: FastifyInstance, db: Database, env: AIEnviron
           input.prompt,
           row.document.content,
           row.settings.model,
+          JSON.stringify(row.document.aiContext ?? { ...defaultContext(row.document), web: true }),
         ],
       );
       await client.query('COMMIT');

@@ -109,9 +109,20 @@ export interface CommandResult {
     imageId?: string;
     imageError?: string;
     imageCaption?: string;
+    citation?: CommandCitation;
+    kind?: 'fact' | 'inference' | 'proposal';
   }[];
+  contextSources?: CommandCitation[];
   sources: { title: string; url: string }[];
   warnings: string[];
+}
+export interface CommandCitation {
+  noteId: string;
+  revision: string;
+  title: string;
+  attachment?: string;
+  page?: number;
+  quote?: string;
 }
 export interface NoteCommand {
   id: string;

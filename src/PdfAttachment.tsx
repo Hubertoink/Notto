@@ -7,7 +7,17 @@ import { desktop } from './repository';
 import type { Attachment } from './domain';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
-export function PdfAttachment({ scope, id, children }: { scope: string; id: string; children: ReactNode }) {
+export function PdfAttachment({
+  scope,
+  id,
+  children,
+  initialPage = 1,
+}: {
+  scope: string;
+  id: string;
+  children: ReactNode;
+  initialPage?: number;
+}) {
   const [open, setOpen] = useState(false),
     [attachment, setAttachment] = useState<Attachment | null>(null),
     [pdf, setPdf] = useState<PDFDocumentProxy | null>(null),
@@ -19,7 +29,7 @@ export function PdfAttachment({ scope, id, children }: { scope: string; id: stri
     let cancelled = false;
     let dispose: undefined | (() => Promise<void>);
     setError('');
-    setPage(1);
+    setPage(Math.max(1, initialPage));
     void (async () => {
       const a = await fetchAttachment(scope, id);
       if (!a) throw new Error('PDF fehlt. Bitte synchronisieren.');
@@ -33,15 +43,17 @@ export function PdfAttachment({ scope, id, children }: { scope: string; id: stri
       const task = lib.getDocument({ data: new Uint8Array(a.bytes) });
       dispose = () => task.destroy();
       const document = await task.promise;
-      if (!cancelled) setPdf(document);
-      else await task.destroy();
+      if (!cancelled) {
+        setPdf(document);
+        setPage(Math.max(1, Math.min(initialPage, document.numPages)));
+      } else await task.destroy();
     })().catch((e) => !cancelled && setError(String(e)));
     return () => {
       cancelled = true;
       setPdf(null);
       void dispose?.();
     };
-  }, [scope, id, open]);
+  }, [scope, id, open, initialPage]);
   useEffect(() => {
     if (!pdf || !canvas.current) return;
     let cancelled = false;

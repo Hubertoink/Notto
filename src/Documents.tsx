@@ -13,7 +13,7 @@ import { DocumentLabels, documentTags } from './DocumentLabels';
 import { useNotto } from './state';
 import { useKnowledgeRecords } from './Tasks';
 import './documents.css';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronRight, CircleCheck, CircleAlert, Clock3, FileText, ShieldOff } from 'lucide-react';
 
 export function DocumentUpload({
   collection,
@@ -272,6 +272,23 @@ export function DocumentDetail({
   }
   const readable = pages.filter((page) => page.text.trim() && !page.text.startsWith('[Kein Text erkannt.'));
   const missing = pages.length - readable.length;
+  const status = !eligible(note)
+    ? 'excluded'
+    : ocrProgress || reading
+      ? 'reading'
+      : !readable.length
+        ? 'empty'
+        : missing
+          ? 'partial'
+          : 'ready';
+  const StatusIcon =
+    status === 'ready'
+      ? CircleCheck
+      : status === 'excluded'
+        ? ShieldOff
+        : status === 'reading'
+          ? Clock3
+          : CircleAlert;
   const older = note.history
     .flatMap((revision) =>
       attachmentIds(revision.content).map((id) => ({ id, at: revision.savedAt, content: revision.content })),
@@ -296,20 +313,27 @@ export function DocumentDetail({
       <p className="muted">
         {document.name} · Version {document.version}
       </p>
-      <p className="document-status" role="status">
-        {!eligible(note)
-          ? 'Von der KI ausgeschlossen'
-          : ocrProgress
-            ? ocrProgress
-            : reading
-              ? 'Dokument wird gelesen …'
-              : !readable.length
-                ? `Kein lesbarer Text${document.attachmentId.endsWith('.pdf') ? ' · Texterkennung erforderlich' : ''}`
-                : missing
-                  ? `${readable.length} Seiten lesbar · ${missing} Seiten benötigen Texterkennung`
-                  : 'Für KI verfügbar'}
-        {!config(note.scope).enabled && ' · KI derzeit ausgeschaltet'}
-      </p>
+      <div className="document-status" role="status">
+        <span className={`document-status-badge document-status-${status}`}>
+          <StatusIcon size={15} aria-hidden="true" />
+          <span>
+            {!eligible(note)
+              ? 'Von der KI ausgeschlossen'
+              : ocrProgress
+                ? ocrProgress
+                : reading
+                  ? 'Dokument wird gelesen …'
+                  : !readable.length
+                    ? `Kein lesbarer Text${document.attachmentId.endsWith('.pdf') ? ' · Texterkennung erforderlich' : ''}`
+                    : missing
+                      ? `${readable.length} Seiten lesbar · ${missing} Seiten benötigen Texterkennung`
+                      : 'Für KI verfügbar'}
+          </span>
+        </span>
+        {!config(note.scope).enabled && (
+          <span className="muted document-status-hint">KI derzeit ausgeschaltet</span>
+        )}
+      </div>
       <div className="document-actions">
         {document.attachmentId.endsWith('.pdf') ? (
           <PdfAttachment scope={note.scope} id={document.attachmentId}>
@@ -378,7 +402,8 @@ export function DocumentDetail({
       {document.attachmentId.endsWith('.pdf') && missing > 0 && (
         <p className="muted document-ocr-hint">
           Die Texterkennung liest bis zu fünf fehlende Seiten pro Durchlauf über OpenAI. Danach kannst du
-          fortsetzen; erkannter Text bleibt gespeichert. Die Seiten werden dafür an OpenAI gesendet.
+          fortsetzen; erkannter Text bleibt gespeichert. Die Seiten werden dafür an OpenAI gesendet.{' '}
+          Verwendetes Modell: <strong>{config(note.scope).model}</strong> (aus „Wissen & KI“).
         </p>
       )}
       <form
@@ -475,11 +500,25 @@ export function DocumentDetail({
         </p>
       )}
       {!!readable.length && (
-        <details>
-          <summary>Erkannten Text prüfen</summary>
-          <pre className="document-text">
-            {readable.map((page) => `${page.page ? `Seite ${page.page}\n` : ''}${page.text}`).join('\n\n')}
-          </pre>
+        <details className="document-source">
+          <summary>
+            <FileText size={18} aria-hidden="true" />
+            <span className="document-source-heading">
+              <strong>Erkannten Text prüfen</strong>
+              <small>
+                {document.attachmentId.endsWith('.pdf')
+                  ? `${readable.length} lesbare ${readable.length === 1 ? 'Seite' : 'Seiten'}`
+                  : 'Dokumentinhalt'}{' '}
+                · Quelle für die KI
+              </small>
+            </span>
+            <ChevronRight size={18} className="document-source-chevron" aria-hidden="true" />
+          </summary>
+          <div className="document-source-body">
+            <pre className="document-text">
+              {readable.map((page) => `${page.page ? `Seite ${page.page}\n` : ''}${page.text}`).join('\n\n')}
+            </pre>
+          </div>
         </details>
       )}
     </section>

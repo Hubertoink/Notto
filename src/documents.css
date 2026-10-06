@@ -99,8 +99,97 @@
   margin: 12px 0;
 }
 .document-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
   font-size: 13px;
   margin: 14px 0;
+}
+.document-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--nt-line);
+  border-radius: 4px;
+  background: var(--nt-paper);
+  line-height: 1.4;
+  font-weight: 600;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.document-status-badge svg {
+  flex-shrink: 0;
+}
+.document-status-ready {
+  color: var(--nt-accent);
+  border-color: color-mix(in srgb, var(--nt-accent) 45%, var(--nt-line));
+  background: color-mix(in srgb, var(--nt-accent) 7%, var(--nt-paper));
+}
+.document-status-partial,
+.document-status-empty {
+  border-left: 3px solid var(--bauhaus-yellow);
+}
+.document-status-excluded {
+  color: var(--nt-muted);
+}
+.document-status-reading {
+  border-left: 3px solid var(--bauhaus-blue);
+}
+.document-status-hint {
+  font-size: 12px;
+}
+.document-source {
+  margin-top: 28px;
+  border: 1px solid var(--nt-line);
+  border-left: 3px solid var(--nt-accent);
+  border-radius: 6px;
+  background: var(--nt-paper);
+  overflow: hidden;
+}
+.document-source > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  list-style: none;
+  cursor: pointer;
+  padding: 16px 18px;
+}
+.document-source > summary::-webkit-details-marker {
+  display: none;
+}
+.document-source > summary::marker {
+  content: '';
+}
+.document-source > summary:hover {
+  background: var(--nt-hover);
+}
+.document-source > summary > svg {
+  flex-shrink: 0;
+  color: var(--nt-accent);
+}
+.document-source-heading {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.document-source-heading strong {
+  font-size: 14px;
+}
+.document-source-heading small {
+  font-size: 12px;
+  color: var(--nt-muted);
+}
+.document-source[open] > summary {
+  border-bottom: 1px solid var(--nt-line);
+}
+.document-source[open] .document-source-chevron {
+  transform: rotate(90deg);
+}
+.document-source-body {
+  padding: 18px;
 }
 .document-text {
   white-space: pre-wrap;
@@ -109,7 +198,7 @@
   line-height: 1.6;
   max-height: 55vh;
   overflow: auto;
-  padding: 16px 0;
+  margin: 0;
 }
 .document-upload,
 .collection-question {

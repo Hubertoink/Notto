@@ -13,6 +13,65 @@
   gap: 18px;
   margin: 24px 0;
 }
+.document-labels {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.document-label-chips {
+  margin: 0;
+  flex-wrap: wrap;
+}
+.document-label-chips .tag,
+.document-label-chips .collection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.document-label-chips .tag button {
+  display: inline-flex;
+  background: transparent;
+  border: 0;
+  padding: 2px;
+  color: inherit;
+}
+.document-label-input {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.document-label-input input {
+  flex: 1;
+  min-width: 0;
+}
+.document-label-input > button {
+  flex-shrink: 0;
+  padding: 6px 10px;
+}
+.document-label-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.document-label-suggestions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--nt-line);
+  border-radius: 5px;
+  background: var(--nt-paper);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+.document-labels small,
+.document-ocr-hint {
+  font-size: 12px;
+  line-height: 1.5;
+}
 .document-form label,
 .context-picker > label {
   display: grid;

@@ -8,6 +8,8 @@ import { repo } from './repository';
 import { fetchAttachment, ownBackend, syncNotes } from './cloud';
 import { config, eligible, extract, knowledge, type Evidence } from './intelligence';
 import { normalizeCollections } from './note-tools';
+import { collectionNames, createCollection } from './collections';
+import { DocumentLabels, documentTags } from './DocumentLabels';
 import { useNotto } from './state';
 import { useKnowledgeRecords } from './Tasks';
 import './documents.css';
@@ -200,10 +202,13 @@ export function DocumentDetail({
   onOpen: (id: string) => void;
   onBack?: () => void;
 }) {
-  const { sync, notify } = useNotto();
+  const { sync, notify, notes } = useNotto();
   const [title, setTitle] = useState(titleOf(note.content)),
-    [tags, setTags] = useState(tagsOf(note.content).join(' '));
-  const [collections, setCollections] = useState(note.collections?.join(', ') ?? '');
+    [tags, setTags] = useState(tagsOf(note.content));
+  const [collections, setCollections] = useState(note.collections ?? []);
+  const [tagInput, setTagInput] = useState(''),
+    [collectionInput, setCollectionInput] = useState('');
+  const [ocrProgress, setOcrProgress] = useState('');
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [pages, setPages] = useState<Evidence[]>([]),
@@ -213,9 +218,12 @@ export function DocumentDetail({
   const document = note.document!;
   useEffect(() => {
     setTitle(titleOf(note.content));
-    setTags(tagsOf(note.content).join(' '));
-    setCollections(note.collections?.join(', ') ?? '');
-  }, [note.revision]);
+    setTags(tagsOf(note.content));
+    setCollections(note.collections ?? []);
+    setTagInput('');
+    setCollectionInput('');
+    setOcrProgress('');
+  }, [note.id, note.revision]);
   useEffect(() => {
     let alive = true;
     setReading(true);
@@ -247,12 +255,19 @@ export function DocumentDetail({
     setError('');
     try {
       await action();
-      await knowledge.sync(note.scope);
-      await sync();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      try {
+        await knowledge.sync(note.scope);
+        await sync();
+      } catch (e) {
+        setError((previous) =>
+          [previous, e instanceof Error ? e.message : String(e)].filter(Boolean).join(' · '),
+        );
+      }
       setBusy(false);
+      setOcrProgress('');
     }
   }
   const readable = pages.filter((page) => page.text.trim() && !page.text.startsWith('[Kein Text erkannt.'));
@@ -284,13 +299,15 @@ export function DocumentDetail({
       <p className="document-status" role="status">
         {!eligible(note)
           ? 'Von der KI ausgeschlossen'
-          : reading
-            ? 'Dokument wird gelesen …'
-            : !readable.length
-              ? 'Kein lesbarer Text · Texterkennung erforderlich'
-              : missing
-                ? `${readable.length} Seiten lesbar · ${missing} Seiten benötigen Texterkennung`
-                : 'Für KI verfügbar'}
+          : ocrProgress
+            ? ocrProgress
+            : reading
+              ? 'Dokument wird gelesen …'
+              : !readable.length
+                ? `Kein lesbarer Text${document.attachmentId.endsWith('.pdf') ? ' · Texterkennung erforderlich' : ''}`
+                : missing
+                  ? `${readable.length} Seiten lesbar · ${missing} Seiten benötigen Texterkennung`
+                  : 'Für KI verfügbar'}
         {!config(note.scope).enabled && ' · KI derzeit ausgeschaltet'}
       </p>
       <div className="document-actions">
@@ -326,32 +343,55 @@ export function DocumentDetail({
         />
         {document.attachmentId.endsWith('.pdf') && missing > 0 && (
           <Action
-            label="Texterkennung starten"
+            label={
+              ocrProgress
+                ? 'Texterkennung läuft …'
+                : records.some(
+                      (record) =>
+                        record.noteId === note.id &&
+                        record.kind === 'extraction' &&
+                        (record.data as { id?: string; ocr?: boolean }).id === document.attachmentId &&
+                        (record.data as { ocr?: boolean }).ocr,
+                    )
+                  ? 'Texterkennung fortsetzen'
+                  : 'Texterkennung starten'
+            }
             isDisabled={busy || !config(note.scope).enabled || !eligible(note)}
             onClick={() =>
               void run(async () => {
-                await extract(note, document.attachmentId, true);
-                await knowledge.sync(note.scope);
+                const result = await extract(note, document.attachmentId, true, {
+                  onProgress: (progress) =>
+                    setOcrProgress(
+                      `Texterkennung · Seite ${progress.page} von ${progress.total} · ${progress.processed} in diesem Durchlauf erkannt`,
+                    ),
+                });
+                notify(
+                  result?.remaining
+                    ? `${result.processed} Seiten erkannt · ${result.remaining} Seiten noch offen. Texterkennung fortsetzen.`
+                    : 'Texterkennung abgeschlossen',
+                );
               })
             }
           />
         )}
       </div>
+      {document.attachmentId.endsWith('.pdf') && missing > 0 && (
+        <p className="muted document-ocr-hint">
+          Die Texterkennung liest bis zu fünf fehlende Seiten pro Durchlauf über OpenAI. Danach kannst du
+          fortsetzen; erkannter Text bleibt gespeichert. Die Seiten werden dafür an OpenAI gesendet.
+        </p>
+      )}
       <form
         className="document-form"
         onSubmit={(e) => {
           e.preventDefault();
           void run(async () => {
-            const parsedTags = tagsOf(
-              tags
-                .split(/[\s,]+/)
-                .filter(Boolean)
-                .map((tag) => (tag.startsWith('#') ? tag : `#${tag}`))
-                .join(' '),
-            );
+            const parsedTags = documentTags([...tags, tagInput].join(' '));
+            const selectedCollections = normalizeCollections([...collections, ...collectionInput.split(',')]);
+            for (const name of selectedCollections) await createCollection(note.scope, name);
             const updated = reviseNote(note, {
               content: documentContent(title, parsedTags, { id: document.attachmentId, name: document.name }),
-              collections: normalizeCollections(collections.split(',')),
+              collections: selectedCollections,
             });
             await repo.put(updated, note.revision);
             notify('Dokument aktualisiert');
@@ -360,24 +400,38 @@ export function DocumentDetail({
       >
         <label>
           Titel
-          <input value={title} maxLength={110} required onChange={(e) => setTitle(e.target.value)} />
-        </label>
-        <label>
-          Tags
           <input
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="jugendhaus konzeption pädagogik"
+            value={title}
+            maxLength={110}
+            required
+            disabled={busy}
+            onChange={(e) => setTitle(e.target.value)}
           />
         </label>
-        <label>
-          Sammlungen
-          <input
-            value={collections}
-            onChange={(e) => setCollections(e.target.value)}
-            placeholder="Jugendhaus, Organisation"
-          />
-        </label>
+        <DocumentLabels
+          kind="tags"
+          values={tags}
+          onChange={setTags}
+          input={tagInput}
+          onInput={setTagInput}
+          disabled={busy}
+          known={[
+            ...new Set(
+              notes
+                .filter((item) => item.scope === note.scope && !item.deleted)
+                .flatMap((item) => tagsOf(item.content)),
+            ),
+          ].sort((a, b) => a.localeCompare(b, 'de'))}
+        />
+        <DocumentLabels
+          kind="collections"
+          values={collections}
+          onChange={setCollections}
+          input={collectionInput}
+          onInput={setCollectionInput}
+          disabled={busy}
+          known={collectionNames(notes, records, note.scope)}
+        />
         <Action label="Änderungen speichern" type="submit" isDisabled={busy || !title.trim()} />
       </form>
       <Action

@@ -213,7 +213,7 @@ export function Knowledge({
   onTabChange?: (tab: string) => void;
   onOpenTasks?: () => void;
 }) {
-  const { scope, notes } = useNotto();
+  const { scope, notes, notify } = useNotto();
   const [serverJobs, setServerJobs] = useState<BackgroundJob[]>([]);
   const [jobsLoaded, setJobsLoaded] = useState(false);
   const [jobsError, setJobsError] = useState('');
@@ -708,22 +708,54 @@ export function Knowledge({
                         </button>
                       </td>
                       <td className="knowledge-status">
-                        {id.toLowerCase().endsWith('.pdf') ? 'PDF' : 'Bild'}
+                        {id.toLowerCase().endsWith('.pdf')
+                          ? 'PDF'
+                          : id.endsWith('.docx')
+                            ? 'DOCX'
+                            : id.endsWith('.txt')
+                              ? 'Text'
+                              : id.endsWith('.md')
+                                ? 'Markdown'
+                                : 'Bild'}
                       </td>
-                      <td className="knowledge-status">{extraction ? 'Erkannt' : 'Offen'}</td>
+                      <td className="knowledge-status">
+                        {extraction
+                          ? (() => {
+                              const pages = (extraction.data as { pages: Evidence[] }).pages;
+                              const readable = pages.filter(
+                                (page) => page.text.trim() && !page.text.startsWith('[Kein Text erkannt.'),
+                              ).length;
+                              return readable === pages.length && readable > 0
+                                ? 'Erkannt'
+                                : `${readable} von ${pages.length} Seiten erkannt`;
+                            })()
+                          : 'Offen'}
+                      </td>
                       <td>
                         <div className="knowledge-row-actions">
                           {id.toLowerCase().endsWith('.pdf') && (
                             <Action
                               label="PDF lesen"
                               isDisabled={!!busy}
-                              onClick={() => void run('PDF auslesen', () => extract(note, id))}
+                              onClick={() =>
+                                void run('PDF auslesen', async () => {
+                                  await extract(note, id);
+                                })
+                              }
                             />
                           )}
                           <Action
                             label="OCR starten"
                             isDisabled={!!busy}
-                            onClick={() => void run('Text erkennen', () => extract(note, id, true))}
+                            onClick={() =>
+                              void run('Text erkennen', async () => {
+                                const result = await extract(note, id, true);
+                                if (result.remaining)
+                                  notify(
+                                    `${result.remaining} Seiten noch offen. OCR erneut starten, um fortzusetzen.`,
+                                  );
+                              })
+                            }
                           />
                           {extraction && (
                             <Action

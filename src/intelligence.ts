@@ -307,11 +307,39 @@ export async function analyze(note: Note) {
   if (config(note.scope).autoResearch)
     for (const { item } of researchCandidates(result.suggestions)) await research(note, item, true);
 }
-export async function extract(note: Note, id: string, ocr = false) {
+export interface ExtractionProgress {
+  page: number;
+  total: number;
+  processed: number;
+}
+export async function extract(
+  note: Note,
+  id: string,
+  ocr = false,
+  options: {
+    onProgress?: (progress: ExtractionProgress) => void;
+  } = {},
+) {
   if (!eligible(note)) throw new Error('Notiz ist ausgeschlossen.');
   const a = await fetchAttachment(note.scope, id);
   if (!a) throw new Error('Anhang fehlt. Bitte synchronisieren.');
   const pages: Evidence[] = [];
+  let processed = 0;
+  const readable = (text: string) => !!text.trim() && !text.startsWith('[Kein Text erkannt.');
+  const sourceAvailable = async () => {
+    const current = await repo.get(note.scope, note.id);
+    if (!current || !eligible(current) || !attachmentIds(current.content).includes(id))
+      throw new Error('Texterkennung gestoppt: Dokument geändert, entfernt oder von der KI ausgeschlossen.');
+    return current;
+  };
+  const savePages = async () => {
+    const current = await sourceAvailable();
+    await knowledge.append({ ...current, revision: contentRevision(current) }, 'extraction', {
+      id,
+      pages: pages.map((page) => ({ ...page })),
+      ocr,
+    });
+  };
   const readImage = async (data: string) =>
     responseText(
       await request(note.scope, 'responses', {
@@ -349,31 +377,58 @@ export async function extract(note: Note, id: string, ocr = false) {
     const pdf = await loading.promise;
     try {
       if (pdf.numPages > 100) throw new Error('Bitte das PDF auf höchstens 100 Seiten aufteilen.');
-      let scanned = 0;
+      const previous = (await knowledge.list(note.scope))
+        .filter(
+          (record) =>
+            record.kind === 'extraction' &&
+            record.noteId === note.id &&
+            (record.data as { id?: string }).id === id,
+        )
+        .sort((a, b) => b.at.localeCompare(a.at))[0];
+      const cached = new Map(
+        ((previous?.data as { pages?: Evidence[] })?.pages ?? []).map((page) => [page.page, page.text]),
+      );
       for (let number = 1; number <= pdf.numPages; number++) {
         const page = await pdf.getPage(number),
           content = await page.getTextContent();
-        let text = content.items
+        const text = content.items
           .map((i) => ('str' in i ? i.str + (i.hasEOL ? '\n' : ' ') : ''))
           .join('')
           .trim();
-        if (!text && ocr) {
-          if (++scanned > 5)
-            throw new Error('OCR ist auf fünf gescannte Seiten je PDF begrenzt. Bitte das PDF aufteilen.');
-          const viewport = page.getViewport({ scale: 1.5 });
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.ceil(viewport.width);
-          canvas.height = Math.ceil(viewport.height);
-          await page.render({ canvas, viewport }).promise;
-          text = await readImage(canvas.toDataURL('image/png'));
-        }
+        const stored = cached.get(number);
         pages.push({
           noteId: note.id,
           revision: note.revision,
           attachment: id,
           page: number,
-          text: text || '[Kein Text erkannt. OCR erforderlich.]',
+          text: stored && readable(stored) ? stored : text || '[Kein Text erkannt. OCR erforderlich.]',
         });
+        page.cleanup();
+      }
+      if (ocr) {
+        // Save all page positions before the first paid request. Each completed page
+        // is checkpointed so an interrupted run can continue without reading it again.
+        await savePages();
+        for (const evidence of pages.filter((page) => !readable(page.text)).slice(0, 5)) {
+          await sourceAvailable();
+          options.onProgress?.({ page: evidence.page!, total: pdf.numPages, processed });
+          const page = await pdf.getPage(evidence.page!);
+          const base = page.getViewport({ scale: 1 });
+          const viewport = page.getViewport({ scale: Math.min(2, 2048 / Math.max(base.width, base.height)) });
+          const canvas = document.createElement('canvas');
+          try {
+            canvas.width = Math.ceil(viewport.width);
+            canvas.height = Math.ceil(viewport.height);
+            await page.render({ canvas, viewport }).promise;
+            evidence.text = await readImage(canvas.toDataURL('image/png'));
+            processed++;
+            await savePages();
+            options.onProgress?.({ page: evidence.page!, total: pdf.numPages, processed });
+          } finally {
+            canvas.width = canvas.height = 0;
+            page.cleanup();
+          }
+        }
       }
     } finally {
       await loading.destroy();
@@ -389,13 +444,8 @@ export async function extract(note: Note, id: string, ocr = false) {
     });
     pages.push({ noteId: note.id, revision: note.revision, attachment: id, text: await readImage(data) });
   }
-  const current = await repo.get(note.scope, note.id);
-  if (!current || !eligible(current) || !attachmentIds(current.content).includes(id)) return;
-  await knowledge.append({ ...current, revision: contentRevision(current) }, 'extraction', {
-    id,
-    pages,
-    ocr,
-  });
+  if (a.mime !== 'application/pdf' || !ocr) await savePages();
+  return { processed, remaining: pages.filter((page) => !readable(page.text)).length };
 }
 export function cosine(a: number[], b: number[]) {
   if (a.length !== b.length || !a.length) return 0;

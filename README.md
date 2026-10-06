@@ -1,6 +1,6 @@
 # Noto
 
-**Aktuelle Version: 1.5.0.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.0](docs/releases/1.5.0.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
+**Aktuelle Version: 1.5.1.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.1](docs/releases/1.5.1.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 Eine lokale Windows- und Linux-Notizapp mit Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 1.0 enthält PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
 
@@ -100,7 +100,7 @@ In einer Notiz öffnet „KI fragen“ einen Auftrag mit sichtbarer Kontextauswa
 
 Direkt ausgewählte Dokumente und Anhänge werden vollständig gelesen, bis insgesamt 120.000 Zeichen. Darüber wird der Auftrag mit einer Meldung angehalten; Dateien aufteilen oder weniger Quellen auswählen. Im weiteren Kontext werden passende Textstellen gesucht. Antworten unterscheiden Quellenangaben, Schlussfolgerungen und Vorschläge und zeigen klickbare Belege, bei PDFs mit Seitenzahl. „In Notiz übernehmen“ fügt das Ergebnis als bearbeitbaren Entwurf ein. KI-Aufträge benötigen ein angemeldetes Konto mit eingerichtetem Noto-KI-Server.
 
-PDFs bleiben auf 100 Seiten begrenzt. Nicht lesbare Seiten werden kenntlich gemacht; Antworten mit Lücken erscheinen als „Teilergebnis“. OCR wird ausdrücklich gestartet und bleibt auf fünf gescannte PDF-Seiten begrenzt. Die KI verwendet die aktuelle Dokumentfassung. Papierkorb, ausgeschlossene Tags und einzeln ausgeschlossene Quellen gelten auch für Bibliotheksdokumente. Änderungen oder ein Entzug der Freigabe während eines Auftrags verhindern die Übernahme veralteter Quellen.
+PDFs bleiben auf 100 Seiten begrenzt. Nicht lesbare Seiten werden kenntlich gemacht; Antworten mit Lücken erscheinen als „Teilergebnis“. OCR wird ausdrücklich gestartet und verarbeitet bis zu fünf fehlende PDF-Seiten je Durchlauf. Jede erkannte Seite wird sofort gespeichert; weitere Durchläufe setzen bei den fehlenden Seiten fort. Die KI verwendet die aktuelle Dokumentfassung. Papierkorb, ausgeschlossene Tags und einzeln ausgeschlossene Quellen gelten auch für Bibliotheksdokumente. Änderungen oder ein Entzug der Freigabe während eines Auftrags verhindern die Übernahme veralteter Quellen.
 
 ## Speicherung und Originale
 

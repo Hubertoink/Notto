@@ -12,6 +12,12 @@ import {
   excerptOf,
 } from './domain';
 describe('original notes', () => {
+  it('marks abbreviated previews and stops at whole words', () => {
+    expect(excerptOf('Titel\nEin Text mit Verantwortung', 16)).toBe('Ein Text mit…');
+    expect(excerptOf('Titel\nEin kurzer Text', 15)).toBe('Ein kurzer Text');
+    expect(excerptOf('Titel\nEin Text mit mehr', 12)).toBe('Ein Text mit…');
+    expect(excerptOf('Titel\n' + 'ü'.repeat(230))).toBe('…');
+  });
   it('preserves third-party Markdown frontmatter', () => {
     const text = '---\ntitle: Mein Dokument\n---\n\nOriginal';
     expect(importedMarkdown(text)).toBe(text);

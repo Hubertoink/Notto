@@ -850,7 +850,7 @@ function Notebook({
                     <span className="draft-label">Entwurf · lokal</span>
                   </div>
                   <h2>{titleOf(draft.content)}</h2>
-                  {excerptOf(draft.content) && <p>{excerptOf(draft.content).slice(0, 155)}</p>}
+                  {excerptOf(draft.content) && <p>{excerptOf(draft.content, 155)}</p>}
                 </button>
               ))}
               {loading ? (
@@ -920,7 +920,7 @@ function Notebook({
                       {n.pinned && <Pin size={13} />}
                     </div>
                     <h2>{titleOf(n.content)}</h2>
-                    {excerptOf(n.content) && <p>{excerptOf(n.content).slice(0, 155)}</p>}
+                    {excerptOf(n.content) && <p>{excerptOf(n.content, 155)}</p>}
                     <div className="note-card-tags">
                       {tagsOf(n.content)
                         .slice(0, 3)

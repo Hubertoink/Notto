@@ -18,9 +18,20 @@
   gap: 8px;
   min-width: 0;
 }
-.document-label-chips {
+.document-labels .document-label-chips {
   margin: 0;
+  padding: 0;
   flex-wrap: wrap;
+}
+.document-label-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.document-label-editor {
+  display: grid;
+  gap: 8px;
 }
 .document-label-chips .tag,
 .document-label-chips .collection-chip {

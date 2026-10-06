@@ -496,12 +496,18 @@
     grid-row: 3;
     min-width: 0;
   }
+  .editor.editor-with-annotations > .editor-body,
+  .editor-with-annotations > .editor-controls {
+    width: 100%;
+    max-width: 100%;
+    transition: max-width 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
   .editor.editor-with-annotations:has(> .annotation-open) {
     grid-template-columns: minmax(0, 1fr) clamp(380px, 38cqi, 460px);
   }
   .editor.editor-with-annotations:has(> .annotation-open) > .editor-body,
   .editor-with-annotations:has(> .annotation-open) > .editor-controls {
-    grid-column: 1;
+    max-width: calc(100% - clamp(380px, 38cqi, 460px) - 28px);
   }
   .editor-with-annotations > .note-annotations {
     grid-column: 2;
@@ -553,5 +559,11 @@
   }
   .editor-with-annotations .annotation-panel .markdown h3 {
     font-size: 1rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .editor.editor-with-annotations > .editor-body,
+  .editor-with-annotations > .editor-controls {
+    transition: none;
   }
 }

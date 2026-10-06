@@ -3,18 +3,31 @@ import { Action, readableDate, WebLink } from './components';
 import { PdfAttachment } from './PdfAttachment';
 import { DocumentAttachment } from './DocumentAttachment';
 import { AttachmentDownload } from './AttachmentDownload';
-import { attachmentIds, newNote, reviseNote, tagsOf, titleOf, type Note } from './domain';
-import { createDocument, documentContent, documentPages, replaceDocument } from './document-store';
+import { attachmentIds, newNote, tagsOf, titleOf, type Note } from './domain';
+import { createDocument, documentPages, replaceDocument } from './document-store';
 import { repo } from './repository';
 import { fetchAttachment, ownBackend, syncNotes } from './cloud';
 import { config, eligible, extract, knowledge, type Evidence } from './intelligence';
-import { normalizeCollections } from './note-tools';
-import { collectionNames, createCollection } from './collections';
-import { DocumentLabels, documentTags } from './DocumentLabels';
+import { collectionNames } from './collections';
+import { DocumentLabels } from './DocumentLabels';
+import {
+  mergeDocumentMetadataChanges,
+  updateDocumentMetadata,
+  type DocumentMetadataChange,
+} from './document-metadata';
 import { useNotto } from './state';
 import { useKnowledgeRecords } from './Tasks';
 import './documents.css';
-import { ArrowLeft, ChevronRight, CircleCheck, CircleAlert, Clock3, FileText, ShieldOff } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronRight,
+  CircleCheck,
+  CircleAlert,
+  Clock3,
+  FileText,
+  ShieldOff,
+  Upload,
+} from 'lucide-react';
 
 export function DocumentUpload({
   collection,
@@ -210,6 +223,20 @@ export function DocumentDetail({
   const [tagInput, setTagInput] = useState(''),
     [collectionInput, setCollectionInput] = useState('');
   const [ocrProgress, setOcrProgress] = useState('');
+  const [metadataStatus, setMetadataStatus] = useState('');
+  const metadataQueue = useRef(Promise.resolve());
+  const pendingMetadata = useRef(0);
+  const failedMetadata = useRef<DocumentMetadataChange[]>([]);
+  const titleDirty = useRef(false);
+  const titleRef = useRef(title);
+  titleRef.current = title;
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [pages, setPages] = useState<Evidence[]>([]),
@@ -218,13 +245,62 @@ export function DocumentDetail({
   const records = useKnowledgeRecords(note.scope);
   const document = note.document!;
   useEffect(() => {
-    setTitle(titleOf(note.content));
+    if (pendingMetadata.current || failedMetadata.current.length) return;
+    if (!titleDirty.current) setTitle(titleOf(note.content));
     setTags(tagsOf(note.content));
     setCollections(note.collections ?? []);
-    setTagInput('');
-    setCollectionInput('');
     setOcrProgress('');
   }, [note.id, note.revision]);
+  function saveMetadata(change: DocumentMetadataChange) {
+    if ('title' in change)
+      failedMetadata.current = failedMetadata.current.filter((previous) => !('title' in previous));
+    pendingMetadata.current++;
+    setMetadataStatus('Wird gespeichert …');
+    setError('');
+    const owner = { id: note.id, scope: note.scope };
+    metadataQueue.current = metadataQueue.current.then(async () => {
+      if ('kind' in change) {
+        const kind = change.kind;
+        const previous = failedMetadata.current.filter((item) => 'kind' in item && item.kind === kind);
+        failedMetadata.current = failedMetadata.current.filter(
+          (item) => !('kind' in item) || item.kind !== kind,
+        );
+        change = mergeDocumentMetadataChanges([...previous, change]);
+      }
+      try {
+        const saved = await updateDocumentMetadata(owner, change);
+        if ('title' in change)
+          failedMetadata.current = failedMetadata.current.filter((previous) => !('title' in previous));
+        if ('title' in change && titleRef.current === change.title) titleDirty.current = false;
+        if (alive.current && pendingMetadata.current === 1 && !failedMetadata.current.length && saved) {
+          setTags(tagsOf(saved.content));
+          setCollections(saved.collections ?? []);
+          if (!titleDirty.current) setTitle(titleOf(saved.content));
+        }
+      } catch (e) {
+        failedMetadata.current.push(change);
+        if (alive.current)
+          setError(e instanceof Error ? e.message : 'Änderung konnte nicht gespeichert werden.');
+      } finally {
+        pendingMetadata.current--;
+        if (alive.current && !pendingMetadata.current) {
+          setMetadataStatus(failedMetadata.current.length ? 'Nicht gespeichert' : 'Gespeichert');
+          if (!failedMetadata.current.length)
+            void knowledge
+              .sync(owner.scope)
+              .then(() => {
+                if (alive.current) return sync();
+              })
+              .catch((e) => {
+                if (alive.current) setError(String(e));
+              });
+        }
+      }
+    });
+  }
+  function saveTitle() {
+    if (titleDirty.current) saveMetadata({ title: titleRef.current });
+  }
   useEffect(() => {
     let alive = true;
     setReading(true);
@@ -255,6 +331,9 @@ export function DocumentDetail({
     setBusy(true);
     setError('');
     try {
+      await metadataQueue.current;
+      if (failedMetadata.current.length)
+        throw new Error('Bitte zuerst die nicht gespeicherte Änderung korrigieren oder erneut speichern.');
       await action();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -362,6 +441,10 @@ export function DocumentDetail({
         <AttachmentDownload scope={note.scope} id={document.attachmentId} name={document.name} />
         <Action
           label="Neue Fassung hochladen"
+          tooltip="Neue Fassung hochladen"
+          icon={<Upload size={18} />}
+          isIconOnly
+          variant="ghost"
           isDisabled={busy}
           onClick={() => replacement.current?.click()}
         />
@@ -375,7 +458,9 @@ export function DocumentDetail({
             e.target.value = '';
             if (file)
               void run(async () => {
-                const updated = await replaceDocument(note, file);
+                const current = await repo.get(note.scope, note.id);
+                if (!current || current.deleted) throw new Error('Das Dokument ist nicht mehr verfügbar.');
+                const updated = await replaceDocument(current, file);
                 await documentPages(updated);
                 notify('Neue Dokumentfassung gespeichert');
               });
@@ -422,28 +507,7 @@ export function DocumentDetail({
           Verwendetes Modell: <strong>{config(note.scope).model}</strong> (aus „Wissen & KI“).
         </p>
       )}
-      <form
-        className="document-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run(async () => {
-            const parsedTags = documentTags([...tags, tagInput].join(' '));
-            const selectedCollections = normalizeCollections([...collections, ...collectionInput.split(',')]);
-            for (const name of selectedCollections) await createCollection(note.scope, name);
-            const updated = reviseNote(note, {
-              content: documentContent(
-                title,
-                parsedTags,
-                { id: document.attachmentId, name: document.name },
-                document.source,
-              ),
-              collections: selectedCollections,
-            });
-            await repo.put(updated, note.revision);
-            notify('Dokument aktualisiert');
-          });
-        }}
-      >
+      <div className="document-form">
         <label>
           Titel
           <input
@@ -451,13 +515,28 @@ export function DocumentDetail({
             maxLength={110}
             required
             disabled={busy}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              titleDirty.current = true;
+              titleRef.current = e.target.value;
+              setTitle(e.target.value);
+            }}
+            onBlur={saveTitle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                e.currentTarget.blur();
+              }
+            }}
           />
         </label>
         <DocumentLabels
+          key={`${note.id}-tags`}
           kind="tags"
           values={tags}
-          onChange={setTags}
+          onChange={(values) => {
+            setTags(values);
+            saveMetadata({ kind: 'tags', before: tags, after: values });
+          }}
           input={tagInput}
           onInput={setTagInput}
           disabled={busy}
@@ -470,24 +549,43 @@ export function DocumentDetail({
           ].sort((a, b) => a.localeCompare(b, 'de'))}
         />
         <DocumentLabels
+          key={`${note.id}-collections`}
           kind="collections"
           values={collections}
-          onChange={setCollections}
+          onChange={(values) => {
+            setCollections(values);
+            saveMetadata({ kind: 'collections', before: collections, after: values });
+          }}
           input={collectionInput}
           onInput={setCollectionInput}
           disabled={busy}
           known={collectionNames(notes, records, note.scope)}
         />
-        <Action label="Änderungen speichern" type="submit" isDisabled={busy || !title.trim()} />
-      </form>
+        {metadataStatus && (
+          <span className="muted small" role="status" aria-live="polite">
+            {metadataStatus}
+          </span>
+        )}
+        {metadataStatus === 'Nicht gespeichert' && (
+          <Action
+            label="Änderung erneut speichern"
+            onClick={() => {
+              const changes = failedMetadata.current.splice(0);
+              changes.forEach(saveMetadata);
+            }}
+          />
+        )}
+      </div>
       <Action
         label="Mit diesem Dokument arbeiten"
         isDisabled={busy || !eligible(note)}
         onClick={() =>
           void run(async () => {
+            const current = await repo.get(note.scope, note.id);
+            if (!current || current.deleted) throw new Error('Das Dokument ist nicht mehr verfügbar.');
             const draft = {
-              ...newNote(note.scope, `Gedanken zu ${titleOf(note.content)}\n\n`),
-              collections: note.collections,
+              ...newNote(note.scope, `Gedanken zu ${titleOf(current.content)}\n\n`),
+              collections: current.collections,
               aiContext: { mode: 'selected' as const, sourceIds: [note.id] },
             };
             await repo.put(draft, null);

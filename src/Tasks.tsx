@@ -1,5 +1,5 @@
 import { isConnectionError } from './connection';
-import { useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, useRef, useId, type ReactNode, type CSSProperties } from 'react';
 import { withoutNoteCommands, commandEvidence } from './note-command';
 import {
@@ -211,14 +211,18 @@ export function NoteAnnotations({
     return () => observer.disconnect();
   }, []);
   const expanded = docked ? sidebarOpen : open;
-  const layoutExpanded = expanded;
+  const reduced = useReducedMotion();
+  const [closing, setClosing] = useState(false);
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+  const layoutExpanded = expanded || (closing && !reduced);
   const toggle = (next: boolean) => {
+    setClosing(!next && expanded && !reduced);
     if (docked) {
       setSidebarOpen(next);
       localStorage.setItem('notto-ai-sidebar', next ? 'open' : 'closed');
     } else setOpen(next);
   };
-  const reduced = useReducedMotion();
   const anchors = useRef<Record<string, HTMLElement | null>>({});
   const [jumpTarget, setJumpTarget] = useState<string | null>(null);
   const jumpTo = (category: string) => {
@@ -484,7 +488,22 @@ export function NoteAnnotations({
           </button>
         )}
       </div>
-      <div className="annotation-content" hidden={!expanded}>
+      <motion.div
+        className="annotation-content"
+        hidden={!layoutExpanded}
+        inert={!expanded}
+        aria-hidden={!expanded}
+        initial={false}
+        animate={{
+          opacity: expanded ? 1 : 0,
+          x: !expanded && docked ? 12 : 0,
+          y: !expanded && !docked ? 6 : 0,
+        }}
+        transition={{ duration: reduced ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
+        onAnimationComplete={() => {
+          if (!expandedRef.current) setClosing(false);
+        }}
+      >
         <div
           className="annotation-tabs"
           role="tablist"
@@ -706,7 +725,7 @@ export function NoteAnnotations({
         >
           {commands}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

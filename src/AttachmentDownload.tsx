@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Action } from './components';
 import { fetchAttachment } from './cloud';
 import { desktop } from './repository';
+import { Download, LoaderCircle } from 'lucide-react';
 
 export function AttachmentDownload({ scope, id, name }: { scope: string; id: string; name: string }) {
   const [busy, setBusy] = useState(false),
@@ -49,6 +50,12 @@ export function AttachmentDownload({ scope, id, name }: { scope: string; id: str
           busy ? 'Datei wird geladen …' : id.endsWith('.pdf') ? 'PDF herunterladen' : 'Datei herunterladen'
         }
         isDisabled={busy}
+        tooltip={
+          busy ? 'Datei wird geladen …' : id.endsWith('.pdf') ? 'PDF herunterladen' : 'Datei herunterladen'
+        }
+        icon={busy ? <LoaderCircle size={18} className="command-spin" /> : <Download size={18} />}
+        isIconOnly
+        variant="ghost"
         onClick={() => void download()}
       />
       {error && (

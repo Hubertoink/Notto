@@ -101,12 +101,12 @@ export function titleOf(content: string): string {
       ?.slice(0, 110) || 'Unbenannte Notiz'
   );
 }
-export function excerptOf(content: string): string {
+export function excerptOf(content: string, limit = 220): string {
   const lines = content.split('\n');
   const title = titleOf(content);
   const titleIndex = lines.findIndex((line) => line.trim() && titleOf(line) === title);
   if (titleIndex >= 0) lines.splice(titleIndex, 1);
-  return lines
+  const text = lines
     .join('\n')
     .replace(/^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/gm, '')
     .replace(/^\s*\|\s*/gm, '')
@@ -117,8 +117,12 @@ export function excerptOf(content: string): string {
     .replace(/(?:https?:\/\/|www\.)[^\s<>)]+/gi, ' ')
     .replace(/[#*_`>]/g, '')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 220);
+    .trim();
+  if (text.length <= limit) return text;
+  const prefix = text.slice(0, limit);
+  const boundary = prefix.lastIndexOf(' ');
+  // A single oversized word is omitted whole rather than cut in the middle.
+  return `${(/\s/.test(text[limit]) ? prefix : boundary > 0 ? prefix.slice(0, boundary) : '').trimEnd()}…`;
 }
 export function newNote(scope: Scope, content: string, now = new Date().toISOString()): Note {
   const revision = crypto.randomUUID();

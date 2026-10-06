@@ -58,6 +58,10 @@ it('renders in the page, saves only explicitly, retains failures and reloads con
     'formulate',
   );
   await user.click(screen.getByLabelText('KI für dieses Notizbuch aktivieren'));
+  expect((screen.getByLabelText('Webrecherche bei KI-Aufträgen zulassen') as HTMLInputElement).checked).toBe(
+    true,
+  );
+  await user.click(screen.getByLabelText('Webrecherche bei KI-Aufträgen zulassen'));
   expect(api.mock.calls.filter((call) => call[2])).toHaveLength(0);
   expect(config('account').enabled).toBe(false);
   await user.click(screen.getByRole('button', { name: 'Einstellungen speichern' }));
@@ -67,7 +71,12 @@ it('renders in the page, saves only explicitly, retains failures and reloads con
   fail = false;
   await user.click(screen.getByRole('button', { name: 'Einstellungen speichern' }));
   await screen.findByText('KI-Einstellungen im Konto gespeichert.');
-  expect(config('account')).toMatchObject({ model: 'gpt-5-mini', enabled: true, rewriteMode: 'formulate' });
+  expect(config('account')).toMatchObject({
+    model: 'gpt-5-mini',
+    enabled: true,
+    rewriteMode: 'formulate',
+    commandWeb: false,
+  });
   view.unmount();
   render(<Knowledge onOpen={() => {}} />);
   await user.click(screen.getAllByRole('button', { name: 'KI einrichten' })[0]);
@@ -81,6 +90,9 @@ it('renders in the page, saves only explicitly, retains failures and reloads con
   ).toBe('formulate');
   expect((screen.getByLabelText('KI für dieses Notizbuch aktivieren') as HTMLInputElement).checked).toBe(
     true,
+  );
+  expect((screen.getByLabelText('Webrecherche bei KI-Aufträgen zulassen') as HTMLInputElement).checked).toBe(
+    false,
   );
   await user.click(screen.getByRole('button', { name: 'Mein Kontext' }));
   expect(await screen.findByRole('button', { name: 'Information hinzufügen' })).toBeTruthy();

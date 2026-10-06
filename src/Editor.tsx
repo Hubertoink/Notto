@@ -56,7 +56,7 @@ import { serverRequest } from './backend';
 import { contentRevision } from './domain';
 import { type AIContext } from './domain';
 import { ContextPicker } from './ContextPicker';
-import { defaultContext } from './source-context';
+import { defaultContext, webResearchEnabled } from './source-context';
 
 export function Editor({
   note,
@@ -78,6 +78,13 @@ export function Editor({
   aiBackgroundEnabled?: boolean;
 }) {
   const { scope, notify, notes, sync } = useNotto();
+  const [commandWeb, setCommandWeb] = useState(config(scope).commandWeb !== false);
+  useEffect(() => {
+    const update = () => setCommandWeb(config(scope).commandWeb !== false);
+    update();
+    window.addEventListener('notto-ai-config', update);
+    return () => window.removeEventListener('notto-ai-config', update);
+  }, [scope]);
   const draftNote = useMemo(() => newNote(scope, ''), [scope]);
   const [commandCount, setCommandCount] = useState(0);
   const collectionRecords = useKnowledgeRecords(scope);
@@ -777,11 +784,14 @@ export function Editor({
                 : aiContext.mode === 'selected'
                   ? 'Ausgewählte Quellen'
                   : 'Gesamtes Notizbuch'}
+            {' · '}
+            {webResearchEnabled(aiContext, { commandWeb }) ? 'Webrecherche an' : 'Webrecherche aus'}
           </summary>
           {contextOpen && (
             <ContextPicker
               names={knownCollections}
               value={aiContext}
+              commandWeb={commandWeb}
               current={{ ...(note ?? draftNote), collections }}
               notes={notes || []}
               disabled={saving}
@@ -809,6 +819,7 @@ export function Editor({
           <ContextPicker
             names={knownCollections}
             value={aiContext}
+            commandWeb={commandWeb}
             current={{ ...(note ?? draftNote), collections }}
             notes={notes || []}
             disabled={saving}

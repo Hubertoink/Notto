@@ -142,6 +142,150 @@ afterAll(async () => {
   await pg.close();
 });
 
+it.each([
+  { policy: undefined, commandWeb: undefined, expected: true },
+  { policy: 'inherit' as const, commandWeb: true, expected: true },
+  { policy: 'off' as const, commandWeb: true, expected: false },
+  { policy: 'inherit' as const, commandWeb: false, expected: false },
+])(
+  'uses the notebook default for legacy notes and snapshots explicit opt-outs: %j',
+  async ({ policy, commandWeb, expected }) => {
+    const current = reviseNote(note, { aiContext: { mode: 'note', web: false, webPolicy: policy } });
+    await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
+      note.id,
+      JSON.stringify(current),
+      current.revision,
+    ]);
+    await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+      user,
+      JSON.stringify({ ...settings, commandWeb }),
+    ]);
+    expect((await start(randomUUID(), user, current.revision)).statusCode).toBe(200);
+    const job: any = (await pg.query('SELECT context FROM note_commands')).rows[0];
+    expect(job.context).toMatchObject({ mode: 'note', web: expected });
+  },
+);
+
+it('applies the same inherited web setting when saving an inline command', async () => {
+  const current = reviseNote(note, {
+    content: 'Ownership als Führungsprinzip\n/ki gibt es hierzu Führungskonzepte?',
+    aiContext: { mode: 'note', web: false },
+  });
+  const saved = await app.inject({
+    method: 'POST',
+    url: '/api/notes/push',
+    headers: headers(),
+    payload: {
+      p_id: note.id,
+      p_revision: current.revision,
+      p_base_revision: note.revision,
+      p_document: current,
+    },
+  });
+  expect(saved.json()).toEqual({ accepted: true });
+  expect((await pg.query('SELECT prompt,context FROM note_commands')).rows[0]).toMatchObject({
+    prompt: 'gibt es hierzu Führungskonzepte?',
+    context: { web: true },
+  });
+});
+
+it('honors a global web opt-out made after a command was queued', async () => {
+  await start();
+  await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+    user,
+    JSON.stringify({ ...settings, commandWeb: false }),
+  ]);
+  const localResponse = response();
+  const answer = JSON.parse(localResponse.output[0].content[0].text);
+  answer.items[0].target = null;
+  localResponse.output[0].content[0].text = JSON.stringify(answer);
+  vi.mocked(openai).mockResolvedValue(localResponse);
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,result FROM note_commands')).rows[0];
+  expect(job.status).toBe('done');
+  expect(job.result).toMatchObject({ webEnabled: false, searched: false, sources: [] });
+  expect(openai).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(openai).mock.calls[0][3].tools).toBeUndefined();
+  expect(
+    JSON.parse(vi.mocked(openai).mock.calls[0][3].input as string).sources.every(
+      (source: any) => !source.url,
+    ),
+  ).toBe(true);
+});
+
+it('researches an open-ended question from a legacy note instead of restricting the answer to that note', async () => {
+  const prompt = 'gibt es hierzu Führungskonzepte?';
+  const current = reviseNote(note, {
+    content: 'Ownership als Führungsprinzip\nVerantwortung für Projekte und Prozesse im Jugendhaus.',
+    aiContext: { mode: 'note', web: false },
+  });
+  await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
+    note.id,
+    JSON.stringify(current),
+    current.revision,
+  ]);
+  expect(
+    (
+      await app.inject({
+        method: 'PUT',
+        url: `/api/commands/${randomUUID()}`,
+        headers: headers(),
+        payload: { noteId: current.id, revision: current.revision, prompt },
+      })
+    ).statusCode,
+  ).toBe(200);
+  vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) => {
+    expect(JSON.parse(body.input as string).auftrag).toBe(prompt);
+    const verification = verificationResponse(body, null, ['Belegter Führungsansatz']);
+    if (verification) return verification;
+    if (!body.tools)
+      return {
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({ queries: ['Ownership Führung wissenschaftliche Theorie'] }),
+              },
+            ],
+          },
+        ],
+      };
+    expect(body.tool_choice).toBe('required');
+    const text = 'Ein belegter Führungsansatz. [1]';
+    return {
+      status: 'completed',
+      output: [
+        { type: 'web_search_call', status: 'completed' },
+        {
+          content: [
+            {
+              type: 'output_text',
+              text,
+              annotations: [
+                {
+                  type: 'url_citation',
+                  start_index: text.indexOf('[1]'),
+                  end_index: text.length,
+                  title: 'Fachquelle',
+                  url: 'https://example.com/leadership',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  });
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,result FROM note_commands')).rows[0];
+  expect(job.status).toBe('done');
+  expect(job.result).toMatchObject({ webEnabled: true, searched: true, partial: false });
+  expect(job.result.research).toContain('[Fachquelle](https://example.com/leadership)');
+  expect(vi.mocked(openai).mock.calls.filter((call) => call[3].tools)).toHaveLength(1);
+});
+
 it('supports idempotent manual retries with automation disabled', async () => {
   expect(await workCommandOnce(adapter, env)).toBe(false);
   const id = randomUUID();
@@ -580,7 +724,7 @@ async function startDocumentCommand() {
   const attachment = `${randomUUID()}.pdf`;
   const live = reviseNote(note, {
     content: `Konzeption Jugendhaus\n[Konzeption](attachments/${attachment})\n/ki Fasse die Konzeption zusammen`,
-    aiContext: { mode: 'note', web: false },
+    aiContext: { mode: 'note', webPolicy: 'off' },
   });
   await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
     note.id,
@@ -667,7 +811,8 @@ it('supplies attached PDF text to a command and persists a clickable page citati
     quote: 'Jugendliche bestimmen das Programm gemeinsam.',
   });
   expect(openai).toHaveBeenCalledTimes(1);
-  expect(job.result.searched).toBeUndefined();
+  expect(job.result.searched).toBe(false);
+  expect(job.result.webEnabled).toBe(false);
 });
 it('discards invented PDF quotes instead of retaining an unsupported summary', async () => {
   await startDocumentCommand();
@@ -733,7 +878,9 @@ async function startLibraryCommand() {
       version: 2,
     },
   };
-  const current = reviseNote(note, { aiContext: { mode: 'selected', sourceIds: [library.id], web: false } });
+  const current = reviseNote(note, {
+    aiContext: { mode: 'selected', sourceIds: [library.id], webPolicy: 'off' },
+  });
   await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
     note.id,
     JSON.stringify(current),

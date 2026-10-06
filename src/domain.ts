@@ -28,6 +28,9 @@ export interface AIContext {
   collection?: string;
   sourceIds?: string[];
   tags?: string[];
+  /** Notes inherit the notebook default unless web research is explicitly disabled. */
+  webPolicy?: 'inherit' | 'off';
+  /** Resolved command snapshot; legacy note values no longer override the notebook default. */
   web?: boolean;
 }
 export interface Draft {
@@ -248,6 +251,7 @@ export function validAIContext(value: unknown): value is AIContext {
       (Array.isArray(c.tags) &&
         c.tags.length <= 30 &&
         c.tags.every((tag) => typeof tag === 'string' && tag.length <= 60))) &&
-    (c.web === undefined || typeof c.web === 'boolean')
+    (c.web === undefined || typeof c.web === 'boolean') &&
+    (c.webPolicy === undefined || ['inherit', 'off'].includes(c.webPolicy))
   );
 }

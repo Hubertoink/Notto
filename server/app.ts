@@ -376,6 +376,7 @@ export async function buildApp(db: Database, env: Environment) {
         enabled: z.boolean(),
         auto: z.boolean(),
         autoResearch: z.boolean().default(false),
+        commandWeb: z.boolean().optional(),
         rewriteMode: z.enum(['correct', 'formulate']).default('correct'),
         model: z.string().max(100),
         excludedTags: z.string().max(2000),
@@ -385,6 +386,8 @@ export async function buildApp(db: Database, env: Environment) {
     const previousSettings = (
       await db.query('SELECT document FROM ai_settings WHERE user_id=$1', [req.nottoUser!.id])
     ).rows[0]?.document;
+    // Older desktop clients do not send this field; preserve a saved global opt-out.
+    document.commandWeb ??= previousSettings?.commandWeb ?? true;
     await db.query(
       'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
       [req.nottoUser!.id, JSON.stringify(document)],

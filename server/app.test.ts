@@ -26,6 +26,29 @@ const headers = (secret?: string) => ({
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
 });
+it('defaults command web research on and preserves a global opt-out when an older client saves settings', async () => {
+  const settings = {
+    enabled: true,
+    auto: false,
+    autoResearch: false,
+    model: 'gpt-4.1-mini',
+    excludedTags: '',
+    excludedNotes: [],
+  };
+  const save = (payload: typeof settings & { commandWeb?: boolean }) =>
+    app.inject({ method: 'PUT', url: '/api/ai/settings', headers: headers(aToken), payload });
+  await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+  expect((await save(settings)).statusCode).toBe(200);
+  expect(
+    (await app.inject({ url: '/api/ai/settings', headers: headers(aToken) })).json().config.commandWeb,
+  ).toBe(true);
+  await save({ ...settings, commandWeb: false });
+  await save(settings);
+  expect(
+    (await app.inject({ url: '/api/ai/settings', headers: headers(aToken) })).json().config.commandWeb,
+  ).toBe(false);
+  await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+});
 it('keeps completed analyses completed after a model switch but schedules newly enabled research', async () => {
   const note = newNote(alice, 'Music Assistant auf dem Heimserver prüfen');
   await app.inject({

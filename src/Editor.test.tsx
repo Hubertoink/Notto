@@ -57,6 +57,39 @@ function renderEditor(saved = vi.fn()) {
     </Theme>,
   );
 }
+it('shows inherited web research for a legacy note and persists a deliberate note opt-out', async () => {
+  const note = { ...newNote('local', 'Ownership'), aiContext: { mode: 'note' as const, web: false } };
+  await repo.put(note, null);
+  const saved = vi.fn();
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={saved} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const summary = await screen.findByText(/KI-Kontext · Notiz und Anhänge · Webrecherche an/);
+  const details = summary.closest('details')!;
+  details.open = true;
+  fireEvent(details, new Event('toggle'));
+  const checkbox = (await screen.findByLabelText(
+    'Webrecherche für diese Notiz ausschalten',
+  )) as HTMLInputElement;
+  expect(checkbox.checked).toBe(false);
+  fireEvent.click(checkbox);
+  await screen.findByText(/KI-Kontext · Notiz und Anhänge · Webrecherche aus/);
+  fireEvent.click(screen.getByRole('button', { name: 'Festhalten' }));
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect((await repo.get('local', note.id))?.aiContext?.webPolicy).toBe('off');
+});
+
+it('updates the visible context status when the global command web setting changes', async () => {
+  renderEditor();
+  await screen.findByText(/Webrecherche an/);
+  localStorage.setItem('notto-ai:local', JSON.stringify({ commandWeb: false }));
+  fireEvent(window, new Event('notto-ai-config'));
+  await screen.findByText(/KI-Kontext · Notiz und Anhänge · Webrecherche aus/);
+});
 it('edits and formats text after an inline image without changing its reference', async () => {
   renderEditor();
   const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;

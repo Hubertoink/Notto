@@ -100,6 +100,7 @@ export interface CommandResult {
   /** Web-search answer with provider-verified, clickable citations. */
   research?: string;
   searched?: boolean;
+  webEnabled?: boolean;
   searchQueries?: string[];
   partial?: boolean;
   items: {

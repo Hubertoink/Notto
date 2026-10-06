@@ -282,6 +282,11 @@ export function NoteCommands({
             )}
             {result && (
               <>
+                {result.webEnabled === false && (
+                  <p className="muted small">
+                    Webrecherche ausgeschaltet · Antwort aus den gewählten Quellen
+                  </p>
+                )}
                 {(!result.research || result.partial) && <p className="command-summary">{result.summary}</p>}
                 {result.research && <NoteMarkdown content={result.research} scope={scope} />}
                 <div className="command-results">

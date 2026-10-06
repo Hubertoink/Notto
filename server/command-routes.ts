@@ -8,7 +8,7 @@ import type { AIEnvironment } from './openai.js';
 import { limit, type Database } from './database.js';
 import { publicUrl } from './browser-network.js';
 import { cleanCompletedPrompts } from './command-cleanup.js';
-import { defaultContext } from '../src/source-context.js';
+import { commandSourceContext } from '../src/source-context.js';
 
 const fields = 'id,note_id,revision,prompt,status,stage,error,result,created_at';
 const fail = (message: string, statusCode: number): never => {
@@ -91,7 +91,7 @@ export async function queueSavedCommands(
         error ? 'failed' : 'pending',
         error ? 'Nicht gestartet' : 'Wartet',
         error,
-        JSON.stringify(note.aiContext ?? { ...defaultContext(note), web: true }),
+        JSON.stringify(commandSourceContext(note, settings ?? {})),
       ],
     );
   }
@@ -174,7 +174,7 @@ export function commandRoutes(app: FastifyInstance, db: Database, env: AIEnviron
           input.prompt,
           row.document.content,
           row.settings.model,
-          JSON.stringify(row.document.aiContext ?? { ...defaultContext(row.document), web: true }),
+          JSON.stringify(commandSourceContext(row.document, row.settings)),
         ],
       );
       await client.query('COMMIT');

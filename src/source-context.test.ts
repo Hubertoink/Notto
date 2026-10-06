@@ -1,7 +1,32 @@
 import { expect, it } from 'vitest';
 import { newNote, validNote } from './domain';
-import { contextNotes, defaultContext } from './source-context';
+import { contextNotes, defaultContext, commandSourceContext, webResearchEnabled } from './source-context';
 const settings = { excludedNotes: [], excludedTags: 'privat' };
+it('inherits web research for new notes and legacy notes, with deliberate note and notebook opt-outs', () => {
+  for (const context of [
+    undefined,
+    { mode: 'note' as const, web: false },
+    { mode: 'note' as const, web: true },
+  ]) {
+    const note = { ...newNote('alice', 'Ownership'), aiContext: context };
+    expect(commandSourceContext(note, {}).web).toBe(true);
+    expect(commandSourceContext(note, { commandWeb: false }).web).toBe(false);
+  }
+  const optedOut = { mode: 'note' as const, webPolicy: 'off' as const };
+  expect(webResearchEnabled(optedOut)).toBe(false);
+  expect(webResearchEnabled({ ...optedOut, webPolicy: 'inherit' })).toBe(true);
+  const selected = {
+    mode: 'selected' as const,
+    sourceIds: [crypto.randomUUID()],
+    tags: ['jugendarbeit'],
+    web: false,
+  };
+  expect(commandSourceContext({ aiContext: selected }, {})).toEqual({ ...selected, web: true });
+  expect(validNote({ ...newNote('alice', 'Ownership'), aiContext: optedOut })).toBe(true);
+  expect(
+    validNote({ ...newNote('alice', 'Ownership'), aiContext: { ...optedOut, webPolicy: 'invalid' } }),
+  ).toBe(false);
+});
 it('selects collection and tagged sources while enforcing account and privacy boundaries', () => {
   const current = { ...newNote('alice', 'Planung'), collections: ['Jugendhaus'] };
   const document = { ...newNote('alice', 'Konzeption #pädagogik'), collections: ['Jugendhaus'] };

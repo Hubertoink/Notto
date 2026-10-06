@@ -159,7 +159,7 @@ export function CollectionQuestion({
           const note = {
             ...newNote(scope, `Frage zu ${collection}\n\n/ki ${question.trim().replace(/\r?\n/g, ' ')}`),
             collections: [collection],
-            aiContext: { mode: 'collection' as const, collection, web: false },
+            aiContext: { mode: 'collection' as const, collection },
           };
           await knowledge.sync(scope);
           await repo.put(note, null);
@@ -467,7 +467,7 @@ export function DocumentDetail({
             const draft = {
               ...newNote(note.scope, `Gedanken zu ${titleOf(note.content)}\n\n`),
               collections: note.collections,
-              aiContext: { mode: 'selected' as const, sourceIds: [note.id], web: false },
+              aiContext: { mode: 'selected' as const, sourceIds: [note.id] },
             };
             await repo.put(draft, null);
             onOpen(draft.id);

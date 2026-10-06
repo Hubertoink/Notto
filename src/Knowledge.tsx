@@ -637,6 +637,19 @@ export function Knowledge({
           <label className="checkbox-row">
             <input
               type="checkbox"
+              checked={settings.commandWeb !== false}
+              onChange={(e) => update({ commandWeb: e.target.checked })}
+            />{' '}
+            Webrecherche bei KI-Aufträgen zulassen
+          </label>
+          <p className="muted small">
+            Standard für neue und bestehende Notizen. KI-Aufträge recherchieren bei Bedarf; reine
+            Zusammenfassungen bleiben bei ihren Quellen. Im KI-Kontext einer Notiz kannst du Webrecherche
+            gezielt ausschalten.
+          </p>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
               checked={settings.autoResearch}
               onChange={(e) => update({ autoResearch: e.target.checked })}
             />{' '}

@@ -109,7 +109,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
     const warnings: string[] = [];
     const sources: (BrowserSource & { evidence?: ContextSource })[] = [];
     const context = validAIContext(job.context) ? job.context : { mode: 'note' as const, web: true };
-    const webEnabled = context.web === true;
+    const webEnabled = context.web === true && permission.settings.commandWeb !== false;
     if (attachmentIds(job.note_content).length || context.mode !== 'note') {
       if (!currentContent(permission.document, job.revision))
         throw new Error('Die Notiz wurde inzwischen geändert. Bitte den Auftrag erneut starten.');
@@ -316,6 +316,8 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
       items: [],
       sources: sources.filter((s) => s.url).map(({ title, url }) => ({ title, url })),
       warnings,
+      webEnabled,
+      searched: !!search,
       ...(contextSources.length
         ? {
             contextSources: contextSources.map(({ noteId, revision, title, attachment, page }) => ({
@@ -327,7 +329,6 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
             })),
           }
         : {}),
-      ...(needsSearch ? { searched: !!search } : {}),
       ...(search ? { research: search.text, searchQueries: search.queries, partial: search.partial } : {}),
       ...(contextIncomplete ? { partial: true } : {}),
     };

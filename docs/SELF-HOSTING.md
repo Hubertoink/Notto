@@ -27,6 +27,8 @@ Web-Sitzungen liegen in HttpOnly-/Secure-/SameSite-Cookies. Windows legt sein Si
 
 ## OpenAI
 
+Ab Version 1.5.3 dürfen ausdrücklich gestartete KI-Aufträge standardmäßig bei Bedarf im Web recherchieren. Unter **Wissen & KI → KI einrichten → Webrecherche bei KI-Aufträgen zulassen** lässt sich das für das gesamte Notizbuch ausschalten. Im **KI-Kontext** einer einzelnen Notiz kann Webrecherche zusätzlich gezielt ausgeschaltet werden. Bestehende Notizen übernehmen die globale Voreinstellung; die alte automatische Vorgabe „Web aus“ muss nicht einzeln korrigiert werden. Automatische Hintergrundrecherche hat weiterhin ihre eigene Einstellung. Reine Zusammenfassungen und ausdrücklich auf vorhandene Quellen begrenzte Aufträge suchen nicht zusätzlich im Web.
+
 `OPENAI_API_KEY` gehört in die geschützte Serverkonfiguration für **app und worker**, niemals in Git, einen `VITE_*`-Wert oder die Browseroberfläche. Die beim ersten Deployment angelegte `.notto-deploy/production.env` enthält dieses Feld zunächst leer. Dort lokal hinterlegen und den Stack erneut deployen; alternativ beide Dienste in mStudio konfigurieren und die lokale Datei für spätere Deployments konsistent halten. Bitte den Schlüssel nicht im Chat senden.
 
 In Notto anschließend **Wissen & KI → KI einrichten → KI aktivieren**. Die Oberfläche zeigt an, ob der Server einen Schlüssel hat. Analyse und Recherche laufen nach separater Aktivierung auch bei geschlossener App. Der Worker verarbeitet gespeicherte Revisionen, prüft Belege und hält Entscheidungen getrennt. Maximal drei Versuche je Job, fünf Minuten Abstand, begrenzte Laufzeit-Lease zur Wiederaufnahme nach Absturz. Serverseitig maximal 100 API-Anfragen pro Benutzer/UTC-Tag; weitere lokale Limits können früher greifen. Keine Euro-Kostengarantie.

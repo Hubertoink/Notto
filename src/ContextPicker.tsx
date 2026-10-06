@@ -1,6 +1,7 @@
 import { tagsOf, titleOf, type AIContext, type Note } from './domain';
 import { collectionNames } from './collections';
 import { eligible } from './intelligence';
+import { webResearchEnabled } from './source-context';
 
 export function ContextPicker({
   value,
@@ -9,6 +10,7 @@ export function ContextPicker({
   current,
   disabled = false,
   names = [],
+  commandWeb = true,
 }: {
   value: AIContext;
   onChange: (value: AIContext) => void;
@@ -16,6 +18,7 @@ export function ContextPicker({
   current: Note;
   disabled?: boolean;
   names?: string[];
+  commandWeb?: boolean;
 }) {
   const collections = [
     ...new Set([
@@ -131,11 +134,18 @@ export function ContextPicker({
       <label className="context-web">
         <input
           type="checkbox"
-          checked={value.web === true}
-          onChange={(e) => onChange({ ...value, web: e.target.checked })}
+          checked={value.webPolicy === 'off'}
+          onChange={(e) => onChange({ ...value, webPolicy: e.target.checked ? 'off' : 'inherit' })}
         />
-        Webquellen zusätzlich verwenden
+        Webrecherche für diese Notiz ausschalten
       </label>
+      <p className="muted small" role="status">
+        {webResearchEnabled(value, { commandWeb })
+          ? 'KI-Aufträge dürfen bei Bedarf im Web recherchieren. Die globale Einstellung wird übernommen.'
+          : commandWeb
+            ? 'KI-Aufträge verwenden nur die gewählten Notizen und Anhänge.'
+            : 'Webrecherche für KI-Aufträge ist in „Wissen & KI“ ausgeschaltet.'}
+      </p>
       <p className="muted small">
         Ausgeschlossene Quellen bleiben ausgeschlossen. Direkt gewählte Dokumente werden vollständig gelesen;
         im weiteren Kontext sucht Noto passende Textstellen.

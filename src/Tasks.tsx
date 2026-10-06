@@ -687,7 +687,11 @@ export function NoteAnnotations({
                     content={compactParenthesizedLines((r.data as Research).text)}
                     scope={note.scope}
                   />
-                  <Sources sources={(r.data as Research).sources ?? []} compact />
+                  <Sources
+                    sources={(r.data as Research).sources ?? []}
+                    compact
+                    importFrom={{ noteId: note.id, scope: note.scope }}
+                  />
                 </article>
               ))}
             </section>

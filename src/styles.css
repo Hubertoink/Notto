@@ -3141,3 +3141,22 @@ dialog.image-lightbox::backdrop {
     pointer-events: auto;
   }
 }
+.source-import {
+  margin-top: 6px;
+  min-width: 0;
+}
+.source-import > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+  white-space: normal;
+}
+.source-import > button svg {
+  flex-shrink: 0;
+}
+.source-import [role='alert'] {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--nt-danger);
+}

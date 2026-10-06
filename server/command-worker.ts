@@ -8,6 +8,7 @@ import type { Database } from './database.js';
 import { searchCommand } from './command-search.js';
 import { cleanCompletedPrompts } from './command-cleanup.js';
 import { commandNeedsSearch } from './command-intent.js';
+import { commandImportsDocuments, importCommandDocuments } from './command-document-import.js';
 import { commandContextSources, type ContextSource } from './command-context.js';
 import { attachmentIds, currentContent, validAIContext, type Note } from '../src/domain.js';
 import { evidenceCurrent } from '../src/evidence-policy.js';
@@ -103,6 +104,45 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
         checking = false;
       });
   }, 5000);
+  async function finish(result: CommandResult, images: { id: string; bytes: Buffer }[] = []) {
+    await permitted();
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query(
+        "UPDATE note_commands SET status='done',stage=$4,result=$3,lease_until=NULL,updated_at=now() WHERE id=$1 AND run_token=$2 AND status='running' RETURNING id",
+        [
+          job.id,
+          token,
+          JSON.stringify(result),
+          result.partial
+            ? 'Teilergebnis'
+            : result.items.length || result.research || result.imports?.length
+              ? 'Fertig'
+              : 'Keine belegten Ergebnisse',
+        ],
+      );
+      if (updated.rowCount)
+        for (const image of images)
+          await client.query('INSERT INTO command_images(id,command_id,bytes) VALUES($1,$2,$3)', [
+            image.id,
+            job.id,
+            image.bytes,
+          ]);
+      if (
+        updated.rowCount &&
+        !result.partial &&
+        (result.items.length || result.research || result.imports?.length)
+      )
+        await cleanCompletedPrompts(client, job.user_id, job.note_id, [job.prompt]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
   try {
     if (job.attempts > 2) throw new Error('Der Auftrag wurde wiederholt unterbrochen. Bitte erneut starten.');
     const permission = await permitted();
@@ -110,6 +150,18 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
     const sources: (BrowserSource & { evidence?: ContextSource })[] = [];
     const context = validAIContext(job.context) ? job.context : { mode: 'note' as const, web: true };
     const webEnabled = context.web === true && permission.settings.commandWeb !== false;
+    if (commandImportsDocuments(job.prompt)) {
+      await finish(
+        await importCommandDocuments(db, env, job, {
+          token,
+          webEnabled,
+          signal: controller.signal,
+          permitted,
+          progress,
+        }),
+      );
+      return true;
+    }
     if (attachmentIds(job.note_content).length || context.mode !== 'note') {
       if (!currentContent(permission.document, job.revision))
         throw new Error('Die Notiz wurde inzwischen geändert. Bitte den Auftrag erneut starten.');
@@ -386,39 +438,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
         ? `${result.items.length} Ergebnisse konnten anhand der besuchten Quellen belegt werden. Weitere Vorschläge wurden wegen fehlender Belege ausgelassen.`
         : 'Es konnten keine ausreichend belegten Ergebnisse erstellt werden. Bitte den Auftrag eingrenzen oder eine andere Quelle angeben.';
     }
-    await permitted();
-    const client = await db.connect();
-    try {
-      await client.query('BEGIN');
-      const updated = await client.query(
-        "UPDATE note_commands SET status='done',stage=$4,result=$3,lease_until=NULL,updated_at=now() WHERE id=$1 AND run_token=$2 AND status='running' RETURNING id",
-        [
-          job.id,
-          token,
-          JSON.stringify(result),
-          result.partial
-            ? 'Teilergebnis'
-            : result.items.length || result.research
-              ? 'Fertig'
-              : 'Keine belegten Ergebnisse',
-        ],
-      );
-      if (updated.rowCount)
-        for (const image of images)
-          await client.query('INSERT INTO command_images(id,command_id,bytes) VALUES($1,$2,$3)', [
-            image.id,
-            job.id,
-            image.bytes,
-          ]);
-      if (updated.rowCount && !result.partial && (result.items.length || result.research))
-        await cleanCompletedPrompts(client, job.user_id, job.note_id, [job.prompt]);
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    await finish(result, images);
   } catch (error) {
     const reason = controller.signal.aborted ? controller.signal.reason : error;
     const message = reason instanceof Error ? reason.message : 'KI-Auftrag fehlgeschlagen.';

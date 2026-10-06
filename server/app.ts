@@ -1,5 +1,6 @@
 import { memorySchema } from '../src/memory-policy.js';
 import { commandRoutes, queueSavedCommands } from './command-routes.js';
+import { documentImportRoutes } from './document-import-routes.js';
 import { organizationRecordSchema, organizationDecisionSchema } from '../src/agent-policy.js';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
@@ -416,6 +417,7 @@ export async function buildApp(db: Database, env: Environment) {
     return openai(db, req.nottoUser!.id, p.endpoint, p.body, env);
   });
   commandRoutes(app, db, env);
+  documentImportRoutes(app, db, env.dataDir);
   if (env.staticDir) {
     await app.register(staticFiles, { root: resolve(env.staticDir) });
     app.setNotFoundHandler((req, reply) =>

@@ -1,3 +1,4 @@
+import { validDocumentOrigin, type DocumentOrigin } from './document-origin.js';
 export type Scope = string;
 export interface Revision {
   revision: string;
@@ -19,7 +20,7 @@ export interface Note {
   conflictOf?: string;
   collections?: string[];
   /** Standalone library source, using the same revision/sync envelope as notes. */
-  document?: { attachmentId: string; name: string; mime: string; version: number };
+  document?: { attachmentId: string; name: string; mime: string; version: number; source?: DocumentOrigin };
   aiContext?: AIContext;
   history: Revision[];
 }
@@ -213,6 +214,7 @@ export function validNote(value: unknown): value is Note {
         /^[a-f0-9-]{36}\.(pdf|docx|txt|md)$/.test(n.document.attachmentId) &&
         Number.isInteger(n.document.version) &&
         n.document.version > 0 &&
+        (n.document.source === undefined || validDocumentOrigin(n.document.source)) &&
         attachmentIds(n.content).includes(n.document.attachmentId))) &&
     (n.aiContext === undefined || validAIContext(n.aiContext)) &&
     (n.collections === undefined ||

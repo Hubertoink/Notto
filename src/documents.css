@@ -266,3 +266,8 @@
   padding-left: 10px;
   border-left: 2px solid var(--nt-line);
 }
+.document-origin {
+  margin: 8px 0 18px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}

@@ -48,7 +48,7 @@ export function commandThreads(commands: NoteCommand[]) {
     if (
       !thread.resultCommand &&
       command.status === 'done' &&
-      (command.result?.items.length || command.result?.research)
+      (command.result?.items.length || command.result?.research || command.result?.imports?.length)
     )
       thread.resultCommand = command;
   }
@@ -97,6 +97,7 @@ export const commandAnswerSchema = z.object({
 
 export interface CommandResult {
   summary: string;
+  imports?: { noteId: string; title: string; sourceUrl: string; reused: boolean; needsOCR: boolean }[];
   /** Web-search answer with provider-verified, clickable citations. */
   research?: string;
   searched?: boolean;

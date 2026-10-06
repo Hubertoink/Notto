@@ -8,6 +8,14 @@ export interface BrowserSource {
   text: string;
   targets: { id: string; text: string }[];
   links: { title: string; url: string }[];
+  document?: {
+    title: string;
+    pdfUrls: string[];
+    authors: string[];
+    doi?: string;
+    published?: string;
+    licenseUrl?: string;
+  };
 }
 export class CommandBrowser {
   private browser?: Browser;
@@ -116,7 +124,68 @@ export class CommandBrowser {
         }))
         .filter((link) => /^https?:/.test(link.url) && link.title)
         .slice(0, 100);
-      return { title: document.title, text, targets, links };
+      const helpers = {
+        meta(name: string) {
+          return [...document.querySelectorAll('meta')]
+            .filter(
+              (el) => (el.getAttribute('name') || el.getAttribute('property') || '').toLowerCase() === name,
+            )
+            .map((el) => (el.getAttribute('content') || '').trim())
+            .filter(Boolean);
+        },
+        absolute(value: string) {
+          try {
+            return new URL(value, location.href).href;
+          } catch {
+            return '';
+          }
+        },
+      };
+      const pdfUrls = [
+        ...new Set([
+          ...helpers.meta('citation_pdf_url').map(helpers.absolute),
+          ...links
+            .filter(
+              (link) =>
+                /\.pdf(?:[?#]|$)/i.test(link.url) ||
+                /(?:download|herunterladen).*pdf|pdf.*(?:download|herunterladen)/i.test(link.title),
+            )
+            .map((link) => link.url),
+        ]),
+      ]
+        .filter((url) => /^https?:/.test(url))
+        .slice(0, 5);
+      const doi = [...helpers.meta('citation_doi'), ...helpers.meta('dc.identifier')]
+        .map((value) => value.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, ''))
+        .find((value) => /^10\.\d{4,9}\/\S{1,200}$/i.test(value));
+      const license =
+        document.querySelector('a[rel~=license]')?.getAttribute('href') ||
+        links.find((link) => /^https?:\/\/(?:www\.)?creativecommons\.org\/licenses\//i.test(link.url))?.url;
+      return {
+        title: document.title,
+        text,
+        targets,
+        links,
+        document: {
+          title: (
+            helpers.meta('citation_title')[0] ||
+            document.querySelector('h1')?.textContent ||
+            document.title
+          )
+            .trim()
+            .slice(0, 500),
+          pdfUrls,
+          authors: [...new Set([...helpers.meta('citation_author'), ...helpers.meta('dc.creator')])]
+            .slice(0, 30)
+            .map((name) => name.slice(0, 200)),
+          doi,
+          published: (
+            helpers.meta('citation_publication_date')[0] || helpers.meta('citation_date')[0]
+          )?.slice(0, 100),
+          licenseUrl:
+            license && /^https?:/.test(helpers.absolute(license)) ? helpers.absolute(license) : undefined,
+        },
+      };
     });
     return { ...snapshot, url: page.url(), pageIndex: this.pages.indexOf(page) };
   }
@@ -134,6 +203,12 @@ export class CommandBrowser {
     if (!rect || rect.width > 2200 || rect.height > 2000)
       throw new Error('Bildausschnitt ist zu groß oder nicht sichtbar.');
     return element.screenshot({ type: 'jpeg', quality: 82, timeout: 10000 });
+  }
+  async cookies(url: string) {
+    publicUrl(url);
+    return ((await this.context?.cookies(url)) ?? [])
+      .map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join('; ');
   }
   async close() {
     await this.browser?.close().catch(() => {});

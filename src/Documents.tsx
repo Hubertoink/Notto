@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Action, readableDate } from './components';
+import { Action, readableDate, WebLink } from './components';
 import { PdfAttachment } from './PdfAttachment';
 import { DocumentAttachment } from './DocumentAttachment';
 import { attachmentIds, newNote, reviseNote, tagsOf, titleOf, type Note } from './domain';
@@ -313,6 +313,20 @@ export function DocumentDetail({
       <p className="muted">
         {document.name} · Version {document.version}
       </p>
+      {document.source && (
+        <div className="document-origin muted small">
+          <WebLink href={document.source.url}>Originalartikel</WebLink>
+          {document.source.authors?.length ? <span> · {document.source.authors.join(', ')}</span> : null}
+          {document.source.published ? <span> · {document.source.published}</span> : null}
+          {document.source.doi ? <span> · DOI: {document.source.doi}</span> : null}
+          {document.source.licenseUrl ? (
+            <span>
+              {' '}
+              · <WebLink href={document.source.licenseUrl}>Lizenz</WebLink>
+            </span>
+          ) : null}
+        </div>
+      )}
       <div className="document-status" role="status">
         <span className={`document-status-badge document-status-${status}`}>
           <StatusIcon size={15} aria-hidden="true" />
@@ -415,7 +429,12 @@ export function DocumentDetail({
             const selectedCollections = normalizeCollections([...collections, ...collectionInput.split(',')]);
             for (const name of selectedCollections) await createCollection(note.scope, name);
             const updated = reviseNote(note, {
-              content: documentContent(title, parsedTags, { id: document.attachmentId, name: document.name }),
+              content: documentContent(
+                title,
+                parsedTags,
+                { id: document.attachmentId, name: document.name },
+                document.source,
+              ),
               collections: selectedCollections,
             });
             await repo.put(updated, note.revision);

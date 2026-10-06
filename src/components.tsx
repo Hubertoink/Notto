@@ -18,6 +18,7 @@ import { excerptOf, titleOf } from './domain';
 import { imageLayout, noteImages, updateImageLayout } from './image-layout';
 import { parseNoteLink, relationLabels, type NoteLinkTarget } from './note-links';
 import { markdownTasks } from './note-tools';
+import { SourceImport } from './SourceImport';
 
 function NoteReferencePreview({
   targets,
@@ -264,9 +265,11 @@ function SourceIcon({ url }: { url: string }) {
 export function Sources({
   sources,
   compact = false,
+  importFrom,
 }: {
   sources: { title: string; url: string }[];
   compact?: boolean;
+  importFrom?: { noteId: string; scope: string };
 }) {
   const unique = uniqueSources(sources);
   if (!unique.length) return null;
@@ -289,6 +292,7 @@ export function Sources({
                 <WebLink href={source.url}>{source.title || new URL(source.url).hostname}</WebLink>
                 <span className="source-domain">{new URL(source.url).hostname.replace(/^www\./, '')}</span>
                 <span className="source-url">{source.url}</span>
+                {importFrom && <SourceImport source={source} from={importFrom} />}
               </div>
             </li>
           ))}
@@ -300,6 +304,7 @@ export function Sources({
       {unique.map((source) => (
         <li key={source.url}>
           <WebLink href={source.url}>{source.title}</WebLink>
+          {importFrom && <SourceImport source={source} from={importFrom} />}
         </li>
       ))}
     </ul>

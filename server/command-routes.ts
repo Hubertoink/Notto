@@ -31,7 +31,11 @@ export async function queueSavedCommands(
         [user, note.id],
       )
     ).rows
-      .filter((command) => command.result?.items?.length || command.result?.research)
+      .filter(
+        (command) =>
+          !command.result?.partial &&
+          (command.result?.items?.length || command.result?.research || command.result?.imports?.length),
+      )
       .map((command) => command.prompt);
     if (completed.length) note = (await cleanCompletedPrompts(client, user, note.id, completed)) || note;
   }

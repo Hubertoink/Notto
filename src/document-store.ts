@@ -1,11 +1,9 @@
 import { newNote, reviseNote, tagsOf, titleOf, type Attachment, type Note } from './domain';
 import { repo } from './repository';
 import { extract, knowledge, type Evidence } from './intelligence';
+import { documentContent } from './document-content';
+export { documentContent, safeLabel } from './document-content';
 
-export const safeLabel = (value: string) => value.replace(/[\[\]\\\r\n]/g, '').trim();
-export function documentContent(title: string, tags: string[], attachment: Pick<Attachment, 'id' | 'name'>) {
-  return `${safeLabel(title) || safeLabel(attachment.name)}\n\n${tags.map((tag) => `#${tag}`).join(' ')}\n\n[${safeLabel(attachment.name)}](attachments/${attachment.id})`;
-}
 export async function createDocument(
   scope: string,
   attachment: Attachment,

@@ -95,8 +95,8 @@ export function NoteCommands({
     const completed = commands.filter(
       (command) =>
         command.status === 'done' &&
-        (command.result?.items.length || command.result?.research) &&
-        drafts.includes(command.prompt) &&
+        (command.result?.items.length || command.result?.research || command.result?.imports?.length) &&
+        (drafts.includes(command.prompt) || !!command.result?.imports?.length) &&
         !syncedCompletions.current.has(command.id),
     );
     if (!completed.length) return;
@@ -239,7 +239,8 @@ export function NoteCommands({
                 ) : command.result?.partial ||
                   (command.status === 'done' &&
                     !command.result?.items.length &&
-                    !command.result?.research) ? (
+                    !command.result?.research &&
+                    !command.result?.imports?.length) ? (
                   <CircleAlert size={15} />
                 ) : command.status === 'done' ? (
                   <Check size={15} />
@@ -289,6 +290,28 @@ export function NoteCommands({
                 )}
                 {(!result.research || result.partial) && <p className="command-summary">{result.summary}</p>}
                 {result.research && <NoteMarkdown content={result.research} scope={scope} />}
+                {!!result.imports?.length && (
+                  <ul className="command-imports">
+                    {result.imports.map((document) => (
+                      <li key={document.noteId}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            window.dispatchEvent(
+                              new CustomEvent('notto-open-note', { detail: { id: document.noteId, scope } }),
+                            )
+                          }
+                        >
+                          {document.title}
+                        </button>
+                        <small className="muted">
+                          {document.reused ? 'Vorhandenes Dokument verknüpft' : 'Gespeichert und verknüpft'}
+                          {document.needsOCR ? ' · Texterkennung erforderlich' : ' · Text eingelesen'}
+                        </small>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="command-results">
                   {result.items.map((item, index) => (
                     <section className="command-card" key={index}>
@@ -309,13 +332,23 @@ export function NoteCommands({
                         {item.imageCaption && <small>{item.imageCaption}</small>}
                         <p>{item.detail}</p>
                         {item.imageError && <small>Screenshot nicht verfügbar: {item.imageError}</small>}
-                        {item.url && <Sources sources={[{ title: item.title, url: item.url }]} compact />}
+                        {item.url && (
+                          <Sources
+                            sources={[{ title: item.title, url: item.url }]}
+                            compact
+                            importFrom={noteId ? { noteId, scope } : undefined}
+                          />
+                        )}
                         {item.citation && <CitationLink citation={item.citation} scope={scope} />}
                       </div>
                     </section>
                   ))}
                 </div>
-                <Sources sources={result.sources} compact />
+                <Sources
+                  sources={result.sources}
+                  compact
+                  importFrom={noteId ? { noteId, scope } : undefined}
+                />
                 {onInsert && (
                   <button
                     type="button"

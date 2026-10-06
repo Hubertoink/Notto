@@ -191,3 +191,23 @@
     animation: none;
   }
 }
+.command-imports {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.command-imports > li {
+  padding: 12px;
+  border: 1px solid var(--nt-line);
+  border-radius: var(--nt-radius);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.command-imports button {
+  text-align: left;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}

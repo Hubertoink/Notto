@@ -35,6 +35,8 @@ export function groundAnalysis(
           .split(/\s+/u)
           .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
           .join('\\s+');
+        // Only PDFs may contain a word split by a hyphen at a physical line break.
+        const pdfPattern = pattern.replace(/(\p{L})(?=\p{L})/gu, '$1(?:-\\s*\\n\\s*)?');
         for (const source of sources) {
           if (
             suggestion.kind === 'insight' &&
@@ -43,7 +45,9 @@ export function groundAnalysis(
             continue;
           const quote = source.text.includes(suggestion.quote)
             ? suggestion.quote
-            : source.text.match(new RegExp(pattern, 'u'))?.[0];
+            : source.text.match(
+                new RegExp(source.attachment?.endsWith('.pdf') ? pdfPattern : pattern, 'u'),
+              )?.[0];
           if (quote) return { ...suggestion, quote };
         }
       }

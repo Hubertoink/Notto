@@ -49,3 +49,20 @@ it('still requires an actual PDF source for PDF insights', () => {
     ]),
   ).toThrow('KI-Beleg');
 });
+it('restores PDF word splits at line breaks as literal original excerpts', () => {
+  const text = 'Eigenverantwor-\n tung und motivationale Bin- \n dung stärken.';
+  const grounded = groundAnalysis(
+    result('Eigenverantwortung und motivationale Bindung stärken.', 'insight'),
+    [{ text, attachment: 'article.pdf' }],
+  );
+  expect(grounded.suggestions[0].quote).toBe(text);
+  expect(text.includes(grounded.suggestions[0].quote)).toBe(true);
+});
+it('does not remove ordinary hyphens or reinterpret word splits outside PDF sources', () => {
+  for (const source of [
+    { text: 'Eigenverantwor-\n tung', attachment: 'article.txt' },
+    { text: 'Eigen-Verantwortung', attachment: 'article.pdf' },
+    { text: 'Eigenverantwor- tung', attachment: 'article.pdf' },
+  ])
+    expect(() => groundAnalysis(result('Eigenverantwortung'), [source])).toThrow('KI-Beleg');
+});

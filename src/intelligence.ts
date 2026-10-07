@@ -13,6 +13,7 @@ import { diverseHits, lexicalScore, splitEvidence } from './retrieval';
 import {
   analysisSchema,
   analysisInstructions,
+  groundAnalysis,
   noteAllowed,
   noteExclusionReason,
   evidenceCurrent,
@@ -294,20 +295,10 @@ export async function analyze(note: Note) {
   );
   if (sources.reduce((s, p) => s + p.text.length, 0) > 60000)
     throw new Error('Diese Notiz ist für eine einzelne Analyse zu lang (maximal 60.000 Zeichen).');
-  const result = await structured(note.scope, analysisInstructions, sources, suggestionSchema);
-  if (
-    result.suggestions.some(
-      (s) =>
-        !s.quote.trim() ||
-        !sources.some(
-          (p) =>
-            p.text.includes(s.quote) &&
-            (s.kind !== 'insight' ||
-              (p.attachment?.endsWith('.pdf') && !p.text.startsWith('[Kein Text erkannt.'))),
-        ),
-    )
-  )
-    throw new Error('Analyse verworfen: Ein Beleg stimmt nicht mit der Quelle überein.');
+  const result = groundAnalysis(
+    await structured(note.scope, analysisInstructions, sources, suggestionSchema),
+    sources,
+  );
   const current = await repo.get(note.scope, note.id);
   if (!current || !eligible(current) || !currentAnalysis(current, contentRevision(note))) return;
   await knowledge.append({ ...note, revision: contentRevision(note) }, 'analysis', result);

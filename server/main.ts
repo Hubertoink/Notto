@@ -3,6 +3,7 @@ import { migrate } from './database.js';
 import { buildApp, type Environment } from './app.js';
 import { workOnce } from './worker.js';
 import { queueExistingRelations } from './note-relations.js';
+import { resumeAttachmentAnalyses } from './attachment-jobs.js';
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL fehlt.');
 const db = new Pool({ connectionString: databaseUrl, max: 5 });
@@ -24,6 +25,7 @@ await migrate(
     : undefined,
 );
 if (process.env.NOTTO_ROLE === 'worker') {
+  await resumeAttachmentAnalyses(db, env.dataDir);
   await queueExistingRelations(db);
   let stopping = false;
   process.on('SIGTERM', () => {

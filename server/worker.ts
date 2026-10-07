@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { contentRevision, currentContent } from '../src/domain.js';
 import { analysisContent, currentAnalysis } from '../src/analysis-current.js';
-import { analysisSchema, analysisInstructions, noteAllowed } from '../src/evidence-policy.js';
+import { analysisSchema, analysisInstructions, groundAnalysis, noteAllowed } from '../src/evidence-policy.js';
 import { splitEvidence } from '../src/retrieval.js';
 import { sourceTexts } from './sources.js';
 import { findServerRelations } from './note-relations.js';
@@ -199,21 +199,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         },
         env,
       );
-      const result = analysis.parse(JSON.parse(text(response)));
-      if (
-        result.suggestions.some(
-          (s) =>
-            !s.quote.trim() ||
-            !evidence.some(
-              (source) =>
-                source.text.includes(s.quote) &&
-                (s.kind !== 'insight' ||
-                  (source.attachment?.endsWith('.pdf') && !source.text.startsWith('[Kein Text erkannt.'))),
-            ),
-        )
-      )
-        throw new Error('KI-Beleg stimmt nicht mit der Originalquelle überein.');
-      data = result;
+      data = groundAnalysis(analysis.parse(JSON.parse(text(response))), evidence);
       kind = 'analysis';
     } else {
       if (!c.autoResearch) {

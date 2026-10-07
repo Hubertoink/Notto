@@ -42,6 +42,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       DATA_DIR: /data/attachments
       NOTTO_ROLE: worker
+    volumes:
+      - attachments:/data/attachments
     depends_on:
       db:
         condition: service_healthy

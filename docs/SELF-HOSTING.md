@@ -17,6 +17,7 @@ Ziel: **https://noto-app.de** (ein t), Projekt `p-wqa66m` / `77a026ee-99bd-4c29-
 - Stack `4ffda78f-d86e-42df-b037-fd189425d44f`: App/API, PostgreSQL und Hintergrundverarbeitung.
 - Stack `d68be178-038d-40ff-9773-016376a4f54a`: passwortgeschützte Image-Registry unter `p-wqa66m.project.space`. Die Projektadresse ist deshalb keine zweite Notto-Webadresse.
 - `database` und `attachments` sind dauerhafte Volumes. Die Datenbank ist nicht öffentlich erreichbar. HTTP wird durch Mittwald unter der Domain mit HTTPS bereitgestellt.
+- **App und Worker benötigen dasselbe Volume `attachments:/data/attachments`** und denselben `DATA_DIR`. Der Worker liest Anhänge für die KI und speichert importierte Artikel; beide Dienste benötigen Schreibzugriff. Ab 1.5.8 nimmt er beim Start daran gescheiterte Analysen wieder auf, sobald die Dateien lesbar sind und die aktuelle Notiz weiterhin für automatische KI-Prüfungen freigegeben ist.
 - Die Webapp und `/api` werden aus demselben Container ausgeliefert. Windows spricht dieselbe API an. Eine Supabase-Installation ist für diesen Betrieb nicht erforderlich. Alte Supabase-Verbindungen bleiben ausschließlich aus Kompatibilitätsgründen lesbar.
 
 ## Erster Zugang
@@ -33,7 +34,7 @@ Ab Version 1.5.3 dürfen ausdrücklich gestartete KI-Aufträge standardmäßig b
 
 In Notto anschließend **Wissen & KI → KI einrichten → KI aktivieren**. Die Oberfläche zeigt an, ob der Server einen Schlüssel hat. Analyse und Recherche laufen nach separater Aktivierung auch bei geschlossener App. Der Worker verarbeitet gespeicherte Revisionen, prüft Belege und hält Entscheidungen getrennt. Maximal drei Versuche je Job, fünf Minuten Abstand, begrenzte Laufzeit-Lease zur Wiederaufnahme nach Absturz. Serverseitig maximal 100 API-Anfragen pro Benutzer/UTC-Tag; weitere lokale Limits können früher greifen. Keine Euro-Kostengarantie.
 
-PDF-Text und OCR werden über die bestehenden Anhangfunktionen erzeugt und als separate Erkenntnisse synchronisiert. Der Hintergrundworker verwendet die bereits synchronisierten Extraktionen; nach einer späteren Extraktion eine Analyse bei Bedarf manuell wiederholen. Diktat und interaktive Suche verwenden ebenfalls den serverseitigen OpenAI-Schlüssel bei angemeldetem Konto. Das lokale Offline-Notizbuch kann weiterhin optional einen eigenen Windows-Schlüssel verwenden.
+PDF-Text und OCR werden über die bestehenden Anhangfunktionen erzeugt und als separate Erkenntnisse synchronisiert. Der Hintergrundworker verwendet passende synchronisierte Extraktionen oder liest den Text direkt aus dem gemeinsamen Anhangspeicher; nach einer späteren OCR-Extraktion eine Analyse bei Bedarf manuell wiederholen. Diktat und interaktive Suche verwenden ebenfalls den serverseitigen OpenAI-Schlüssel bei angemeldetem Konto. Das lokale Offline-Notizbuch kann weiterhin optional einen eigenen Windows-Schlüssel verwenden.
 
 ## Aktualisieren
 

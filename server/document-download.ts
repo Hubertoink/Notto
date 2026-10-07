@@ -5,12 +5,24 @@ import { CommandBrowser } from './command-browser.js';
 import { sourceIdentity, type DocumentOrigin } from '../src/document-origin.js';
 
 const MAX_BYTES = 12 * 1024 * 1024;
+export class DocumentDownloadError extends Error {
+  readonly statusCode: number;
+  constructor(
+    message: string,
+    readonly availability: 'unavailable' | 'unknown',
+  ) {
+    super(message);
+    this.statusCode = availability === 'unknown' ? 424 : 422;
+  }
+}
 export async function fetchDocumentBytes(
   value: string,
   signal: AbortSignal,
   cookies?: (url: string) => Promise<string>,
+  probe = false,
 ) {
   let url = publicUrl(value);
+  let range = probe;
   for (let redirects = 0; redirects <= 5; redirects++) {
     signal.throwIfAborted();
     const target = await resolvePublic(url.hostname);
@@ -28,6 +40,7 @@ export async function fetchDocumentBytes(
               Accept: 'application/pdf,text/html;q=0.9',
               'Accept-Encoding': 'identity',
               'User-Agent': 'Noto document import/1.0',
+              ...(range ? { Range: 'bytes=0-4095' } : {}),
               ...(cookie ? { Cookie: cookie } : {}),
             },
           },
@@ -52,7 +65,13 @@ export async function fetchDocumentBytes(
               if (size > maximum) {
                 incoming.destroy();
                 reject(new Error('Die Datei überschreitet die zulässige Größe von 12 MB.'));
-              } else chunks.push(chunk);
+              } else {
+                chunks.push(chunk);
+                if (probe && size >= 5 && Buffer.concat(chunks).subarray(0, 5).toString() === '%PDF-') {
+                  done({ bytes: Buffer.concat(chunks).subarray(0, 4096), status, type });
+                  incoming.destroy();
+                }
+              }
             });
             incoming.on('error', reject);
             incoming.on('end', () => done({ bytes: Buffer.concat(chunks), status, type }));
@@ -66,6 +85,12 @@ export async function fetchDocumentBytes(
       url = publicUrl(new URL(response.location, url).href);
       continue;
     }
+    if (range && [405, 416].includes(response.status)) {
+      // Some publishers reject range requests; an ordinary GET is still read only to the PDF header.
+      range = false;
+      redirects--;
+      continue;
+    }
     if (response.status < 200 || response.status >= 300)
       throw new Error(`Quelle nicht erreichbar (HTTP ${response.status}).`);
     return { ...response, url: url.href };
@@ -73,7 +98,7 @@ export async function fetchDocumentBytes(
   throw new Error('Zu viele Weiterleitungen beim PDF-Download.');
 }
 
-export async function downloadDocument(url: string, title = '', parentSignal?: AbortSignal) {
+export async function resolveDocumentFile(url: string, parentSignal?: AbortSignal, probe = false) {
   const signal = parentSignal
     ? AbortSignal.any([parentSignal, AbortSignal.timeout(60000)])
     : AbortSignal.timeout(60000);
@@ -87,7 +112,7 @@ export async function downloadDocument(url: string, title = '', parentSignal?: A
     let file: Awaited<ReturnType<typeof fetchDocumentBytes>> | undefined;
     let initialError: unknown;
     try {
-      file = await fetchDocumentBytes(url, signal);
+      file = await fetchDocumentBytes(url, signal, undefined, probe);
     } catch (error) {
       signal.throwIfAborted();
       initialError = error;
@@ -101,7 +126,12 @@ export async function downloadDocument(url: string, title = '', parentSignal?: A
       const errors: string[] = [];
       for (const candidate of candidates.slice(0, 3)) {
         try {
-          const downloaded = await fetchDocumentBytes(candidate, signal, (value) => browser.cookies(value));
+          const downloaded = await fetchDocumentBytes(
+            candidate,
+            signal,
+            (value) => browser.cookies(value),
+            probe,
+          );
           if (isPdf(downloaded.bytes)) {
             file = downloaded;
             break;
@@ -113,17 +143,48 @@ export async function downloadDocument(url: string, title = '', parentSignal?: A
         }
       }
       if (!file || !isPdf(file.bytes))
-        throw new Error(
-          `Keine frei herunterladbare PDF gefunden.${errors[0] ? ` ${errors[0]}` : initialError instanceof Error ? ` ${initialError.message}` : ''}`,
+        throw new DocumentDownloadError(
+          `Keine frei herunterladbare PDF gefunden. Der Quellenlink bleibt nutzbar.${errors[0] ? ` ${errors[0]}` : initialError instanceof Error ? ` ${initialError.message}` : ''}`,
+          errors.some((error) => /HTTP 5\d\d|timeout|socket|ECONN|ENOTFOUND/i.test(error))
+            ? 'unknown'
+            : 'unavailable',
         );
     }
     signal.throwIfAborted();
+    return { file, metadata };
+  } catch (error) {
+    parentSignal?.throwIfAborted();
+    if (error instanceof DocumentDownloadError) throw error;
+    if (error instanceof Error && /HTTP (401|402|403|404|410)\b/.test(error.message))
+      throw new DocumentDownloadError(
+        'Kein öffentlich zugängliches PDF gefunden. Die Quelle ist nicht erreichbar oder benötigt einen Zugang.',
+        'unavailable',
+      );
+    throw new DocumentDownloadError(
+      'Die Quelle konnte derzeit nicht auf ein zugängliches PDF geprüft werden. Bitte später erneut prüfen.',
+      'unknown',
+    );
+  } finally {
+    signal.removeEventListener('abort', close);
+    await browser.close();
+  }
+}
+
+export async function downloadDocument(url: string, title = '', parentSignal?: AbortSignal) {
+  const { file, metadata } = await resolveDocumentFile(url, parentSignal);
+  const signal = parentSignal
+    ? AbortSignal.any([parentSignal, AbortSignal.timeout(30000)])
+    : AbortSignal.timeout(30000);
+  try {
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const loading = pdfjs.getDocument({ data: new Uint8Array(file.bytes), useSystemFonts: true });
     try {
       const pdf = await loading.promise;
       if (pdf.numPages > 100)
-        throw new Error('Das PDF hat mehr als 100 Seiten; bitte eine kürzere Fassung importieren.');
+        throw new DocumentDownloadError(
+          'Das PDF hat mehr als 100 Seiten; bitte eine kürzere Fassung importieren.',
+          'unavailable',
+        );
       const info = await pdf.getMetadata().catch(() => undefined);
       const pdfTitle = (info?.info as { Title?: string } | undefined)?.Title;
       const name = (metadata?.title || pdfTitle || title || 'Importierter Artikel').slice(0, 500);
@@ -159,8 +220,12 @@ export async function downloadDocument(url: string, title = '', parentSignal?: A
     } finally {
       await loading.destroy();
     }
-  } finally {
-    signal.removeEventListener('abort', close);
-    await browser.close();
+  } catch (error) {
+    parentSignal?.throwIfAborted();
+    if (error instanceof DocumentDownloadError) throw error;
+    throw new DocumentDownloadError(
+      'Die Quelle liefert kein lesbares PDF-Dokument. Der Quellenlink bleibt nutzbar.',
+      'unavailable',
+    );
   }
 }

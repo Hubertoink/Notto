@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { buildApp } from './app';
 import { downloadDocument } from './document-download';
 import { importWebDocument } from './document-import';
+import { checkDocumentAvailability } from './document-availability';
 import { commandImportsDocuments } from './command-document-import';
 import { workCommandOnce } from './command-worker';
 import { openai } from './openai';
@@ -16,6 +17,7 @@ import { newNote, reviseNote, validNote, attachmentIds, contentRevision } from '
 import type { Database } from './database';
 
 vi.mock('./document-download', () => ({ downloadDocument: vi.fn() }));
+vi.mock('./document-availability', () => ({ checkDocumentAvailability: vi.fn() }));
 vi.mock('./openai', () => ({ openai: vi.fn() }));
 vi.mock('./command-search', () => ({ searchCommand: vi.fn() }));
 vi.mock('./command-browser', () => ({
@@ -118,6 +120,9 @@ beforeEach(async () => {
   vi.mocked(downloadDocument).mockReset().mockResolvedValue(downloaded);
   vi.mocked(openai).mockReset().mockResolvedValue(plan());
   vi.mocked(searchCommand).mockReset();
+  vi.mocked(checkDocumentAvailability)
+    .mockReset()
+    .mockResolvedValue({ status: 'available', message: 'PDF vorhanden.' });
 });
 afterAll(async () => {
   await app.close();
@@ -125,6 +130,55 @@ afterAll(async () => {
   await rm(dataDir, { recursive: true, force: true });
 });
 const rows = async (table: string) => (await pg.query<any>(`SELECT * FROM ${table}`)).rows;
+it('checks owned sources without importing documents or calling OpenAI and isolates accounts', async () => {
+  const request = (owner: string) =>
+    app.inject({
+      method: 'PUT',
+      url: '/api/documents/check',
+      headers: headers(owner),
+      payload: { noteId: note.id, url },
+    });
+  expect((await request(other)).statusCode).toBe(404);
+  expect(checkDocumentAvailability).not.toHaveBeenCalled();
+  const result = await request(user);
+  expect(result.statusCode).toBe(200);
+  expect(result.json().availability.status).toBe('available');
+  expect(downloadDocument).not.toHaveBeenCalled();
+  expect(openai).not.toHaveBeenCalled();
+  expect(await rows('attachments')).toHaveLength(0);
+  expect(await rows('knowledge')).toHaveLength(0);
+});
+it('returns an ordinary availability result for sources without a downloadable PDF', async () => {
+  vi.mocked(checkDocumentAvailability).mockResolvedValue({
+    status: 'unavailable',
+    message: 'Keine frei herunterladbare PDF gefunden.',
+  });
+  const result = await app.inject({
+    method: 'PUT',
+    url: '/api/documents/check',
+    headers: headers(),
+    payload: { noteId: note.id, url, refresh: true },
+  });
+  expect(result.statusCode).toBe(200);
+  expect(result.json().availability.status).toBe('unavailable');
+  expect(checkDocumentAvailability).toHaveBeenCalledWith(url, true);
+  expect(openai).not.toHaveBeenCalled();
+});
+it('keeps expected download failures readable rather than turning them into generic server errors', async () => {
+  vi.mocked(downloadDocument).mockRejectedValue(
+    Object.assign(new Error('Keine frei herunterladbare PDF gefunden.'), { statusCode: 422 }),
+  );
+  const result = await app.inject({
+    method: 'PUT',
+    url: '/api/documents/import',
+    headers: headers(),
+    payload: { noteId: note.id, url },
+  });
+  expect(result.statusCode).toBe(422);
+  expect(result.json().error).toContain('Keine frei');
+  expect(await rows('attachments')).toHaveLength(0);
+  expect(await rows('knowledge')).toHaveLength(0);
+});
 async function startImport(web = true) {
   const id = randomUUID();
   await pg.query(

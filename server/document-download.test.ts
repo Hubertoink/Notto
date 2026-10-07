@@ -1,7 +1,9 @@
-import { afterAll, beforeAll, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { fetchDocumentBytes, downloadDocument } from './document-download';
+import { checkDocumentAvailability } from './document-availability';
+const browserActivity = vi.hoisted(() => ({ active: 0, peak: 0 }));
 const metadata = vi.hoisted(() => ({
   title: 'Originalartikel',
   authors: ['Autorin'],
@@ -25,7 +27,13 @@ vi.mock('./browser-network', async (original) => {
 });
 vi.mock('./command-browser', () => ({
   CommandBrowser: class {
-    read = vi.fn(async () => ({ document: metadata }));
+    read = vi.fn(async () => {
+      browserActivity.active++;
+      browserActivity.peak = Math.max(browserActivity.peak, browserActivity.active);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      browserActivity.active--;
+      return { document: metadata };
+    });
     cookies = vi.fn(async () => 'anonymous=1');
     close = vi.fn(async () => {});
   },
@@ -53,7 +61,11 @@ function pdf() {
   return Buffer.from(result);
 }
 let base: string;
+let requestedRange: string | undefined;
+const requests = new Map<string, number>();
 const fixture = createServer((req, res) => {
+  requests.set(req.url!, (requests.get(req.url!) ?? 0) + 1);
+  requestedRange = req.headers.range;
   if (req.url === '/redirect') {
     res.writeHead(302, { location: '/pdf' });
     res.end();
@@ -66,13 +78,26 @@ const fixture = createServer((req, res) => {
   } else if (req.url === '/stream') {
     res.writeHead(200, { 'content-type': 'application/pdf' });
     res.end(Buffer.alloc(13 * 1024 * 1024));
-  } else if (req.url === '/pdf' || (req.url === '/cookie-pdf' && req.headers.cookie === 'anonymous=1')) {
+  } else if (req.url === '/blocked' || req.url === '/transient') {
+    res.writeHead(req.url === '/blocked' ? 403 : 503, { 'content-type': 'text/html' });
+    res.end('Nicht verfügbar');
+  } else if (req.url === '/no-range.pdf') {
+    res.writeHead(req.headers.range ? 416 : 200, { 'content-type': 'application/pdf' });
+    res.end(req.headers.range ? '' : pdf());
+  } else if (
+    req.url === '/pdf' ||
+    req.url === '/probe.pdf' ||
+    (req.url === '/cookie-pdf' && req.headers.cookie === 'anonymous=1')
+  ) {
     res.writeHead(200, { 'content-type': 'application/pdf' });
     res.end(pdf());
   } else {
     res.writeHead(200, { 'content-type': 'text/html' });
     res.end('<html>Anmelden</html>');
   }
+});
+beforeEach(() => {
+  metadata.pdfUrls = [`${base}/cookie-pdf`];
 });
 beforeAll(async () => {
   await new Promise<void>((done) => fixture.listen(0, '127.0.0.1', done));
@@ -111,4 +136,56 @@ it('resolves publisher PDF metadata with anonymous cookies and extracts real pag
 it('rejects an HTML login page pretending to be the PDF', async () => {
   metadata.pdfUrls = [`${base}/fake.pdf`];
   await expect(downloadDocument(`${base}/article`)).rejects.toThrow('Keine frei herunterladbare PDF');
+});
+it('checks direct PDFs using a bounded range request without reading or storing the whole file', async () => {
+  const result = await fetchDocumentBytes(`${base}/probe.pdf`, AbortSignal.timeout(5000), undefined, true);
+  expect(requestedRange).toBe('bytes=0-4095');
+  expect(result.bytes.length).toBeLessThanOrEqual(4096);
+  expect(result.bytes.subarray(0, 5).toString()).toBe('%PDF-');
+});
+it('shares pending and cached checks without making a model request', async () => {
+  const fetch = vi.spyOn(globalThis, 'fetch');
+  const before = requests.get('/probe.pdf') ?? 0;
+  try {
+    const results = await Promise.all([
+      checkDocumentAvailability(`${base}/probe.pdf`),
+      checkDocumentAvailability(`${base}/probe.pdf`),
+    ]);
+    expect(results.every((value) => value.status === 'available')).toBe(true);
+    await checkDocumentAvailability(`${base}/probe.pdf`);
+    expect(requests.get('/probe.pdf')).toBe(before + 1);
+    expect(fetch).not.toHaveBeenCalled();
+  } finally {
+    fetch.mockRestore();
+  }
+});
+it('falls back to a bounded ordinary GET when a publisher rejects range requests', async () => {
+  const result = await checkDocumentAvailability(`${base}/no-range.pdf`);
+  expect(result.status).toBe('available');
+  expect(requests.get('/no-range.pdf')).toBe(2);
+  expect(requestedRange).toBeUndefined();
+});
+it('classifies absent and protected PDFs as unavailable and lets a user explicitly recheck', async () => {
+  metadata.pdfUrls = [`${base}/fake.pdf`];
+  expect((await checkDocumentAvailability(`${base}/without-pdf`)).status).toBe('unavailable');
+  metadata.pdfUrls = [`${base}/blocked`];
+  expect((await checkDocumentAvailability(`${base}/protected-article`)).status).toBe('unavailable');
+  metadata.pdfUrls = [`${base}/cookie-pdf`];
+  expect((await checkDocumentAvailability(`${base}/without-pdf`)).status).toBe('unavailable');
+  expect((await checkDocumentAvailability(`${base}/without-pdf`, true)).status).toBe('available');
+});
+it('does not label an upstream outage as a missing PDF', async () => {
+  metadata.pdfUrls = [`${base}/transient`];
+  expect((await checkDocumentAvailability(`${base}/temporarily-unreachable`)).status).toBe('unknown');
+});
+it('runs at most two publisher checks at a time', async () => {
+  browserActivity.peak = 0;
+  const results = await Promise.all(
+    Array.from({ length: 6 }, (_, index) => checkDocumentAvailability(`${base}/parallel-article-${index}`)),
+  );
+  expect(results.every((value) => value.status === 'available')).toBe(true);
+  expect(browserActivity.peak).toBe(2);
+});
+it('rejects private URLs before launching a check', () => {
+  expect(() => checkDocumentAvailability('http://127.0.0.1/secret')).toThrow('öffentliche');
 });

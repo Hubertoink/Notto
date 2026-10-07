@@ -23,6 +23,40 @@ export async function sourceTexts(
       .filter((r) => r.kind === 'extraction' && r.data?.id === id && (!r.noteId || r.noteId === note.id))
       .sort((a, b) => b.at.localeCompare(a.at))[0];
     if (!extraction && (id.endsWith('.pdf') || isTextDocument(id))) {
+      // Attachment IDs are immutable within a user. Reuse the extraction, while
+      // retaining a note-specific record for consent and citation freshness checks.
+      const shared = (
+        await db.query(
+          "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'kind'='extraction' AND document->'data'->>'id'=$2 ORDER BY document->>'at' DESC,id DESC LIMIT 1",
+          [userId, id],
+        )
+      ).rows[0]?.document;
+      if (shared?.kind === 'extraction' && shared.data?.id === id && Array.isArray(shared.data.pages)) {
+        extraction = {
+          ...shared,
+          id: randomUUID(),
+          scope: userId,
+          noteId: note.id,
+          revision: contentRevision(note),
+          at: new Date().toISOString(),
+          data: {
+            ...shared.data,
+            pages: shared.data.pages.map((page: unknown) => ({
+              ...evidenceSchema.parse(page),
+              noteId: note.id,
+              revision: contentRevision(note),
+            })),
+          },
+        };
+        await db.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [
+          userId,
+          extraction.id,
+          JSON.stringify(extraction),
+        ]);
+        records.push(extraction);
+      }
+    }
+    if (!extraction && (id.endsWith('.pdf') || isTextDocument(id))) {
       if (!dataDir) throw new Error('PDF-Verarbeitung: Anhangspeicher fehlt.');
       // IDs from legacy notebooks are not necessarily valid filesystem names.
       if (!/^[a-f0-9-]{36}\.(pdf|docx|txt|md)$/.test(id)) throw new Error('Ungültige Dokumentreferenz.');
@@ -76,6 +110,7 @@ export async function sourceTexts(
         extraction.id,
         JSON.stringify(extraction),
       ]);
+      records.push(extraction);
     }
     if (extraction)
       for (const page of extraction.data.pages ?? []) {

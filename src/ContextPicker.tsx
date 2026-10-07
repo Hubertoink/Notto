@@ -147,8 +147,9 @@ export function ContextPicker({
             : 'Webrecherche für KI-Aufträge ist in „Wissen & KI“ ausgeschaltet.'}
       </p>
       <p className="muted small">
-        Ausgeschlossene Quellen bleiben ausgeschlossen. Direkt gewählte Dokumente werden vollständig gelesen;
-        im weiteren Kontext sucht Noto passende Textstellen.
+        Anhänge werden aufbereitet; passende Originalstellen fließen in die Analyse ein. Vollständige
+        Zusammenfassungen lesen alle verfügbaren Abschnitte schrittweise. Ausgeschlossene Quellen bleiben
+        ausgeschlossen.
       </p>
     </fieldset>
   );

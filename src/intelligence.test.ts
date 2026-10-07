@@ -130,7 +130,7 @@ it('accepts PDF reading notes only when the quote occurs on an extracted PDF pag
   };
   api.mockResolvedValue(response([insight]));
   await analyze(note);
-  expect((await knowledge.list('local')).find((record) => record.kind === 'analysis')?.data).toEqual({
+  expect((await knowledge.list('local')).find((record) => record.kind === 'analysis')?.data).toMatchObject({
     suggestions: [insight],
   });
   api.mockResolvedValue(response([{ ...insight, quote: 'Artikel für die Jugendarbeit' }]));

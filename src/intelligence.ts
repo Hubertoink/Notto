@@ -10,6 +10,7 @@ import { attachmentIds, contentRevision, currentContent, titleOf, type Note } fr
 import { analysisContent, currentAnalysis } from './analysis-current';
 import { withoutNoteCommands, commandEvidence } from './note-command';
 import { diverseHits, lexicalScore, splitEvidence } from './retrieval';
+import { selectDocumentContext, type ContextReport } from './document-context';
 import {
   analysisSchema,
   analysisInstructions,
@@ -59,6 +60,7 @@ export interface KnowledgeRecord {
 }
 export interface Analysis {
   suggestions: Suggestion[];
+  context?: ContextReport;
 }
 export interface Decision {
   key: string;
@@ -287,21 +289,33 @@ export async function analyze(note: Note) {
     );
   const records = await knowledge.list(note.scope);
   for (const id of attachmentIds(note.content).filter((id) => /\.(pdf|docx|txt|md)$/.test(id))) {
-    if (!records.some((r) => r.kind === 'extraction' && r.noteId === note.id && (r.data as any).id === id))
-      await extract(note, id);
+    if (!records.some((r) => r.kind === 'extraction' && r.noteId === note.id && (r.data as any).id === id)) {
+      const shared = records
+        .filter((r) => r.scope === note.scope && r.kind === 'extraction' && (r.data as any).id === id)
+        .sort((a, b) => b.at.localeCompare(a.at))[0];
+      if (shared) {
+        const data = shared.data as { id: string; pages: Evidence[]; ocr?: boolean };
+        await knowledge.append(note, 'extraction', {
+          ...data,
+          pages: data.pages.map((page) => ({ ...page, noteId: note.id, revision: contentRevision(note) })),
+        });
+      } else await extract(note, id);
+    }
   }
   const sources = (await evidence(note)).map((source) =>
     source.attachment ? source : { ...source, text: analysisContent(source.text) },
   );
-  if (sources.reduce((s, p) => s + p.text.length, 0) > 60000)
-    throw new Error('Diese Notiz ist für eine einzelne Analyse zu lang (maximal 60.000 Zeichen).');
+  const prepared = selectDocumentContext(sources, note.id, analysisContent(note.content));
   const result = groundAnalysis(
-    await structured(note.scope, analysisInstructions, sources, suggestionSchema),
-    sources,
+    await structured(note.scope, analysisInstructions, prepared.sources, suggestionSchema),
+    prepared.sources,
   );
   const current = await repo.get(note.scope, note.id);
   if (!current || !eligible(current) || !currentAnalysis(current, contentRevision(note))) return;
-  await knowledge.append({ ...note, revision: contentRevision(note) }, 'analysis', result);
+  await knowledge.append({ ...note, revision: contentRevision(note) }, 'analysis', {
+    ...result,
+    context: prepared.report,
+  });
   await (await import('./relation-client')).findNoteRelations(note);
   if (config(note.scope).autoResearch)
     for (const { item } of researchCandidates(result.suggestions)) await research(note, item, true);

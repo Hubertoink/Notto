@@ -29,8 +29,19 @@ export function lexicalScore(chunk: SearchChunk, query: string) {
 export function splitEvidence<T extends SearchChunk>(sources: T[]): T[] {
   return sources.flatMap((source) => {
     const chunks: T[] = [];
-    for (let offset = 0; offset < source.text.length; offset += 1800)
-      chunks.push({ ...source, text: source.text.slice(offset, offset + 2000) });
+    for (let offset = 0; offset < source.text.length;) {
+      let end = Math.min(source.text.length, offset + 2000);
+      if (end < source.text.length) {
+        const paragraph = source.text.lastIndexOf('\n\n', end);
+        const sentence = source.text.lastIndexOf('. ', end);
+        const boundary =
+          paragraph > offset + 1000 ? paragraph + 2 : sentence > offset + 1000 ? sentence + 2 : end;
+        end = Math.min(end, boundary);
+      }
+      chunks.push({ ...source, text: source.text.slice(offset, end) });
+      if (end === source.text.length) break;
+      offset = end - 200;
+    }
     return chunks;
   });
 }

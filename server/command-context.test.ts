@@ -56,7 +56,7 @@ it('includes every page of explicitly selected documents with page and version p
     text: 'Jugendliche bestimmen das Programm gemeinsam.',
   });
 });
-it('reports unreadable pages and rejects excluded explicit sources and oversized full reads', async () => {
+it('reports unreadable pages, rejects excluded sources and batches oversized full reads', async () => {
   const f = fixture('[Kein Text erkannt. OCR erforderlich.]');
   const result = await commandContextSources(
     f.db,
@@ -79,16 +79,22 @@ it('reports unreadable pages and rejects excluded explicit sources and oversized
     ),
   ).rejects.toThrow('ausgeschlossen');
   const large = fixture('X'.repeat(120001));
-  await expect(
-    commandContextSources(
-      large.db,
-      large.user,
-      large.current,
-      { mode: 'selected', sourceIds: [large.document.id] },
-      settings,
-      'Fasse zusammen',
-    ),
-  ).rejects.toThrow('120.000');
+  const complete = await commandContextSources(
+    large.db,
+    large.user,
+    large.current,
+    { mode: 'selected', sourceIds: [large.document.id] },
+    settings,
+    'Fasse zusammen',
+  );
+  expect(complete.report.mode).toBe('sectionwise');
+  expect(
+    complete.batches
+      .flat()
+      .filter((s) => s.page === 1)
+      .map((s) => s.text)
+      .join(''),
+  ).toBe('X'.repeat(120001));
 });
 
 it('uses collection documents for generic requests using the current note as context', async () => {

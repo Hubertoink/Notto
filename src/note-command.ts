@@ -97,6 +97,7 @@ export const commandAnswerSchema = z.object({
 
 export interface CommandResult {
   summary: string;
+  context?: import('./document-context.js').ContextReport;
   imports?: { noteId: string; title: string; sourceUrl: string; reused: boolean; needsOCR: boolean }[];
   /** Web-search answer with provider-verified, clickable citations. */
   research?: string;

@@ -45,7 +45,9 @@ it('extracts actual PDF text before server analysis and persists page provenance
   const result = await sourceTexts({ query } as unknown as Database, user, note, [], '/test-attachments');
   expect(result).toHaveLength(2);
   expect(result[1]).toMatchObject({ text: 'Atlas has four PCs.', page: 1, attachment: id, noteId: note.id });
-  expect(JSON.parse(query.mock.calls[0][1][2]).kind).toBe('extraction');
+  expect(
+    JSON.parse(query.mock.calls.find(([sql]) => sql.startsWith('INSERT INTO knowledge'))![1][2]).kind,
+  ).toBe('extraction');
   // PDF.js initialization can exceed the default five seconds on a cold Windows runner.
 }, 20000);
 it('excludes executable prompts from ordinary annotation evidence', async () => {
@@ -84,4 +86,35 @@ it('keeps extraction provenance separate when a note attachment is adopted by th
   }));
   const result = await sourceTexts({} as Database, 'alice', library, records);
   expect(result[1]).toMatchObject({ noteId: library.id, text: library.id, extractionId: records[0].id });
+});
+
+it('reuses a user-scoped extraction for another note without reopening the PDF', async () => {
+  const id = `${crypto.randomUUID()}.pdf`;
+  const note = newNote('alice', `[Quelle](attachments/${id})`);
+  const shared = {
+    id: 'original',
+    scope: 'alice',
+    noteId: 'other',
+    kind: 'extraction',
+    at: '2026-10-01',
+    data: {
+      id,
+      pages: [
+        { noteId: 'other', revision: 'previous', attachment: id, page: 9, text: 'Beleg aus dem Original.' },
+      ],
+    },
+  };
+  const query = vi.fn(async (sql: string) => ({
+    rows: sql.startsWith('SELECT') ? [{ document: shared }] : [],
+  }));
+  const sources = await sourceTexts({ query } as unknown as Database, 'alice', note, []);
+  expect(query.mock.calls[0][0]).toContain('user_id=$1');
+  expect(sources[1]).toMatchObject({
+    noteId: note.id,
+    revision: note.revision,
+    page: 9,
+    text: 'Beleg aus dem Original.',
+  });
+  expect(sources[1].extractionId).not.toBe('original');
+  expect(query.mock.calls.some(([sql]) => sql.startsWith('INSERT'))).toBe(true);
 });

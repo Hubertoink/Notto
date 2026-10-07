@@ -64,6 +64,63 @@ async function failed(
 }
 const note = () => newNote(user, `Ownership im Jugendhaus. [Artikel](attachments/${id})`);
 
+it('analyzes attachments above the old 60,000 character limit using original passages near the end', async () => {
+  const n = note(),
+    jobId = await failed(n, 'Notiz zu lang: maximal 60.000 Zeichen für eine Analyse.');
+  // The migration resumes precisely the jobs which failed at the removed limit.
+  await pg.exec(await readFile(new URL('./schema.sql', import.meta.url), 'utf8'));
+  const original =
+    'Allgemeiner Hintergrund. '.repeat(6000) +
+    '\nOwnership im Jugendhaus erfordert klare Entscheidungsspielräume.';
+  await writeFile(path, original);
+  const fetch = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [
+            {
+              content: [
+                {
+                  type: 'output_text',
+                  text: JSON.stringify({
+                    suggestions: [
+                      {
+                        kind: 'topic',
+                        title: 'Ownership',
+                        detail: 'Entscheidungsspielräume klären.',
+                        quote: 'Ownership im Jugendhaus erfordert klare Entscheidungsspielräume.',
+                      },
+                    ],
+                  }),
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+  try {
+    await workOnce(db, { dataDir: dir, openaiKey: 'test-only', models: ['gpt-4.1-mini'] });
+    expect((await pg.query('SELECT status,error FROM jobs WHERE id=$1', [jobId])).rows[0]).toMatchObject({
+      status: 'done',
+      error: null,
+    });
+    const input = JSON.parse(String(fetch.mock.calls[0][1]?.body)).input;
+    expect(input.length).toBeLessThan(60000);
+    expect(input).toContain('Ownership im Jugendhaus erfordert klare Entscheidungsspielräume.');
+    const row: any = (await pg.query("SELECT document FROM knowledge WHERE document->>'kind'='analysis'"))
+      .rows[0];
+    expect(row.document.data.context.mode).toBe('selected');
+    expect(
+      (await pg.query('SELECT document FROM document_context_cache WHERE user_id=$1', [user])).rows,
+    ).toHaveLength(1);
+  } finally {
+    fetch.mockRestore();
+  }
+});
+
 it('recovers an exhausted missing attachment job and completes analysis with actual file context', async () => {
   const n = note(),
     jobId = await failed(n);

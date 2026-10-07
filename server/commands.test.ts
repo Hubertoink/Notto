@@ -814,6 +814,70 @@ it('supplies attached PDF text to a command and persists a clickable page citati
   expect(job.result.searched).toBe(false);
   expect(job.result.webEnabled).toBe(false);
 });
+it('reads a long document in sections before synthesizing a summary with original page citations', async () => {
+  const { attachment, live } = await startDocumentCommand();
+  const extraction: any = (
+    await pg.query("SELECT id,document FROM knowledge WHERE document->>'kind'='extraction'")
+  ).rows[0];
+  extraction.document.data.pages = Array.from({ length: 5 }, (_, index) => ({
+    noteId: note.id,
+    revision: live.revision,
+    attachment,
+    page: index + 1,
+    text:
+      `Abschnitt ${index + 1}: Jugendliche entscheiden gemeinsam. ` +
+      'Pädagogischer Hintergrund. '.repeat(1100),
+  }));
+  await pg.query('UPDATE knowledge SET document=$2 WHERE id=$1', [
+    extraction.id,
+    JSON.stringify(extraction.document),
+  ]);
+  const readPages = new Set<number>();
+  vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) => {
+    const input = JSON.parse(body.input as string);
+    const name = (body.text as any).format.name;
+    let result: unknown;
+    if (name === 'document_section') {
+      for (const source of input.sources) if (source.page) readPages.add(source.page);
+      const source = input.sources.find((source: any) => source.attachment);
+      result = {
+        findings: [
+          { source: source.index, quote: source.text.slice(0, 90), detail: 'Beteiligung wird beschrieben.' },
+        ],
+        insufficient: false,
+      };
+    } else {
+      expect(readPages.size).toBe(5);
+      expect(input.documentCoverage).toBe('sectionwise');
+      expect(input.readingNotes.length).toBeGreaterThan(1);
+      result = {
+        summary: 'Die Abschnitte behandeln Beteiligung.',
+        items: [
+          {
+            kind: 'fact',
+            title: 'Beteiligung',
+            detail: 'Jugendliche entscheiden gemeinsam.',
+            source: 0,
+            target: null,
+            quote: input.sources[0].text.slice(0, 90),
+          },
+        ],
+        followLinks: [],
+      };
+    }
+    return {
+      status: 'completed',
+      output: [{ content: [{ type: 'output_text', text: JSON.stringify(result) }] }],
+    };
+  });
+  await workCommandOnce(adapter, env);
+  const job: any = (await pg.query('SELECT status,error,result FROM note_commands')).rows[0];
+  expect(job, job.error).toMatchObject({ status: 'done', error: null });
+  expect(job.result.context.mode).toBe('sectionwise');
+  expect(job.result.items[0].citation).toMatchObject({ attachment, page: 1 });
+  expect(job.result.context.sources.filter((s: any) => s.attachment)).toHaveLength(5);
+  expect(job.result.searched).toBe(false);
+});
 it('discards invented PDF quotes instead of retaining an unsupported summary', async () => {
   await startDocumentCommand();
   vi.mocked(openai).mockResolvedValue(documentResponse('Nicht im Dokument enthalten.'));

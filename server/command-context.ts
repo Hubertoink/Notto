@@ -2,9 +2,9 @@ import type { Database } from './database.js';
 import { sourceTexts } from './sources.js';
 import { contextNotes } from '../src/source-context.js';
 import { attachmentIds, titleOf, type AIContext, type Note } from '../src/domain.js';
-import { diverseHits, lexicalScore, splitEvidence } from '../src/retrieval.js';
+import { completeDocumentRequest, documentBatches, contextReport } from '../src/document-context.js';
+import { serverDocumentContext } from './document-context.js';
 import { evidenceSchema } from '../src/evidence-policy.js';
-import { withoutNoteCommands } from '../src/note-command.js';
 import type { z } from 'zod';
 
 export type ContextSource = z.infer<typeof evidenceSchema> & { title: string };
@@ -82,26 +82,21 @@ export async function commandContextSources(
       throw new Error(
         'Eine ausgewählte Quelle ist nicht verfügbar oder von der KI ausgeschlossen. Bitte die Quellenauswahl prüfen.',
       );
-  if (direct.reduce((sum, source) => sum + source.text.length, 0) > 120000)
-    throw new Error(
-      'Die vollständig ausgewählten Quellen überschreiten 120.000 Zeichen. Bitte weniger Dokumente auswählen oder das Dokument aufteilen.',
-    );
-  const ranked = splitEvidence(related).map((source) => ({
-    ...source,
-    score:
-      3 * lexicalScore(source, query) +
-      lexicalScore(source, withoutNoteCommands(current.content).slice(0, 6000)),
-  }));
-  const matches = ranked.filter((source) => source.score > 0);
-  // A scoped collection/tag request such as "Fasse das für diese Notiz zusammen"
-  // still needs its document context even without topical words in the prompt.
-  const hits = diverseHits(
-    matches.length ? matches : context.mode === 'collection' || context.mode === 'selected' ? ranked : [],
-    16,
-  );
-  if (related.length)
+  const allSources = [...direct, ...related];
+  const prepared = await serverDocumentContext(db, user, allSources, current.id, query);
+  const batches = completeDocumentRequest(query) ? documentBatches(allSources) : [];
+  const fullRead = batches.length > 1;
+  const sources = batches.length === 1 ? batches[0] : prepared.sources;
+  warnings.push(...(batches.length ? [] : prepared.report.warnings));
+  if (fullRead)
     warnings.push(
-      'Aus dem weiteren Kontext wurden passende Textstellen ausgewählt; direkt ausgewählte Dokumente und Anhänge werden vollständig gelesen.',
+      'Alle lesbaren Abschnitte werden schrittweise ausgewertet; die Antwort wird aus belegten Teilergebnissen erstellt.',
     );
-  return { sources: [...direct, ...hits], warnings, incomplete };
+  const report = contextReport(
+    allSources,
+    fullRead ? allSources : sources,
+    fullRead ? 'sectionwise' : batches.length ? 'complete' : prepared.report.mode,
+    warnings,
+  );
+  return { sources, warnings, incomplete, report, batches: fullRead ? batches : [], allSources };
 }

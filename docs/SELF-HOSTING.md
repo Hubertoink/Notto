@@ -36,6 +36,8 @@ In Notto anschließend **Wissen & KI → KI einrichten → KI aktivieren**. Die 
 
 PDF-Text und OCR werden über die bestehenden Anhangfunktionen erzeugt und als separate Erkenntnisse synchronisiert. Der Hintergrundworker verwendet passende synchronisierte Extraktionen oder liest den Text direkt aus dem gemeinsamen Anhangspeicher; nach einer späteren OCR-Extraktion eine Analyse bei Bedarf manuell wiederholen. Diktat und interaktive Suche verwenden ebenfalls den serverseitigen OpenAI-Schlüssel bei angemeldetem Konto. Das lokale Offline-Notizbuch kann weiterhin optional einen eigenen Windows-Schlüssel verwenden.
 
+Die Dokumentaufbereitung verwendet zusätzlich die automatisch angelegte Tabelle `document_context_cache`. Sie hält pro Konto und Anhang Textabschnitte sowie eine Übersicht aus unveränderten Originalauszügen. Ein SHA-256-Fingerabdruck über Seiteninhalt und Verarbeitungsversion verhindert die Wiederverwendung veralteter Aufbereitung; Notizänderungen allein erfordern keine neue Dokumentaufbereitung. Der Cache ist abgeleitet und kann neu aufgebaut werden. Die Quellenauswahl erfolgt erst nach den bestehenden Freigabeprüfungen. Gewöhnliche Analysen verwenden höchstens 48.000 Zeichen serialisierten Quellenkontext; Anweisungen und Antwort haben zusätzlichen Platz. Vollständige Dokumentaufträge lesen alle lesbaren Abschnitte in mehreren Anfragen und prüfen deren Zitate vor der Zusammenführung. Die vorhandenen Grenzen von 12 MB und 100 PDF-Seiten sowie das Auftragszeitlimit bleiben bestehen. Beim Start werden alte, am 60.000-Zeichen-Limit gescheiterte automatische Analysen erneut vorgemerkt; der Worker prüft weiterhin aktuelle Version und Freigabe.
+
 ## Aktualisieren
 
 ### Updates mit `latest` in mStudio

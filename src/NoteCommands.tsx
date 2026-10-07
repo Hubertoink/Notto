@@ -370,6 +370,15 @@ export function NoteCommands({
                 {!!result.contextSources?.length && (
                   <details className="command-sources">
                     <summary>Verwendeter Notiz- und Dokumentkontext</summary>
+                    {result.context && (
+                      <p className="muted small">
+                        {result.context.mode === 'sectionwise'
+                          ? 'Alle lesbaren Abschnitte wurden schrittweise ausgewertet. Die Belege unten zeigen die Originalstellen der Antwort.'
+                          : result.context.mode === 'selected'
+                            ? 'Passende Originalstellen wurden ausgewählt; keine vollständige Dokumentprüfung.'
+                            : 'Alle lesbaren Texte des gewählten Kontexts wurden berücksichtigt.'}
+                      </p>
+                    )}
                     {result.contextSources
                       .filter(
                         (source, index, all) =>

@@ -8,6 +8,7 @@ import { analysisContent, currentAnalysis } from '../src/analysis-current.js';
 import { analysisSchema, analysisInstructions, groundAnalysis, noteAllowed } from '../src/evidence-policy.js';
 import { splitEvidence } from '../src/retrieval.js';
 import { sourceTexts } from './sources.js';
+import { serverDocumentContext } from './document-context.js';
 import { findServerRelations } from './note-relations.js';
 import type { Database } from './database.js';
 import { openai, type AIEnvironment } from './openai.js';
@@ -92,7 +93,6 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         ? { ...source, text: analysisContent(source.text) }
         : source,
     );
-    const sources = evidence.map((source) => source.text);
     const fresh = (
       await db.query(
         'SELECT n.document,s.document AS settings FROM notes n JOIN ai_settings s ON n.user_id=s.user_id WHERE n.user_id=$1 AND n.id=$2',
@@ -176,10 +176,15 @@ export async function workOnce(db: Database, env: AIEnvironment) {
       await db.query("UPDATE jobs SET status='done',lease_until=NULL,error=NULL WHERE id=$1", [job.id]);
       return true;
     }
-    if (sources.join('\n').length > 60000)
-      throw new Error('Notiz zu lang: maximal 60.000 Zeichen für eine Analyse.');
     let data: unknown, kind: string;
     if (job.kind === 'analysis') {
+      const prepared = await serverDocumentContext(
+        db,
+        job.user_id,
+        evidence,
+        n.id,
+        analysisContent(n.content),
+      );
       const response = await openai(
         db,
         job.user_id,
@@ -187,7 +192,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         {
           model: c.model,
           instructions: knowledgeRole + analysisInstructions,
-          input: JSON.stringify(evidence),
+          input: JSON.stringify(prepared.sources),
           text: {
             format: {
               type: 'json_schema',
@@ -199,7 +204,10 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         },
         env,
       );
-      data = groundAnalysis(analysis.parse(JSON.parse(text(response))), evidence);
+      data = {
+        ...groundAnalysis(analysis.parse(JSON.parse(text(response))), prepared.sources),
+        context: prepared.report,
+      };
       kind = 'analysis';
     } else {
       if (!c.autoResearch) {

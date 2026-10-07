@@ -611,6 +611,32 @@ export function NoteAnnotations({
             <ReviewIcon size={18} aria-hidden="true" />
             <div>
               <p>{reviewDescription}</p>
+              {(analysis?.data as Analysis | undefined)?.context && (
+                <div className="muted small">
+                  <p>
+                    {(analysis!.data as Analysis).context!.mode === 'selected'
+                      ? 'Grundlage: Notiz und ausgewählte Originalstellen aus den Anhängen.'
+                      : 'Grundlage: alle lesbaren Texte der Notiz und ihrer Anhänge.'}
+                  </p>
+                  {(analysis!.data as Analysis).context!.warnings.map((warning, index) => (
+                    <p key={index}>{warning}</p>
+                  ))}
+                  <ul>
+                    {(analysis!.data as Analysis)
+                      .context!.sources.filter((source) => source.attachment)
+                      .map((source, index) => (
+                        <li key={index}>
+                          <AttachmentTitle
+                            scope={note.scope}
+                            content={note.content}
+                            id={source.attachment!}
+                          />
+                          {source.page ? ` · Seite ${source.page}` : ''}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
               {job?.error && <p className="command-error">{job.error}</p>}
             </div>
           </details>

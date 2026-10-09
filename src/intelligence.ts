@@ -719,7 +719,7 @@ export async function research(note: Note, item: Suggestion, automatic = false) 
     memory: false,
     include: ['web_search_call.action.sources'],
     instructions: knowledgeRole + researchInstructions(item.kind),
-    input: researchInput(item),
+    input: researchInput(item, note.content),
   });
   if (!response.output?.some((o: any) => o.type === 'web_search_call' && o.status === 'completed'))
     throw new Error('Die Websuche wurde nicht abgeschlossen.');
@@ -732,7 +732,7 @@ export async function research(note: Note, item: Suggestion, automatic = false) 
   if (!sources.length)
     throw new Error('Keine zitierbaren Webquellen gefunden. Die Recherche wurde nicht gespeichert.');
   const current = await repo.get(note.scope, note.id);
-  if (!current || !eligible(current) || !currentContent(current, contentRevision(note))) return;
+  if (!current || !eligible(current) || !currentAnalysis(current, contentRevision(note))) return;
   if (
     !config(note.scope).enabled ||
     (automatic && (!config(note.scope).auto || !config(note.scope).autoResearch))

@@ -11,6 +11,8 @@ import type { Database } from './database';
 import { digest } from './security';
 import { newNote, reviseNote } from '../src/domain';
 import { notebookTools } from '../src/agent-tools';
+import { fetchYoutubeTranscript } from './youtube-fetch';
+vi.mock('./youtube-fetch', () => ({ fetchYoutubeTranscript: vi.fn() }));
 const pg = new PGlite();
 const origin = 'http://localhost:3000';
 let app: Awaited<ReturnType<typeof buildApp>>, dir: string;
@@ -26,51 +28,61 @@ const headers = (secret?: string) => ({
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
 });
-it('reuses analysis after internal linking without a model call and checks real edits again', async () => {
-  await pg.exec('DELETE FROM jobs');
-  const note = newNote(alice, 'Ownership über Projekte und Prozesse.');
-  const linked = reviseNote(note, {
-    content: '[Ownership über Projekte und Prozesse](notes/11111111-1111-4111-8111-111111111111).',
-  });
-  await pg.query(
-    'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
-    [
+it.each(['internal link', 'formatting', 'external link'])(
+  'reuses analysis after %s without a model call and checks real edits again',
+  async (mode) => {
+    await pg.exec('DELETE FROM jobs');
+    const note = newNote(
       alice,
-      JSON.stringify({
-        enabled: true,
-        auto: true,
-        autoResearch: false,
-        model: 'gpt-4.1-mini',
-        excludedTags: '',
-        excludedNotes: [],
-      }),
-    ],
-  );
-  const record = {
-    id: crypto.randomUUID(),
-    scope: alice,
-    noteId: note.id,
-    revision: note.revision,
-    kind: 'analysis',
-    at: new Date().toISOString(),
-    data: { suggestions: [] },
-  };
-  await pg.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3)', [
-    alice,
-    record.id,
-    JSON.stringify(record),
-  ]);
-  const push = (n: typeof note, base: string | null) =>
-    app.inject({
-      method: 'POST',
-      url: '/api/notes/push',
-      headers: headers(aToken),
-      payload: { p_id: n.id, p_revision: n.revision, p_base_revision: base, p_document: n },
+      mode === 'external link'
+        ? 'Ownership über Projekte und Prozesse.\n\nhttps://youtu.be/example'
+        : 'Ownership über Projekte und Prozesse.',
+    );
+    const linked = reviseNote(note, {
+      content:
+        mode === 'internal link'
+          ? '[Ownership über Projekte und Prozesse](notes/11111111-1111-4111-8111-111111111111).'
+          : mode === 'formatting'
+            ? '## **Ownership** über Projekte und Prozesse.\n\n'
+            : '## Ownership über Projekte und Prozesse.\n\n- [Interessanter Ansatz](https://youtu.be/example)',
     });
-  expect((await push(linked, null)).statusCode).toBe(200);
-  const fetch = vi
-    .spyOn(globalThis, 'fetch')
-    .mockResolvedValue(
+    await pg.query(
+      'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
+      [
+        alice,
+        JSON.stringify({
+          enabled: true,
+          auto: true,
+          autoResearch: false,
+          model: 'gpt-4.1-mini',
+          excludedTags: '',
+          excludedNotes: [],
+        }),
+      ],
+    );
+    const record = {
+      id: crypto.randomUUID(),
+      scope: alice,
+      noteId: note.id,
+      revision: note.revision,
+      kind: 'analysis',
+      at: new Date().toISOString(),
+      data: { suggestions: [] },
+    };
+    await pg.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3)', [
+      alice,
+      record.id,
+      JSON.stringify(record),
+    ]);
+    const push = (n: typeof note, base: string | null) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/notes/push',
+        headers: headers(aToken),
+        payload: { p_id: n.id, p_revision: n.revision, p_base_revision: base, p_document: n },
+      });
+    expect((await push(linked, null)).statusCode).toBe(200);
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
           status: 'completed',
@@ -78,31 +90,33 @@ it('reuses analysis after internal linking without a model call and checks real 
         }),
       ),
     );
-  try {
-    const env = { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 };
-    expect(await workOnce(adapter, env)).toBe(true);
-    expect(fetch).not.toHaveBeenCalled();
-    expect(
-      (await pg.query("SELECT status FROM jobs WHERE note_id=$1 AND kind='analysis'", [note.id])).rows[0]
-        .status,
-    ).toBe('done');
-    await pg.exec('DELETE FROM jobs');
-    const changed = reviseNote(linked, { content: linked.content + ' Neue Aufgaben für die Leitung.' });
-    expect((await push(changed, linked.revision)).statusCode).toBe(200);
-    await workOnce(adapter, env);
-    expect(fetch).toHaveBeenCalledOnce();
-    const records = await pg.query(
-      "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'noteId'=$2 AND document->>'kind'='analysis'",
-      [alice, note.id],
-    );
-    expect(records.rows).toHaveLength(2);
-    expect(records.rows.some((r: any) => r.document.revision === changed.revision)).toBe(true);
-  } finally {
-    fetch.mockRestore();
-    await pg.exec('DELETE FROM jobs');
-    await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
-  }
-});
+    try {
+      const env = { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 };
+      expect(await workOnce(adapter, env)).toBe(true);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(await workOnce(adapter, env)).toBe(false);
+      expect(
+        (await pg.query("SELECT status FROM jobs WHERE note_id=$1 AND kind='analysis'", [note.id])).rows[0]
+          .status,
+      ).toBe('done');
+      await pg.exec('DELETE FROM jobs');
+      const changed = reviseNote(linked, { content: linked.content + ' Neue Aufgaben für die Leitung.' });
+      expect((await push(changed, linked.revision)).statusCode).toBe(200);
+      await workOnce(adapter, env);
+      expect(fetch).toHaveBeenCalledOnce();
+      const records = await pg.query(
+        "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'noteId'=$2 AND document->>'kind'='analysis'",
+        [alice, note.id],
+      );
+      expect(records.rows).toHaveLength(2);
+      expect(records.rows.some((r: any) => r.document.revision === changed.revision)).toBe(true);
+    } finally {
+      fetch.mockRestore();
+      await pg.exec('DELETE FROM jobs');
+      await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+    }
+  },
+);
 it('defaults command web research on and preserves a global opt-out when an older client saves settings', async () => {
   const settings = {
     enabled: true,
@@ -416,130 +430,203 @@ it('resumes jobs deferred by the removed daily quota without waiting until tomor
     await pg.query('DELETE FROM rate_limits WHERE key=$1', [`ai:${alice}`]);
   }
 });
-it.each(['success', 'disabled', 'dismissed', 'duplicate', 'no-sources', 'revoked'])(
-  'researches Brooks background topics with consent and deduplication: %s',
-  async (mode) => {
-    await pg.exec('DELETE FROM jobs');
-    const note = newNote(
-      alice,
-      'Frederick P. Brooks Gedanken zur Essentiellen Komplexität scheinen interessant.',
-    );
-    const settings = {
-      enabled: true,
-      auto: true,
-      autoResearch: mode !== 'disabled',
-      model: 'gpt-4.1-mini',
-      excludedNotes: [],
-      excludedTags: '',
-    };
-    await pg.query(
-      'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
-      [alice, JSON.stringify(settings)],
-    );
-    await app.inject({
-      method: 'POST',
-      url: '/api/notes/push',
-      headers: headers(aToken),
-      payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
+it.each([
+  'success',
+  'disabled',
+  'dismissed',
+  'duplicate',
+  'no-sources',
+  'revoked',
+  'format-before',
+  'format-during',
+  'edit-during',
+  'youtube',
+])('researches Brooks background topics with consent and deduplication: %s', async (mode) => {
+  await pg.exec('DELETE FROM jobs');
+  const note = newNote(
+    alice,
+    'Frederick P. Brooks Gedanken zur Essentiellen Komplexität scheinen interessant.' +
+      (mode === 'youtube' ? '\nhttps://youtu.be/qp0HIF3SfI4' : ''),
+  );
+  if (mode === 'youtube')
+    vi.mocked(fetchYoutubeTranscript).mockResolvedValue({
+      title: 'Fachvideo',
+      automatic: false,
+      segments: [{ text: 'Die Komplexität steckt im Problem.', offset: 12, duration: 4, lang: 'de' }],
     });
-    const key = `${note.id}:topic:${note.content.toLocaleLowerCase('de')}`;
-    if (mode === 'dismissed' || mode === 'duplicate') {
-      const id = crypto.randomUUID();
-      await pg.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3)', [
-        alice,
+  const settings = {
+    enabled: true,
+    auto: true,
+    autoResearch: mode !== 'disabled',
+    model: 'gpt-4.1-mini',
+    excludedNotes: [],
+    excludedTags: '',
+  };
+  await pg.query(
+    'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
+    [alice, JSON.stringify(settings)],
+  );
+  await app.inject({
+    method: 'POST',
+    url: '/api/notes/push',
+    headers: headers(aToken),
+    payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
+  });
+  const key = `${note.id}:topic:${note.content.toLocaleLowerCase('de')}`;
+  if (mode === 'dismissed' || mode === 'duplicate') {
+    const id = crypto.randomUUID();
+    await pg.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3)', [
+      alice,
+      id,
+      JSON.stringify({
         id,
-        JSON.stringify({
-          id,
-          scope: alice,
-          noteId: note.id,
-          revision: note.revision,
-          at: new Date().toISOString(),
-          kind: mode === 'duplicate' ? 'research' : 'decision',
-          data: { key, status: 'dismissed' },
-        }),
-      ]);
-    }
-    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
-      const body = JSON.parse(String(init?.body));
-      if (body.tools) {
-        expect(body.tool_choice).toBe('required');
-        expect(JSON.parse(body.input).notizausschnitt).toBe(note.content);
-        expect(body.instructions).toContain('höchstens zwei konkrete Vertiefungen');
-        if (mode === 'revoked')
-          await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
-            alice,
-            JSON.stringify({ ...settings, autoResearch: false }),
-          ]);
-        return new Response(
-          JSON.stringify({
-            status: 'completed',
-            output: [
-              { type: 'web_search_call', status: 'completed' },
+        scope: alice,
+        noteId: note.id,
+        revision: note.revision,
+        at: new Date().toISOString(),
+        kind: mode === 'duplicate' ? 'research' : 'decision',
+        data: { key, status: 'dismissed' },
+      }),
+    ]);
+  }
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    if (body.tools) {
+      expect(body.tool_choice).toBe('required');
+      expect(JSON.parse(body.input).notizausschnitt).toBe(note.content);
+      if (mode === 'youtube')
+        expect(JSON.parse(body.input).youtubeTranskripte).toEqual([
+          {
+            titel: 'Fachvideo',
+            url: 'https://www.youtube.com/watch?v=qp0HIF3SfI4',
+            automatisch: false,
+            ausschnitt: false,
+            passagen: [
               {
-                content: [
-                  {
-                    type: 'output_text',
-                    text: 'Einordnung mit Quelle.',
-                    annotations:
-                      mode === 'no-sources'
-                        ? []
-                        : [{ type: 'url_citation', title: 'Brooks', url: 'https://example.com/brooks' }],
-                  },
-                ],
+                text: 'Die Komplexität steckt im Problem.',
+                zeit: '00:12',
+                url: 'https://www.youtube.com/watch?v=qp0HIF3SfI4&t=12s',
               },
             ],
-          }),
-        );
+          },
+        ]);
+      expect(body.instructions).toContain('höchstens zwei konkrete Vertiefungen');
+      if (mode === 'revoked')
+        await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+          alice,
+          JSON.stringify({ ...settings, autoResearch: false }),
+        ]);
+      if (mode === 'format-during' || mode === 'edit-during') {
+        const changed = reviseNote(note, {
+          content: mode === 'format-during' ? `## **${note.content}**` : 'Ein ganz anderes Thema.',
+        });
+        await pg.query('UPDATE notes SET revision=$3,document=$4 WHERE user_id=$1 AND id=$2', [
+          alice,
+          note.id,
+          changed.revision,
+          JSON.stringify(changed),
+        ]);
       }
       return new Response(
         JSON.stringify({
           status: 'completed',
           output: [
+            { type: 'web_search_call', status: 'completed' },
             {
               content: [
                 {
                   type: 'output_text',
-                  text: JSON.stringify({
-                    suggestions: [
-                      {
-                        kind: 'topic',
-                        title: 'Brooks: essentielle Komplexität',
-                        detail: 'Einordnung und Einstiegstext',
-                        quote: note.content,
-                      },
-                    ],
-                  }),
+                  text: 'Einordnung mit Quelle.',
+                  annotations:
+                    mode === 'no-sources'
+                      ? []
+                      : [{ type: 'url_citation', title: 'Brooks', url: 'https://example.com/brooks' }],
                 },
               ],
             },
           ],
         }),
       );
-    });
-    try {
-      const env = { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 };
-      await workOnce(adapter, env);
-      await pg.query("DELETE FROM jobs WHERE kind NOT LIKE 'research:%'");
-      await workOnce(adapter, env);
-      const rows = (
-        await pg.query<any>(
-          "SELECT document FROM knowledge WHERE document->>'noteId'=$1 AND document->>'kind'='research'",
-          [note.id],
-        )
-      ).rows;
-      expect(rows).toHaveLength(mode === 'success' || mode === 'duplicate' ? 1 : 0);
-      expect(fetch).toHaveBeenCalledTimes(['disabled', 'dismissed', 'duplicate'].includes(mode) ? 1 : 2);
-      if (mode === 'success')
-        expect(rows[0].document.data.sources).toEqual([
-          { title: 'Brooks', url: 'https://example.com/brooks' },
-        ]);
-    } finally {
-      fetch.mockRestore();
-      await pg.exec('DELETE FROM jobs');
-      await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
     }
-  },
-);
+    return new Response(
+      JSON.stringify({
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  suggestions: [
+                    {
+                      kind: 'topic',
+                      title: 'Brooks: essentielle Komplexität',
+                      detail: 'Einordnung und Einstiegstext',
+                      quote: note.content,
+                    },
+                  ],
+                }),
+              },
+            ],
+          },
+        ],
+      }),
+    );
+  });
+  try {
+    const env = { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 };
+    await workOnce(adapter, env);
+    await pg.query("DELETE FROM jobs WHERE kind NOT LIKE 'research:%'");
+    if (mode === 'format-before') {
+      const changed = reviseNote(note, { content: `## **${note.content}**` });
+      await pg.query('UPDATE notes SET revision=$3,document=$4 WHERE user_id=$1 AND id=$2', [
+        alice,
+        note.id,
+        changed.revision,
+        JSON.stringify(changed),
+      ]);
+    }
+    await workOnce(adapter, env);
+    const rows = (
+      await pg.query<any>(
+        "SELECT document FROM knowledge WHERE document->>'noteId'=$1 AND document->>'kind'='research'",
+        [note.id],
+      )
+    ).rows;
+    expect(rows).toHaveLength(
+      ['success', 'duplicate', 'format-before', 'format-during', 'youtube'].includes(mode) ? 1 : 0,
+    );
+    expect(fetch).toHaveBeenCalledTimes(['disabled', 'dismissed', 'duplicate'].includes(mode) ? 1 : 2);
+    if (mode === 'success')
+      expect(rows[0].document.data.sources).toEqual([{ title: 'Brooks', url: 'https://example.com/brooks' }]);
+    if (mode === 'success') {
+      let previous = note;
+      for (const content of [`## ${note.content}`, `## **${note.content}**\n\n`]) {
+        const changed = reviseNote(previous, { content });
+        const pushed = await app.inject({
+          method: 'POST',
+          url: '/api/notes/push',
+          headers: headers(aToken),
+          payload: {
+            p_id: note.id,
+            p_revision: changed.revision,
+            p_base_revision: previous.revision,
+            p_document: changed,
+          },
+        });
+        expect(pushed.json().accepted).toBe(true);
+        expect(await workOnce(adapter, env)).toBe(true);
+        expect(await workOnce(adapter, env)).toBe(false);
+        expect(fetch).toHaveBeenCalledTimes(2);
+        previous = changed;
+      }
+    }
+  } finally {
+    fetch.mockRestore();
+    await pg.exec('DELETE FROM jobs');
+    await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+  }
+});
 
 it('allows desktop attachment upload preflight including PUT', async () => {
   for (const origin of ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost']) {

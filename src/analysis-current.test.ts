@@ -6,6 +6,34 @@ import type { BackgroundJob } from './AIActivity';
 
 const a = '11111111-1111-4111-8111-111111111111',
   b = '22222222-2222-4222-8222-222222222222';
+it.each([
+  '# Selbstreguliertes Lernen\n\nEinführung im **Lernbüro**.\n\nhttps://youtu.be/example',
+  'Selbstreguliertes Lernen\n========================\n\nEinführung im Lernbüro.\n\n<https://youtu.be/example>',
+  'Selbstreguliertes Lernen\n\nEinführung im\nLernbüro.\n\n- [Interessanter Ansatz](https://youtu.be/example)',
+  'Selbstreguliertes Lernen\n\nEinführung im Lernbüro.\n\n[Interessanter Ansatz][video]\n\n[video]: https://youtu.be/example',
+])('keeps analysis current after presentation edits: %s', (content) => {
+  const note = newNote(
+    'local',
+    'Selbstreguliertes Lernen\n\nEinführung im Lernbüro.\n\nhttps://youtu.be/example',
+  );
+  expect(currentAnalysis(reviseNote(note, { content }), note.revision)).toBe(true);
+});
+it.each([
+  ['Termin am 12. Mai', 'Termin am 13. Mai'],
+  ['Das gilt.', 'Das gilt nicht.'],
+  ['Erst lesen.\n\nDann schreiben.', 'Dann schreiben.\n\nErst lesen.'],
+  ['- [ ] Lesen', '- [x] Lesen'],
+  ['Lesen', '~~Lesen~~'],
+  ['[Zusage](https://example.org)', '[Absage](https://example.org)'],
+  ['https://youtu.be/one', '[Video](https://youtu.be/two)'],
+  ['```\na  b\n```', '```\na b\n```'],
+  ['`a  b`', '`a b`'],
+  ['[A](https://example.org "Titel")', '[A](https://example.org "Neuer Titel")'],
+  ['| A | B |\n|---|---|\n| 1 | 2 |', '| A | B |\n|---|---|\n| 2 | 1 |'],
+])('still detects meaningful edits: %s → %s', (before, content) => {
+  const note = newNote('local', before);
+  expect(currentAnalysis(reviseNote(note, { content }), note.revision)).toBe(false);
+});
 it('retains a checked analysis when an internal link is inserted, extended, or removed', () => {
   const original = newNote('local', 'Ownership über Projekte und Prozesse.');
   const linked = reviseNote(original, {

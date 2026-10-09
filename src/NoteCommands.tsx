@@ -7,6 +7,7 @@ import { Modal, NoteMarkdown, Sources, readableDate } from './components';
 import { commandThreads, noteCommands, type NoteCommand } from './note-command';
 import './note-commands.css';
 import { CitationLink } from './CommandCitation';
+import { transcriptTime } from './youtube';
 
 function CommandImage({ command, id, title }: { command: string; id: string; title: string }) {
   const [url, setUrl] = useState('');
@@ -290,6 +291,13 @@ export function NoteCommands({
                 )}
                 {(!result.research || result.partial) && <p className="command-summary">{result.summary}</p>}
                 {result.research && <NoteMarkdown content={result.research} scope={scope} />}
+                {result.transcripts?.map((transcript) => (
+                  <p className="muted small" key={transcript.url}>
+                    YouTube-Transkript: {transcript.title} · {transcript.language} ·{' '}
+                    {transcript.automatic ? 'automatische Untertitel' : 'bereitgestellte Untertitel'}
+                    {transcript.partial ? ' · Ausschnitt gelesen' : ' · vollständig eingelesen'}
+                  </p>
+                ))}
                 {!!result.imports?.length && (
                   <ul className="command-imports">
                     {result.imports.map((document) => (
@@ -331,10 +339,27 @@ export function NoteCommands({
                         <h3>{item.title}</h3>
                         {item.imageCaption && <small>{item.imageCaption}</small>}
                         <p>{item.detail}</p>
+                        {item.transcriptCitation && (
+                          <blockquote>
+                            <p>{item.transcriptCitation.quote}</p>
+                            <small>
+                              YouTube · {transcriptTime(item.transcriptCitation.start)} ·{' '}
+                              {item.transcriptCitation.language}
+                              {item.transcriptCitation.automatic ? ' · automatische Untertitel' : ''}
+                            </small>
+                          </blockquote>
+                        )}
                         {item.imageError && <small>Screenshot nicht verfügbar: {item.imageError}</small>}
                         {item.url && (
                           <Sources
-                            sources={[{ title: item.title, url: item.url }]}
+                            sources={[
+                              {
+                                title: item.transcriptCitation
+                                  ? `${item.title} · ${transcriptTime(item.transcriptCitation.start)}`
+                                  : item.title,
+                                url: item.url,
+                              },
+                            ]}
                             compact
                             importFrom={noteId ? { noteId, scope } : undefined}
                           />
@@ -358,7 +383,7 @@ export function NoteCommands({
                           result.research || result.summary,
                           ...result.items.map(
                             (item) =>
-                              `### ${item.title}\n\n${item.kind === 'proposal' ? 'Vorschlag: ' : item.kind === 'inference' ? 'Schlussfolgerung: ' : ''}${item.detail}${item.citation ? `\n\nQuelle: [${item.citation.title}](notes/${item.citation.noteId})${item.citation.page ? `, Seite ${item.citation.page}` : ''}${item.citation.quote ? `\n\n> ${item.citation.quote.replace(/\n/g, '\n> ')}` : ''}` : ''}`,
+                              `### ${item.title}\n\n${item.kind === 'proposal' ? 'Vorschlag: ' : item.kind === 'inference' ? 'Schlussfolgerung: ' : ''}${item.detail}${item.citation ? `\n\nQuelle: [${item.citation.title}](notes/${item.citation.noteId})${item.citation.page ? `, Seite ${item.citation.page}` : ''}${item.citation.quote ? `\n\n> ${item.citation.quote.replace(/\n/g, '\n> ')}` : ''}` : ''}${item.transcriptCitation ? `\n\nQuelle: [YouTube · ${transcriptTime(item.transcriptCitation.start)}](${item.url})\n\n> ${item.transcriptCitation.quote.replace(/\n/g, '\n> ')}` : ''}`,
                           ),
                         ].join('\n\n'),
                       )

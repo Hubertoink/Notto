@@ -8,8 +8,10 @@ import { openai } from './openai';
 import { digest } from './security';
 import { newNote, reviseNote } from '../src/domain';
 import type { Database } from './database';
+import { fetchYoutubeTranscript } from './youtube-fetch';
 
 vi.mock('./openai', () => ({ openai: vi.fn() }));
+vi.mock('./youtube-fetch', () => ({ fetchYoutubeTranscript: vi.fn() }));
 vi.mock('./command-browser', () => ({
   CommandBrowser: class {
     read = vi.fn(async (url: string) => ({
@@ -123,6 +125,8 @@ beforeAll(async () => {
   app = await buildApp(adapter, env);
 });
 beforeEach(async () => {
+  await pg.exec('DELETE FROM youtube_transcript_cache');
+  vi.mocked(fetchYoutubeTranscript).mockReset();
   await pg.exec('DELETE FROM command_images; DELETE FROM note_commands; DELETE FROM rate_limits');
   await pg.query('DELETE FROM notes WHERE id<>$1', [note.id]);
   await pg.exec('DELETE FROM knowledge');
@@ -141,6 +145,122 @@ afterAll(async () => {
   await app.close();
   await pg.close();
 });
+
+it.each(['success', 'unavailable', 'web-off', 'revoked', 'changed', 'ungrounded'])(
+  'uses real transcript evidence and time links for a video command: %s',
+  async (mode) => {
+    const current = reviseNote(note, {
+      content: 'Lernbüro\nhttps://youtu.be/qp0HIF3SfI4\nhttps://www.youtube.com/watch?v=qp0HIF3SfI4&t=9',
+    });
+    await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
+      note.id,
+      JSON.stringify(current),
+      current.revision,
+    ]);
+    if (mode === 'web-off')
+      await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+        user,
+        JSON.stringify({ ...settings, commandWeb: false }),
+      ]);
+    vi.mocked(fetchYoutubeTranscript).mockImplementation(async () => {
+      if (mode === 'unavailable') throw new Error('Keine Untertitel verfügbar.');
+      if (mode === 'revoked')
+        await pg.query('UPDATE ai_settings SET document=$2 WHERE user_id=$1', [
+          user,
+          JSON.stringify({ ...settings, commandWeb: false }),
+        ]);
+      if (mode === 'changed') {
+        const changed = reviseNote(current, { content: 'Anderes Video https://youtu.be/dQw4w9WgXcQ' });
+        await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
+          note.id,
+          JSON.stringify(changed),
+          changed.revision,
+        ]);
+      }
+      return {
+        title: 'Lernbüro',
+        automatic: true,
+        segments: [
+          { text: 'Willkommen.', offset: 0, duration: 3, lang: 'de' },
+          { text: 'Lernende prüfen ihren Fortschritt.', offset: 83.5, duration: 4, lang: 'de' },
+        ],
+      };
+    });
+    vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) => {
+      const input = JSON.parse(body.input as string);
+      if (mode !== 'web-off') {
+        expect(input.sources[0].text).toContain('[01:23] Lernende prüfen ihren Fortschritt.');
+        expect(input.sources[0].transcript).toMatchObject({ language: 'de', automatic: true });
+      }
+      return {
+        status: 'completed',
+        output: [
+          {
+            content: [
+              {
+                type: 'output_text',
+                text: JSON.stringify({
+                  summary: 'Zusammenfassung',
+                  followLinks: [],
+                  items: [
+                    {
+                      title: 'Fortschritt',
+                      detail: 'Lernende kontrollieren ihren Fortschritt.',
+                      source: 0,
+                      target: null,
+                      quote:
+                        mode === 'ungrounded'
+                          ? 'Das steht nicht im Video.'
+                          : 'Lernende prüfen ihren Fortschritt.',
+                    },
+                  ],
+                }),
+              },
+            ],
+          },
+        ],
+      };
+    });
+    const id = randomUUID();
+    expect(
+      (
+        await app.inject({
+          method: 'PUT',
+          url: `/api/commands/${id}`,
+          headers: headers(),
+          payload: { noteId: note.id, revision: current.revision, prompt: 'Fasse dieses Video zusammen.' },
+        })
+      ).statusCode,
+    ).toBe(200);
+    await workCommandOnce(adapter, env);
+    const job: any = (await pg.query('SELECT status,result,error FROM note_commands WHERE id=$1', [id]))
+      .rows[0];
+    if (['revoked', 'changed'].includes(mode)) {
+      expect(job.status).toBe('failed');
+      expect(openai).not.toHaveBeenCalled();
+    } else {
+      expect(job.status).toBe('done');
+      if (mode === 'success') {
+        expect(job.result.items[0]).toMatchObject({
+          url: 'https://www.youtube.com/watch?v=qp0HIF3SfI4&t=83s',
+          transcriptCitation: {
+            quote: 'Lernende prüfen ihren Fortschritt.',
+            start: 83.5,
+            language: 'de',
+            automatic: true,
+          },
+        });
+        expect(job.result.transcripts).toHaveLength(1);
+      } else if (mode === 'unavailable') {
+        expect(job.result.items).toEqual([]);
+        expect(job.result.partial).toBe(true);
+        expect(job.result.warnings.join(' ')).toContain('Keine Untertitel');
+        expect(openai).not.toHaveBeenCalled();
+      } else if (mode === 'ungrounded') expect(job.result.items).toEqual([]);
+    }
+    expect(fetchYoutubeTranscript).toHaveBeenCalledTimes(mode === 'web-off' ? 0 : 1);
+  },
+);
 
 it.each([
   { policy: undefined, commandWeb: undefined, expected: true },

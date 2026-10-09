@@ -140,6 +140,11 @@
   margin-bottom: 8px;
   color: var(--nt-muted);
 }
+.command-card blockquote {
+  margin: 12px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--nt-line);
+}
 .note-commands .command-image {
   display: block;
   width: 100%;

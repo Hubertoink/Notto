@@ -14,6 +14,7 @@ CREATE INDEX IF NOT EXISTS pending_commands ON note_commands(status,created_at);
 ALTER TABLE note_commands ADD COLUMN IF NOT EXISTS context jsonb;
 CREATE TABLE IF NOT EXISTS command_images(id uuid PRIMARY KEY,command_id uuid NOT NULL REFERENCES note_commands(id) ON DELETE CASCADE,bytes bytea NOT NULL);
 CREATE TABLE IF NOT EXISTS document_context_cache(user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,attachment_id text NOT NULL,fingerprint text NOT NULL,document jsonb NOT NULL,PRIMARY KEY(user_id,attachment_id));
+CREATE TABLE IF NOT EXISTS youtube_transcript_cache(user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,video_id text NOT NULL,document jsonb NOT NULL,expires_at timestamptz NOT NULL,PRIMARY KEY(user_id,video_id));
 -- These failures can now use bounded document context. Consent/revision checks
 -- still run in the worker before processing the restored job.
 UPDATE jobs SET status='pending',attempts=0,error=NULL,available_at=now() WHERE kind='analysis' AND status='failed' AND error='Notiz zu lang: maximal 60.000 Zeichen für eine Analyse.';

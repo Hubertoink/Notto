@@ -1,6 +1,6 @@
 {
   "name": "notto",
-  "version": "1.5.11",
+  "version": "1.5.12",
   "private": true,
   "type": "module",
   "scripts": {
@@ -42,6 +42,9 @@
     "react-markdown": "^10.1.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
+    "remark-parse": "11.0.0",
+    "unified": "11.0.5",
+    "youtube-transcript-plus": "2.0.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {

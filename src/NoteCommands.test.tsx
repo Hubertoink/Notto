@@ -25,6 +25,69 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
+it('shows transcript provenance and preserves its timed quote when inserting into the note', async () => {
+  const url = 'https://www.youtube.com/watch?v=qp0HIF3SfI4&t=83s';
+  vi.mocked(serverRequest).mockResolvedValue({
+    commands: [
+      {
+        id: 'video-command',
+        note_id: 'note',
+        revision: 'r',
+        prompt: 'Fasse das Video zusammen',
+        status: 'done',
+        stage: 'Fertig',
+        created_at: '2026-10-09T12:00:00Z',
+        error: null,
+        result: {
+          summary: 'Aus dem Video',
+          sources: [],
+          warnings: [],
+          transcripts: [
+            {
+              title: 'Lernbüro',
+              url: 'https://www.youtube.com/watch?v=qp0HIF3SfI4',
+              language: 'de',
+              automatic: true,
+              partial: false,
+            },
+          ],
+          items: [
+            {
+              title: 'Fortschritt',
+              detail: 'Regelmäßig reflektieren.',
+              url,
+              transcriptCitation: {
+                quote: 'Lernende prüfen ihren Fortschritt.',
+                start: 83.5,
+                language: 'de',
+                automatic: true,
+              },
+            },
+          ],
+        },
+      },
+    ],
+  });
+  const insert = vi.fn();
+  render(
+    <NoteCommands
+      scope="user"
+      noteId="note"
+      content="Lernbüro"
+      editing={false}
+      dirty={false}
+      onStart={vi.fn()}
+      onInsert={insert}
+    />,
+  );
+  await screen.findByText('Lernende prüfen ihren Fortschritt.');
+  expect(screen.getByText(/YouTube-Transkript: Lernbüro/).textContent).toContain('automatische Untertitel');
+  fireEvent.click(screen.getAllByText('Quellen')[0]);
+  expect(screen.getByRole('link', { name: 'Fortschritt · 01:23' }).getAttribute('href')).toBe(url);
+  fireEvent.click(screen.getByRole('button', { name: 'In Notiz übernehmen' }));
+  expect(insert.mock.calls[0][0]).toContain(`[YouTube · 01:23](${url})`);
+  expect(insert.mock.calls[0][0]).toContain('> Lernende prüfen ihren Fortschritt.');
+});
 it('keeps unsaved typing inert and offers save and start without a repeated hint', async () => {
   vi.mocked(serverRequest).mockResolvedValue({ commands: [] });
   const onStart = vi.fn(async (prompt, id) => ({

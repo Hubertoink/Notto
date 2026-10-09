@@ -96,6 +96,7 @@ export const commandAnswerSchema = z.object({
 });
 
 export interface CommandResult {
+  transcripts?: { title: string; url: string; language: string; automatic: boolean; partial: boolean }[];
   summary: string;
   context?: import('./document-context.js').ContextReport;
   imports?: { noteId: string; title: string; sourceUrl: string; reused: boolean; needsOCR: boolean }[];
@@ -113,6 +114,7 @@ export interface CommandResult {
     imageError?: string;
     imageCaption?: string;
     citation?: CommandCitation;
+    transcriptCitation?: import('./youtube.js').TranscriptCitation;
     kind?: 'fact' | 'inference' | 'proposal';
   }[];
   contextSources?: CommandCitation[];

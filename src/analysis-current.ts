@@ -1,6 +1,7 @@
 import { currentContent, type Note } from './domain.js';
 import { plainNoteLinks } from './note-links.js';
 import { withoutNoteCommands } from './note-command.js';
+import { sameAnalysisContent } from './analysis-equivalence.js';
 
 /** Analysis reads note text and attachments, not the destinations of inline note links. */
 export function analysisContent(content: string) {
@@ -12,5 +13,5 @@ export function currentAnalysis(
 ) {
   if (currentContent(note, revision)) return true;
   const previous = note.history?.find((entry) => entry.revision === revision);
-  return !!previous && analysisContent(previous.content) === analysisContent(note.content);
+  return !!previous && sameAnalysisContent(analysisContent(previous.content), analysisContent(note.content));
 }

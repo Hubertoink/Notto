@@ -2,6 +2,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import { browserProxy, publicUrl } from './browser-network.js';
 
 export interface BrowserSource {
+  transcript?: import('./youtube-transcript.js').YoutubeTranscript & { partial: boolean };
   pageIndex: number;
   title: string;
   url: string;

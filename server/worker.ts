@@ -13,6 +13,8 @@ import { findServerRelations } from './note-relations.js';
 import type { Database } from './database.js';
 import { openai, type AIEnvironment } from './openai.js';
 import { commandEvidence, withoutNoteCommands } from '../src/note-command.js';
+import { noteTranscripts } from './youtube-transcript.js';
+import { youtubeUrl, transcriptTime } from '../src/youtube.js';
 const analysis = analysisSchema;
 function text(response: any) {
   if (response.status !== 'completed') throw new Error('Unvollständige KI-Antwort.');
@@ -42,7 +44,9 @@ export async function workOnce(db: Database, env: AIEnvironment) {
     if (
       !row ||
       !withoutNoteCommands(n.content).trim() ||
-      !(job.kind === 'analysis' ? currentAnalysis(n, job.revision) : currentContent(n, job.revision)) ||
+      !(job.kind === 'analysis' || job.kind.startsWith('research:')
+        ? currentAnalysis(n, job.revision)
+        : currentContent(n, job.revision)) ||
       n.deleted ||
       !c?.enabled ||
       !c.auto ||
@@ -62,27 +66,26 @@ export async function workOnce(db: Database, env: AIEnvironment) {
       await db.query("UPDATE jobs SET status='done',lease_until=NULL,error=NULL WHERE id=$1", [job.id]);
       return true;
     }
-    if (job.kind === 'analysis')
+    const existing = records
+      .filter((r) => r.kind === 'analysis' && currentAnalysis(n, r.revision))
+      .sort((a, b) => b.at.localeCompare(a.at))[0];
+    const presentationOnly = existing && !currentContent(n, existing.revision);
+    if (job.kind === 'analysis' && !presentationOnly)
       await db.query(
         'INSERT INTO jobs(id,user_id,note_id,revision,kind) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
         [randomUUID(), job.user_id, job.note_id, contentRevision(n), 'relations'],
       );
-    if (
-      job.kind === 'analysis' &&
-      records.some((r) => r.kind === 'analysis' && currentAnalysis(n, r.revision))
-    ) {
-      await db.query(
-        'INSERT INTO jobs(id,user_id,note_id,revision,kind) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
-        [randomUUID(), job.user_id, job.note_id, contentRevision(n), 'index:0'],
-      );
+    if (job.kind === 'analysis' && existing) {
+      if (!presentationOnly)
+        await db.query(
+          'INSERT INTO jobs(id,user_id,note_id,revision,kind) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
+          [randomUUID(), job.user_id, job.note_id, contentRevision(n), 'index:0'],
+        );
       if (c.autoResearch) {
-        const existing = records
-          .filter((r) => r.kind === 'analysis' && currentAnalysis(n, r.revision))
-          .sort((a, b) => b.at.localeCompare(a.at))[0];
         for (const { index } of researchCandidates(existing.data.suggestions))
           await db.query(
             'INSERT INTO jobs(id,user_id,note_id,revision,kind) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
-            [randomUUID(), job.user_id, job.note_id, job.revision, `research:${index}`],
+            [randomUUID(), job.user_id, job.note_id, existing.revision, `research:${index}`],
           );
       }
       await db.query("UPDATE jobs SET status='done',lease_until=NULL WHERE id=$1", [job.id]);
@@ -104,7 +107,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
       !fresh.settings.enabled ||
       !fresh.settings.auto ||
       !noteAllowed(fresh.document, fresh.settings) ||
-      !(job.kind === 'analysis'
+      !(job.kind === 'analysis' || job.kind.startsWith('research:')
         ? currentAnalysis(fresh.document, contentRevision(n))
         : currentContent(fresh.document, contentRevision(n))) ||
       (job.kind.startsWith('research:') && !fresh.settings.autoResearch)
@@ -235,6 +238,24 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         await db.query("UPDATE jobs SET status='done',lease_until=NULL WHERE id=$1", [job.id]);
         return true;
       }
+      const transcripts = await noteTranscripts(db, job.user_id, n.content);
+      // Download can take time; check consent and revision again before any model call.
+      const permission = (
+        await db.query(
+          'SELECT n.document,s.document AS settings FROM notes n JOIN ai_settings s ON n.user_id=s.user_id WHERE n.user_id=$1 AND n.id=$2',
+          [job.user_id, job.note_id],
+        )
+      ).rows[0];
+      if (
+        !permission?.settings.enabled ||
+        !permission.settings.auto ||
+        !permission.settings.autoResearch ||
+        !noteAllowed(permission.document, permission.settings) ||
+        !currentAnalysis(permission.document, job.revision)
+      ) {
+        await db.query("UPDATE jobs SET status='skipped',lease_until=NULL WHERE id=$1", [job.id]);
+        return true;
+      }
       const response: any = await openai(
         db,
         job.user_id,
@@ -246,7 +267,21 @@ export async function workOnce(db: Database, env: AIEnvironment) {
           max_tool_calls: 3,
           memory: false,
           instructions: knowledgeRole + researchInstructions(item.kind),
-          input: researchInput(item),
+          input: JSON.stringify({
+            ...JSON.parse(researchInput(item, n.content)),
+            youtubeTranskripte: transcripts.sources.map((s) => ({
+              titel: s.title,
+              url: s.url,
+              automatisch: s.transcript!.automatic,
+              ausschnitt: s.transcript!.partial,
+              passagen: s.transcript!.segments.map((segment) => ({
+                text: segment.text,
+                zeit: transcriptTime(segment.offset),
+                url: youtubeUrl(s.transcript!.videoId, segment.offset),
+              })),
+            })),
+            transkriptHinweise: transcripts.warnings,
+          }),
         },
         env,
       );
@@ -259,7 +294,18 @@ export async function workOnce(db: Database, env: AIEnvironment) {
           .filter((a: any) => a.type === 'url_citation' && /^https?:\/\//.test(a.url))
           .map((a: any) => ({ title: a.title || a.url, url: a.url })) || [];
       if (!citations.length) throw new Error('Keine belegten Webquellen gefunden.');
-      data = { key, text: text(response), sources: uniqueSources(citations) };
+      const transcriptStatus = transcripts.sources.map(
+        (s) =>
+          `YouTube-Transkript eingelesen: ${s.transcript!.segments[0].lang}${s.transcript!.automatic ? ' · automatische Untertitel (Erkennungsfehler möglich)' : ' · bereitgestellte Untertitel'}${s.transcript!.partial ? ' · Ausschnitt' : ''}.`,
+      );
+      data = {
+        key,
+        text: [text(response), ...transcriptStatus, ...transcripts.warnings].join('\n\n'),
+        sources: uniqueSources([
+          ...citations,
+          ...transcripts.sources.map(({ title, url }) => ({ title, url })),
+        ]),
+      };
       kind = 'research';
     }
     const record = {
@@ -277,7 +323,7 @@ export async function workOnce(db: Database, env: AIEnvironment) {
     );
     if (
       check.rows[0] &&
-      (kind === 'analysis'
+      (kind === 'analysis' || kind === 'research'
         ? currentAnalysis(check.rows[0].document, contentRevision(n))
         : currentContent(check.rows[0].document, contentRevision(n))) &&
       check.rows[0].settings.enabled &&

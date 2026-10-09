@@ -178,6 +178,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
         ]
       : [];
     const transcriptBudget = Math.floor(48000 / Math.max(1, urls.slice(0, 3).filter(youtubeVideoId).length));
+    let remainingTranscriptBudget = 48000;
     if (commandImportsDocuments(job.prompt)) {
       await finish(
         await importCommandDocuments(db, env, job, {
@@ -252,8 +253,9 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
           await progress('YouTube-Untertitel werden gelesen');
           const source = transcriptSource(
             await youtubeTranscript(db, job.user_id, url, controller.signal),
-            transcriptBudget,
+            Math.min(transcriptBudget, remainingTranscriptBudget),
           );
+          remainingTranscriptBudget -= source.text.length + 1;
           sources.push(source);
           if (source.transcript!.partial) {
             contextIncomplete = true;

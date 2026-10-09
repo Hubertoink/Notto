@@ -22,6 +22,19 @@ export const analysisSchema = z.object({
     .max(12),
 });
 /** Keep the actual source excerpt; PDF spacing may differ from the model's copied quote. */
+export function originalQuote(source: { text: string; attachment?: string }, quote: string) {
+  if (!quote.trim()) return undefined;
+  if (source.text.includes(quote)) return quote;
+  const pattern = quote
+    .trim()
+    .split(/\s+/u)
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\s+');
+  // Only tolerate layout differences, never missing words or paraphrases.
+  const pdfPattern = pattern.replace(/(\p{L})(?=\p{L})/gu, '$1(?:-\\s*\\n\\s*)?');
+  return source.text.match(new RegExp(source.attachment?.endsWith('.pdf') ? pdfPattern : pattern, 'u'))?.[0];
+}
+
 export function groundAnalysis(
   result: z.infer<typeof analysisSchema>,
   sources: { text: string; attachment?: string }[],
@@ -30,24 +43,13 @@ export function groundAnalysis(
     ...result,
     suggestions: result.suggestions.map((suggestion) => {
       if (suggestion.quote.trim()) {
-        const pattern = suggestion.quote
-          .trim()
-          .split(/\s+/u)
-          .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-          .join('\\s+');
-        // Only PDFs may contain a word split by a hyphen at a physical line break.
-        const pdfPattern = pattern.replace(/(\p{L})(?=\p{L})/gu, '$1(?:-\\s*\\n\\s*)?');
         for (const source of sources) {
           if (
             suggestion.kind === 'insight' &&
             (!source.attachment?.endsWith('.pdf') || source.text.startsWith('[Kein Text erkannt.'))
           )
             continue;
-          const quote = source.text.includes(suggestion.quote)
-            ? suggestion.quote
-            : source.text.match(
-                new RegExp(source.attachment?.endsWith('.pdf') ? pdfPattern : pattern, 'u'),
-              )?.[0];
+          const quote = originalQuote(source, suggestion.quote);
           if (quote) return { ...suggestion, quote };
         }
       }

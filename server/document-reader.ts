@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { originalQuote } from '../src/evidence-policy.js';
 import { documentBatches } from '../src/document-context.js';
 import type { ContextSource } from './command-context.js';
 import type { Database } from './database.js';
@@ -77,13 +78,13 @@ export async function readWholeDocuments(
     incomplete ||= result.insufficient;
     return result.findings.map((finding) => {
       const source = sources[finding.source];
-      if (!source || !source.text.includes(finding.quote))
-        throw new Error('Abschnittsergebnis verworfen: Originalbeleg nicht nachweisbar.');
+      const quote = source && originalQuote(source, finding.quote);
+      if (!quote) throw new Error('Abschnittsergebnis verworfen: Originalbeleg nicht nachweisbar.');
       // Keep enough original surrounding text to make citations interpretable.
-      const offset = source.text.indexOf(finding.quote);
+      const offset = source.text.indexOf(quote);
       return {
         ...source,
-        text: source.text.slice(Math.max(0, offset - 180), offset + finding.quote.length + 180),
+        text: source.text.slice(Math.max(0, offset - 180), offset + quote.length + 180),
         readingNote: finding.detail,
       };
     });

@@ -146,11 +146,15 @@ afterAll(async () => {
   await pg.close();
 });
 
-it.each(['success', 'unavailable', 'web-off', 'revoked', 'changed', 'ungrounded'])(
+it.each(['success', 'with-pdf', 'unavailable', 'web-off', 'revoked', 'changed', 'ungrounded'])(
   'uses real transcript evidence and time links for a video command: %s',
   async (mode) => {
     const current = reviseNote(note, {
-      content: 'Lernbüro\nhttps://youtu.be/qp0HIF3SfI4\nhttps://www.youtube.com/watch?v=qp0HIF3SfI4&t=9',
+      content:
+        'Lernbüro\nhttps://youtu.be/qp0HIF3SfI4\nhttps://www.youtube.com/watch?v=qp0HIF3SfI4&t=9' +
+        (mode === 'with-pdf'
+          ? '\n[Quality Youth Work](attachments/e5906e8f-1025-48f2-983c-0ad9a0426ec7.pdf)\nhttps://example.com/unrelated'
+          : ''),
     });
     await pg.query('UPDATE notes SET document=$2,revision=$3 WHERE id=$1', [
       note.id,
@@ -183,11 +187,25 @@ it.each(['success', 'unavailable', 'web-off', 'revoked', 'changed', 'ungrounded'
         segments: [
           { text: 'Willkommen.', offset: 0, duration: 3, lang: 'de' },
           { text: 'Lernende prüfen ihren Fortschritt.', offset: 83.5, duration: 4, lang: 'de' },
+          ...(mode === 'with-pdf'
+            ? Array.from({ length: 590 }, (_, index) => ({
+                text: `Lernbüroabschnitt ${index} mit weiteren Inhalten.`,
+                offset: 90 + index * 4,
+                duration: 4,
+                lang: 'de',
+              }))
+            : []),
         ],
       };
     });
     vi.mocked(openai).mockImplementation(async (_db, _user, _endpoint, body) => {
       const input = JSON.parse(body.input as string);
+      expect((body.text as any).format.name).toBe('note_command');
+      if (mode === 'with-pdf') {
+        expect(input.sources).toHaveLength(1);
+        expect(input.sources[0].text).toContain('Lernbüroabschnitt 589');
+        expect(input.sources[0].transcript.partial).toBe(false);
+      }
       if (mode !== 'web-off') {
         expect(input.sources[0].text).toContain('[01:23] Lernende prüfen ihren Fortschritt.');
         expect(input.sources[0].transcript).toMatchObject({ language: 'de', automatic: true });
@@ -205,6 +223,7 @@ it.each(['success', 'unavailable', 'web-off', 'revoked', 'changed', 'ungrounded'
                   items: [
                     {
                       title: 'Fortschritt',
+                      kind: 'fact',
                       detail: 'Lernende kontrollieren ihren Fortschritt.',
                       source: 0,
                       target: null,
@@ -228,7 +247,14 @@ it.each(['success', 'unavailable', 'web-off', 'revoked', 'changed', 'ungrounded'
           method: 'PUT',
           url: `/api/commands/${id}`,
           headers: headers(),
-          payload: { noteId: note.id, revision: current.revision, prompt: 'Fasse dieses Video zusammen.' },
+          payload: {
+            noteId: note.id,
+            revision: current.revision,
+            prompt:
+              mode === 'with-pdf'
+                ? 'Fasse die Kernaussagen des verlinkten Videos zum selbstregulierten Lernen zusammen. Welche Ansätze lassen sich auf die offene Jugendarbeit übertragen? Trenne Aussagen aus dem Video von eigenen Vorschlägen und belege die Videoaussagen mit Zeitmarken.'
+                : 'Fasse dieses Video zusammen.',
+          },
         })
       ).statusCode,
     ).toBe(200);
@@ -240,7 +266,7 @@ it.each(['success', 'unavailable', 'web-off', 'revoked', 'changed', 'ungrounded'
       expect(openai).not.toHaveBeenCalled();
     } else {
       expect(job.status).toBe('done');
-      if (mode === 'success') {
+      if (mode === 'success' || mode === 'with-pdf') {
         expect(job.result.items[0]).toMatchObject({
           url: 'https://www.youtube.com/watch?v=qp0HIF3SfI4&t=83s',
           transcriptCitation: {
@@ -251,6 +277,9 @@ it.each(['success', 'unavailable', 'web-off', 'revoked', 'changed', 'ungrounded'
           },
         });
         expect(job.result.transcripts).toHaveLength(1);
+        expect(job.result.searched).toBe(false);
+        expect(job.result.warnings).toEqual([]);
+        expect(job.result.items[0].kind).toBe('fact');
       } else if (mode === 'unavailable') {
         expect(job.result.items).toEqual([]);
         expect(job.result.partial).toBe(true);

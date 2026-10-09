@@ -7,7 +7,7 @@ import { openai, type AIEnvironment } from './openai.js';
 import type { Database } from './database.js';
 import { searchCommand } from './command-search.js';
 import { cleanCompletedPrompts } from './command-cleanup.js';
-import { commandNeedsSearch } from './command-intent.js';
+import { commandFocusesVideo, commandNeedsSearch } from './command-intent.js';
 import { commandImportsDocuments, importCommandDocuments } from './command-document-import.js';
 import { commandContextSources, type ContextSource } from './command-context.js';
 import { attachmentIds, currentContent, validAIContext, type Note } from '../src/domain.js';
@@ -164,6 +164,20 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
     const sources: (BrowserSource & { evidence?: ContextSource })[] = [];
     const context = validAIContext(job.context) ? job.context : { mode: 'note' as const, web: true };
     const webEnabled = context.web === true && permission.settings.commandWeb !== false;
+    const videoOnly = commandFocusesVideo(job.prompt, job.note_content);
+    const urls = webEnabled
+      ? [
+          ...new Set(
+            [...commandUrls(job.prompt), ...commandUrls(job.note_content)]
+              .filter((url) => !videoOnly || !!youtubeVideoId(url))
+              .map((url) => {
+                const id = youtubeVideoId(url);
+                return id ? youtubeUrl(id) : url;
+              }),
+          ),
+        ]
+      : [];
+    const transcriptBudget = Math.floor(48000 / Math.max(1, urls.slice(0, 3).filter(youtubeVideoId).length));
     if (commandImportsDocuments(job.prompt)) {
       await finish(
         await importCommandDocuments(db, env, job, {
@@ -176,7 +190,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
       );
       return true;
     }
-    if (attachmentIds(job.note_content).length || context.mode !== 'note') {
+    if (!videoOnly && (attachmentIds(job.note_content).length || context.mode !== 'note')) {
       if (!currentContent(permission.document, job.revision))
         throw new Error('Die Notiz wurde inzwischen geändert. Bitte den Auftrag erneut starten.');
       const snapshot: Note = { ...permission.document, scope: job.user_id, content: job.note_content };
@@ -236,7 +250,10 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
         if (youtubeVideoId(url)) {
           usedTranscript = true;
           await progress('YouTube-Untertitel werden gelesen');
-          const source = transcriptSource(await youtubeTranscript(db, job.user_id, url, controller.signal));
+          const source = transcriptSource(
+            await youtubeTranscript(db, job.user_id, url, controller.signal),
+            transcriptBudget,
+          );
           sources.push(source);
           if (source.transcript!.partial) {
             contextIncomplete = true;
@@ -252,16 +269,6 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
       controller.signal.throwIfAborted();
       await permitted();
     }
-    const urls = webEnabled
-      ? [
-          ...new Set(
-            [...commandUrls(job.prompt), ...commandUrls(job.note_content)].map((url) => {
-              const id = youtubeVideoId(url);
-              return id ? youtubeUrl(id) : url;
-            }),
-          ),
-        ]
-      : [];
     if (!urls.length && !sources.length)
       sources.push({
         title: 'Notiz zum Startzeitpunkt',
@@ -283,6 +290,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
       commandNeedsSearch(
         job.prompt,
         sources.some((source) => !!source.url),
+        urls.some(youtubeVideoId),
       );
     let search: Awaited<ReturnType<typeof searchCommand>> | undefined;
     if (needsSearch) {
@@ -426,7 +434,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
               type: 'json_schema',
               name: 'note_command',
               strict: true,
-              schema: z.toJSONSchema(contextSources.length ? documentAnswerSchema : answerSchema),
+              schema: z.toJSONSchema(hasSourceContext ? documentAnswerSchema : answerSchema),
             },
           },
         },
@@ -441,7 +449,7 @@ export async function workCommandOnce(db: Database, env: AIEnvironment) {
         .map((item: any) => item.text)
         .join('\n');
       if (!text) throw new Error('Die KI hat kein Ergebnis geliefert.');
-      answer = (contextSources.length ? documentAnswerSchema : answerSchema).parse(JSON.parse(text));
+      answer = (hasSourceContext ? documentAnswerSchema : answerSchema).parse(JSON.parse(text));
       const knownLinks = new Set(sources.flatMap((source) => source.links.map((link) => link.url)));
       const follow = answer.followLinks
         .filter((url) => knownLinks.has(url) && !seen.has(url))

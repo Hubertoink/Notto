@@ -82,3 +82,19 @@ it('rejects invented citations and propagates cancellation before sending text',
   ).rejects.toThrow('Abgebrochen');
   expect(api).not.toHaveBeenCalled();
 });
+
+it('accepts PDF line wraps and preserves the actual original excerpt', async () => {
+  const original = 'Selbstregu-\nliertes Lernen braucht\n  Rückmeldung.';
+  api.mockResolvedValue(response('Selbstreguliertes Lernen braucht Rückmeldung.'));
+  const result = await readWholeDocuments(
+    {} as Database,
+    env,
+    'alice',
+    'test',
+    'Zusammenfassen',
+    [[source(1, original)]],
+    new AbortController().signal,
+    async () => {},
+  );
+  expect(result.sources[0].text).toBe(original);
+});

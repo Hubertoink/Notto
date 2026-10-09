@@ -28,7 +28,7 @@ const headers = (secret?: string) => ({
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
 });
-it.each(['internal link', 'formatting', 'external link'])(
+it.each(['internal link', 'formatting', 'external link', 'hashtag'])(
   'reuses analysis after %s without a model call and checks real edits again',
   async (mode) => {
     await pg.exec('DELETE FROM jobs');
@@ -44,7 +44,9 @@ it.each(['internal link', 'formatting', 'external link'])(
           ? '[Ownership über Projekte und Prozesse](notes/11111111-1111-4111-8111-111111111111).'
           : mode === 'formatting'
             ? '## **Ownership** über Projekte und Prozesse.\n\n'
-            : '## Ownership über Projekte und Prozesse.\n\n- [Interessanter Ansatz](https://youtu.be/example)',
+            : mode === 'hashtag'
+              ? 'Ownership über Projekte und Prozesse.\n\n#Jugendarbeit #Projekt'
+              : '## Ownership über Projekte und Prozesse.\n\n- [Interessanter Ansatz](https://youtu.be/example)',
     });
     await pg.query(
       'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',

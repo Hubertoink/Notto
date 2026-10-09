@@ -3,6 +3,7 @@ import { newNote, reviseNote, currentContent } from './domain';
 import { analysisContent, currentAnalysis } from './analysis-current';
 import { analysisJob } from './analysis-status';
 import type { BackgroundJob } from './AIActivity';
+import { noteAllowed } from './evidence-policy';
 
 const a = '11111111-1111-4111-8111-111111111111',
   b = '22222222-2222-4222-8222-222222222222';
@@ -48,14 +49,13 @@ it('retains a checked analysis when an internal link is inserted, extended, or r
   // Other operations still require the exact source version.
   expect(currentContent(linked, original.revision)).toBe(false);
 });
-it('invalidates actual changes to words, tags, attachments, external URLs, and code', () => {
+it('invalidates actual changes to words, attachments, external URLs, and code', () => {
   const note = newNote(
     'local',
     `Ownership [Artikel](attachments/${a}.pdf) #konzeption\n[Quelle](https://example.org/a)`,
   );
   for (const content of [
     note.content.replace('Ownership', 'Delegation'),
-    note.content.replace('#konzeption', '#team'),
     note.content.replace(`${a}.pdf`, `${b}.pdf`),
     note.content.replace('example.org/a', 'example.org/b'),
     note.content + `\n\n[Neue Quelle](attachments/${b}.pdf)`,
@@ -66,6 +66,31 @@ it('invalidates actual changes to words, tags, attachments, external URLs, and c
   expect(currentAnalysis(reviseNote(code, { content: code.content.replace(a, b) }), code.revision)).toBe(
     false,
   );
+});
+it.each([
+  ['Gedanke', 'Gedanke\n\n#Jugendarbeit #Lernen/selbstständig'],
+  ['Gedanke #alt', '#neu\nGedanke'],
+  ['Gedanke #alt', 'Gedanke'],
+  ['Gedanke', 'Gedanke **#Jugendarbeit**'],
+])('keeps analysis for organizational hashtag changes: %s → %s', (before, content) => {
+  const note = newNote('local', before);
+  expect(currentAnalysis(reviseNote(note, { content }), note.revision)).toBe(true);
+});
+it.each([
+  ['# Lernen', '# Arbeiten'],
+  ['Gedanke #alt', 'Neuer Gedanke #alt'],
+  ['`#alt`', '`#neu`'],
+  ['```\n#alt\n```', '```\n#neu\n```'],
+  ['[Quelle](https://example.org/#alt)', '[Quelle](https://example.org/#neu)'],
+])('preserves meaningful headings, code, and URL fragments: %s → %s', (before, content) => {
+  const note = newNote('local', before);
+  expect(currentAnalysis(reviseNote(note, { content }), note.revision)).toBe(false);
+});
+it('still enforces an exclusion tag even when the analysis content is unchanged', () => {
+  const note = newNote('local', 'Ein Gedanke');
+  const excluded = reviseNote(note, { content: note.content + '\n#privat' });
+  expect(currentAnalysis(excluded, note.revision)).toBe(true);
+  expect(noteAllowed(excluded, { excludedTags: 'privat', excludedNotes: [] })).toBe(false);
 });
 it('does not treat a changed link label as the same content or trust unknown historical revisions', () => {
   const note = newNote('local', 'Ownership im Team');

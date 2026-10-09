@@ -57,6 +57,7 @@ import { contentRevision } from './domain';
 import { type AIContext } from './domain';
 import { ContextPicker } from './ContextPicker';
 import { defaultContext, webResearchEnabled } from './source-context';
+import { resizeNoteTextarea } from './textarea-size';
 
 export function Editor({
   note,
@@ -139,14 +140,20 @@ export function Editor({
   }
   segments.push({ start: cursor, end: content.length });
   useLayoutEffect(() => {
-    const resize = () =>
-      textFields.current.forEach((el) => {
-        el.style.height = 'auto';
-        el.style.height = `${el.scrollHeight}px`;
-      });
+    const resize = () => textFields.current.forEach(resizeNoteTextarea);
     resize();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize);
     const parent = input.current?.parentElement;
+    let width = parent?.getBoundingClientRect().width;
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            const nextWidth = parent?.getBoundingClientRect().width;
+            // Keyboard/viewport height changes and our own autosizing do not change wrapping.
+            if (nextWidth === width) return;
+            width = nextWidth;
+            resize();
+          });
     if (parent) observer?.observe(parent);
     return () => observer?.disconnect();
   }, [content, preview]);
@@ -158,7 +165,7 @@ export function Editor({
       [...textFields.current.values()].find(
         (field) => caret.start >= offsetOf(field) && caret.start <= offsetOf(field) + field.value.length,
       ) || input.current;
-    el?.focus();
+    el?.focus({ preventScroll: true });
     el?.setSelectionRange(caret.start - offsetOf(el), caret.end - offsetOf(el));
     acceptedTagCaret.current = null;
   }, [content, collections]);

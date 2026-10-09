@@ -20,7 +20,7 @@ type Node = {
 type Token = string | { url: string; label: string; title: string };
 const whitespace = (text: string) => text.replace(/\s+/g, ' ').trim();
 
-/** Compare presentation separately from the original text used for citations.
+/** Compare presentation and organizational tags separately from original citation text.
  * Keep order, code, task states, strike-through and source destinations meaningful.
  */
 function tokens(content: string): Token[] {
@@ -49,7 +49,9 @@ function tokens(content: string): Token[] {
     const children = () => node.children?.forEach(visit);
     switch (node.type) {
       case 'text':
-        pending += node.value;
+        // Tags organize notes; changing them alone must not rerun the AI.
+        // Keep code, link destinations, and image descriptions untouched.
+        pending += node.value?.replace(/(^|\s)#[\p{L}\p{N}][\p{L}\p{N}_/-]*/gu, '$1');
         return;
       case 'root':
         children();

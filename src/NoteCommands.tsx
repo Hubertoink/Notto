@@ -195,8 +195,8 @@ export function NoteCommands({
   if (!drafts.length && !commands.length)
     return (
       <p className="command-hint">
-        Mit <code>/ki</code> am Zeilenanfang einen KI-Auftrag formulieren. Neue Aufträge starten beim
-        Speichern.
+        Über + neben „Aufträge“ eine Frage oder einen neuen KI-Auftrag eingeben. Alternativ mit{' '}
+        <code>/ki</code> am Zeilenanfang in der Notiz; diese Aufträge starten beim Speichern.
       </p>
     );
   return (

@@ -103,6 +103,9 @@ export function Editor({
   const contextRef = useRef(aiContext);
   const initialContextRef = useRef(aiContext);
   const [aiQuestion, setAIQuestion] = useState<string | null>(null);
+  const [commandSubmitting, setCommandSubmitting] = useState(false);
+  const commandSubmitLock = useRef(false);
+  const commandInput = useRef<HTMLTextAreaElement>(null);
   const [contextOpen, setContextOpen] = useState(false);
   const collectionRef = useRef(collections);
   const initialCollectionRef = useRef(collections);
@@ -660,51 +663,128 @@ export function Editor({
   const outgoing = linkedNotes(content, notes || [], scope);
   const incoming = note ? backlinks(note, notes || []) : [];
   const commandsPanel = (
-    <NoteCommands
-      key={`${scope}:${note?.id || 'new'}`}
-      content={content}
-      onCount={setCommandCount}
-      onCompleted={sync}
-      noteId={note?.id}
-      scope={scope}
-      editing={!preview}
-      dirty={dirty}
-      onInsert={(text) => {
-        change(`${textRef.current.trimEnd()}\n\n${text}`);
-        setPreview(false);
-      }}
-      onStart={async (prompt, id) => {
-        try {
-          const saved = dirty || !note ? await save() : note;
-          if (!saved)
-            throw new Error('Die Notiz konnte nicht gespeichert werden. Bitte den Hinweis im Editor prüfen.');
-          // An in-flight sync may have read the notebook before this save.
-          // Wait for it, then run a pass that includes the saved revision.
-          const conflicts = (await syncNotes(scope)) + (await syncNotes(scope));
-          if (conflicts)
-            throw new Error('Es gibt eine Konfliktkopie. Bitte zuerst die gewünschte Notizfassung öffnen.');
-          // Saving may already have queued this instruction on the server.
-          const queued = await serverRequest(readCloudConfig().url, `/commands?noteId=${saved.id}`);
-          const active = queued.commands.find(
-            (command: import('./note-command').NoteCommand) =>
-              command.prompt === prompt &&
-              (['pending', 'running'].includes(command.status) ||
-                ((dirty || !note) && command.revision === contentRevision(saved))),
-          );
-          if (active) return active;
-          const result = await serverRequest(readCloudConfig().url, `/commands/${id}`, {
-            noteId: saved.id,
-            revision: contentRevision(saved),
-            prompt,
-          });
-          return result.command;
-        } catch (error) {
-          // Saving a new note remounts this editor; keep failures visible.
-          notify(error instanceof Error ? error.message : 'Auftrag konnte nicht gestartet werden.');
-          throw error;
-        }
-      }}
-    />
+    <>
+      {aiQuestion !== null && (
+        <section className="command-entry" aria-label="Neuer KI-Auftrag">
+          <label className="document-form">
+            Deine Frage oder dein Auftrag
+            <textarea
+              ref={commandInput}
+              autoFocus
+              disabled={saving || commandSubmitting}
+              rows={4}
+              maxLength={4000}
+              value={aiQuestion}
+              onChange={(e) => setAIQuestion(e.target.value)}
+              placeholder="Fasse unsere Konzeption zur Beteiligung zusammen und mache einen Vorschlag für diese Notiz."
+            />
+          </label>
+          <ContextPicker
+            names={knownCollections}
+            value={aiContext}
+            commandWeb={commandWeb}
+            current={{ ...(note ?? draftNote), collections }}
+            notes={notes || []}
+            disabled={saving || commandSubmitting}
+            onChange={(value) => {
+              setAIContext(value);
+              contextRef.current = value;
+              change(textRef.current);
+            }}
+          />
+          <div className="command-entry-actions">
+            <Action
+              label={commandSubmitting ? 'Wird gestartet …' : 'Auftrag starten'}
+              variant="primary"
+              isDisabled={
+                saving ||
+                commandSubmitting ||
+                !ready ||
+                !aiQuestion.trim() ||
+                scope === 'local' ||
+                !ownBackend() ||
+                !config(scope).enabled
+              }
+              onClick={() => {
+                if (commandSubmitLock.current) return;
+                commandSubmitLock.current = true;
+                setCommandSubmitting(true);
+                const request = aiQuestion.trim().replace(/\r?\n/g, ' ');
+                void (async () => {
+                  const saved = await save(false, false, `${textRef.current.trimEnd()}\n\n/ki ${request}`);
+                  if (!saved) return;
+                  setAIQuestion(null);
+                  await syncNotes(scope);
+                  await syncNotes(scope);
+                })()
+                  .catch((e) => notify(e instanceof Error ? e.message : String(e)))
+                  .finally(() => {
+                    commandSubmitLock.current = false;
+                    if (alive.current) setCommandSubmitting(false);
+                  });
+              }}
+            />
+            <Action
+              label="Abbrechen"
+              variant="ghost"
+              isDisabled={saving || commandSubmitting}
+              onClick={() => setAIQuestion(null)}
+            />
+          </div>
+          {scope === 'local' && (
+            <p className="muted">Für KI-Aufträge bitte mit deinem Noto-Server anmelden.</p>
+          )}
+          {!config(scope).enabled && <p className="muted">KI zuerst unter „Wissen & KI“ aktivieren.</p>}
+        </section>
+      )}
+      <NoteCommands
+        key={`${scope}:${note?.id || 'new'}`}
+        content={content}
+        onCount={setCommandCount}
+        onCompleted={sync}
+        noteId={note?.id}
+        scope={scope}
+        editing={!preview}
+        dirty={dirty}
+        onInsert={(text) => {
+          change(`${textRef.current.trimEnd()}\n\n${text}`);
+          setPreview(false);
+        }}
+        onStart={async (prompt, id) => {
+          try {
+            const saved = dirty || !note ? await save() : note;
+            if (!saved)
+              throw new Error(
+                'Die Notiz konnte nicht gespeichert werden. Bitte den Hinweis im Editor prüfen.',
+              );
+            // An in-flight sync may have read the notebook before this save.
+            // Wait for it, then run a pass that includes the saved revision.
+            const conflicts = (await syncNotes(scope)) + (await syncNotes(scope));
+            if (conflicts)
+              throw new Error('Es gibt eine Konfliktkopie. Bitte zuerst die gewünschte Notizfassung öffnen.');
+            // Saving may already have queued this instruction on the server.
+            const queued = await serverRequest(readCloudConfig().url, `/commands?noteId=${saved.id}`);
+            const active = queued.commands.find(
+              (command: import('./note-command').NoteCommand) =>
+                command.prompt === prompt &&
+                (['pending', 'running'].includes(command.status) ||
+                  ((dirty || !note) && command.revision === contentRevision(saved))),
+            );
+            if (active) return active;
+            const result = await serverRequest(readCloudConfig().url, `/commands/${id}`, {
+              noteId: saved.id,
+              revision: contentRevision(saved),
+              prompt,
+            });
+            return result.command;
+          } catch (error) {
+            // Saving a new note remounts this editor; keep failures visible.
+            notify(error instanceof Error ? error.message : 'Auftrag konnte nicht gestartet werden.');
+            throw error;
+          }
+        }}
+      />
+    </>
   );
   return (
     <section
@@ -724,17 +804,6 @@ export function Editor({
             </button>
           )}
           <div className="toolbar">
-            {!compact && (
-              <Action
-                label="KI fragen"
-                variant="ghost"
-                isDisabled={saving || !ready}
-                onClick={() => {
-                  const el = input.current;
-                  setAIQuestion(el?.value.slice(el.selectionStart, el.selectionEnd).trim() || '');
-                }}
-              />
-            )}
             {!compact && (
               <Action
                 label={rewriting ? 'Wird überarbeitet …' : 'Mit KI überarbeiten'}
@@ -827,54 +896,6 @@ export function Editor({
             />
           )}
         </details>
-      )}
-      {aiQuestion !== null && (
-        <Modal title="KI fragen" onClose={() => setAIQuestion(null)}>
-          <label className="document-form">
-            Deine Frage oder dein Auftrag
-            <textarea
-              rows={4}
-              maxLength={4000}
-              value={aiQuestion}
-              onChange={(e) => setAIQuestion(e.target.value)}
-              placeholder="Fasse unsere Konzeption zur Beteiligung zusammen und mache einen Vorschlag für diese Notiz."
-            />
-          </label>
-          <ContextPicker
-            names={knownCollections}
-            value={aiContext}
-            commandWeb={commandWeb}
-            current={{ ...(note ?? draftNote), collections }}
-            notes={notes || []}
-            disabled={saving}
-            onChange={(value) => {
-              setAIContext(value);
-              contextRef.current = value;
-              change(textRef.current);
-            }}
-          />
-          <Action
-            label="Auftrag starten"
-            variant="primary"
-            isDisabled={
-              saving || !aiQuestion.trim() || scope === 'local' || !ownBackend() || !config(scope).enabled
-            }
-            onClick={() => {
-              const request = aiQuestion.trim().replace(/\r?\n/g, ' ');
-              void (async () => {
-                const saved = await save(false, false, `${textRef.current.trimEnd()}\n\n/ki ${request}`);
-                if (!saved) return;
-                setAIQuestion(null);
-                await syncNotes(scope);
-                await syncNotes(scope);
-              })().catch((e) => notify(e instanceof Error ? e.message : String(e)));
-            }}
-          />
-          {scope === 'local' && (
-            <p className="muted">Für KI-Aufträge bitte mit deinem Noto-Server anmelden.</p>
-          )}
-          {!config(scope).enabled && <p className="muted">KI zuerst unter „Wissen & KI“ aktivieren.</p>}
-        </Modal>
       )}
       {rewriteRequest !== null && (
         <Modal title="Notiz überarbeiten" className="rewrite-dialog" onClose={() => setRewriteRequest(null)}>
@@ -1287,6 +1308,15 @@ export function Editor({
           key={note?.id || 'new'}
           note={note || { ...draftNote, content }}
           commands={commandsPanel}
+          newCommandDisabled={saving || commandSubmitting || !ready}
+          onNewCommand={() => {
+            const el = input.current;
+            setAIQuestion(
+              (current) =>
+                current ?? (el?.value.slice(el.selectionStart, el.selectionEnd).trim().slice(0, 4000) || ''),
+            );
+            requestAnimationFrame(() => commandInput.current?.focus());
+          }}
           commandCount={commandCount}
           hasCommandDrafts={noteCommands(content).length > 0}
           hasUnsavedChanges={dirty}

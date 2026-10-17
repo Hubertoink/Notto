@@ -14,6 +14,9 @@ import { newNote, reviseNote, contentRevision } from './domain';
 import { knowledge } from './intelligence';
 import * as intelligence from './intelligence';
 import * as rewriting from './rewrite';
+import * as cloud from './cloud';
+import * as state from './state';
+import * as backend from './backend';
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 beforeAll(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -274,6 +277,110 @@ it('shares one annotation shell with a keyboard accessible commands tab', async 
   expect(screen.queryByRole('tabpanel', { name: 'Aufträge' })).toBeNull();
   await user.keyboard('{ArrowRight}');
   expect(screen.getByRole('tabpanel', { name: 'Aufträge' })).toBeTruthy();
+});
+it('creates questions in the commands tab and preserves the draft when switching tabs or pressing plus again', async () => {
+  renderEditor();
+  const user = userEvent.setup();
+  const noteField = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(noteField.disabled).toBe(false));
+  fireEvent.change(noteField, { target: { value: 'Vergleiche beide Varianten' } });
+  noteField.setSelectionRange(0, 10);
+  expect(screen.queryByRole('button', { name: 'KI fragen' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: /KI-Anmerkungen/ }));
+  await user.click(screen.getByRole('button', { name: 'Neuer KI-Auftrag' }));
+  const field = screen.getByRole('textbox', { name: 'Deine Frage oder dein Auftrag' }) as HTMLTextAreaElement;
+  expect(field.closest('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toContain('commands-tab');
+  expect(field.value).toBe('Vergleiche');
+  expect(document.activeElement).toBe(field);
+  fireEvent.change(field, { target: { value: 'Mein geänderter Auftrag' } });
+  await user.click(screen.getByRole('tab', { name: 'Anmerkungen' }));
+  await user.click(screen.getByRole('button', { name: 'Neuer KI-Auftrag' }));
+  expect(field.value).toBe('Mein geänderter Auftrag');
+  expect(screen.getByRole('button', { name: 'Auftrag starten' }).hasAttribute('disabled')).toBe(true);
+  await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+  expect(screen.queryByRole('textbox', { name: 'Deine Frage oder dein Auftrag' })).toBeNull();
+  expect(noteField.value).toBe('Vergleiche beide Varianten');
+  expect(await repo.list('local')).toHaveLength(0);
+});
+
+function connectedCommands() {
+  vi.spyOn(state, 'useNotto').mockReturnValue({
+    scope: 'test-user',
+    notes: [],
+    user: null,
+    authReady: true,
+    loading: false,
+    notify: vi.fn(),
+    notice: '',
+    sync: vi.fn(),
+    syncState: 'synced',
+    syncError: '',
+    lastSync: null,
+    reload: vi.fn(),
+  });
+  vi.spyOn(cloud, 'ownBackend').mockReturnValue(true);
+  vi.spyOn(cloud, 'syncNotes').mockResolvedValue(0);
+  vi.spyOn(backend, 'serverRequest').mockResolvedValue({ commands: [] });
+  vi.spyOn(knowledge, 'sync').mockResolvedValue(undefined);
+  localStorage.setItem('notto-ai:test-user', JSON.stringify({ enabled: true }));
+}
+
+it('saves the note, command and selected web policy together and prevents a double submission', async () => {
+  connectedCommands();
+  let finish!: () => void;
+  vi.mocked(knowledge.sync).mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const saved = vi.fn();
+  renderEditor(saved);
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  fireEvent.change(field, { target: { value: 'Zwei Varianten mit 80 € und 40 €.' } });
+  fireEvent.click(screen.getByRole('button', { name: /KI-Anmerkungen/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Neuer KI-Auftrag' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Deine Frage oder dein Auftrag' }), {
+    target: { value: 'Vergleiche die Kosten.\nNenne offene Fragen.' },
+  });
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Webrecherche für diese Notiz ausschalten' }));
+  const start = screen.getByRole('button', { name: 'Auftrag starten' });
+  fireEvent.click(start);
+  fireEvent.click(start);
+  await waitFor(() => expect(finish).toBeTypeOf('function'));
+  expect(screen.getByRole('button', { name: 'Wird gestartet …' }).hasAttribute('disabled')).toBe(true);
+  finish();
+  await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+  const notes = await repo.list('test-user');
+  expect(notes).toHaveLength(1);
+  expect(notes[0].content).toBe(
+    'Zwei Varianten mit 80 € und 40 €.\n\n/ki Vergleiche die Kosten. Nenne offene Fragen.',
+  );
+  expect(notes[0].aiContext?.webPolicy).toBe('off');
+  await waitFor(() => expect(cloud.syncNotes).toHaveBeenCalledTimes(2));
+  expect(screen.queryByRole('textbox', { name: 'Deine Frage oder dein Auftrag' })).toBeNull();
+});
+
+it('keeps the command draft available when saving fails', async () => {
+  connectedCommands();
+  vi.spyOn(repo, 'put').mockRejectedValue(new Error('Speicher nicht verfügbar'));
+  renderEditor();
+  const noteField = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(noteField.disabled).toBe(false));
+  fireEvent.change(noteField, { target: { value: 'Mein unveränderter Notiztext' } });
+  fireEvent.click(screen.getByRole('button', { name: /KI-Anmerkungen/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Neuer KI-Auftrag' }));
+  const field = screen.getByRole('textbox', { name: 'Deine Frage oder dein Auftrag' }) as HTMLTextAreaElement;
+  fireEvent.change(field, { target: { value: 'Bitte vergleichen' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Auftrag starten' }));
+  await screen.findByText('Speicher nicht verfügbar');
+  expect(field.value).toBe('Bitte vergleichen');
+  expect(noteField.value).toBe('Mein unveränderter Notiztext');
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Auftrag starten' }).hasAttribute('disabled')).toBe(false),
+  );
+  expect(cloud.syncNotes).not.toHaveBeenCalled();
 });
 it('merges server prompt cleanup into an unsaved draft without losing text', async () => {
   const note = newNote('local', 'Gedanken\n/ki Suche Rezensionen\n');

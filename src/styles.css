@@ -960,7 +960,8 @@ textarea:focus-visible {
   margin-top: 13px;
 }
 .editor-content {
-  flex: 1;
+  /* Measured textareas must keep their full height inside the scrollable grid cell. */
+  flex: 1 0 auto;
   min-height: 200px;
   margin-top: 28px;
   display: flex;

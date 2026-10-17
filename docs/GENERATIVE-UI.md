@@ -67,7 +67,7 @@ Ein genauer Termin und verantwortliche Personen sind noch nicht festgelegt.
 Zu Barrierefreiheit und Versicherungsfragen liegen keine Informationen vor.
 ```
 
-Über „KI fragen“ diese Aufträge einzeln starten:
+Im KI-Anmerkungsbereich über **+ neben „Aufträge“** diese Aufträge einzeln starten:
 
 1. **Vergleich:** „Vergleiche ausschließlich anhand dieser Notiz beide Varianten als visuelle Vergleichstabelle. Verwende drei Vergleichsaspekte: Kosten und Budgetrest, Beteiligung, Durchführung und Personal. Stelle Unterschiede innerhalb jedes Aspekts gegenüber. Belege jeden Aspekt mit einer Originalstelle. Keine Webrecherche.“ Erwartet: 20 bzw. 60 Euro Budgetrest als Ableitung, zwölf Plätze bei beiden Varianten, Regenabhängigkeit nur bei B und keine Reduzierung der insgesamt zwei Fachkräfte.
 2. **Plan:** „Entwickle ausschließlich aus dieser Notiz einen visuellen Ablaufplan für 90 Minuten Kreativwerkstatt mit vier Schritten. Die letzten zehn Minuten sind Rückmeldungen. Kennzeichne deine Zeiteinteilung als Vorschlag, trenne die 30 Minuten Vorbereitung davon und belege die Ausgangspunkte. Erfinde keinen Termin und keine Personennamen.“ Erwartet: nummerierte Schritte, zusammen 90 Minuten einschließlich Abschluss; Übernahme eines Schritts als Checkbox in den Entwurf.

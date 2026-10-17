@@ -14,6 +14,7 @@ import {
   CircleCheck,
   Clock3,
   CircleAlert,
+  Plus,
 } from 'lucide-react';
 import {
   analyze,
@@ -205,6 +206,8 @@ export function NoteAnnotations({
   aiBackgroundEnabled = false,
   onAcceptRelation,
   commands,
+  onNewCommand,
+  newCommandDisabled = false,
   commandCount = 0,
   hasCommandDrafts = false,
 }: {
@@ -214,6 +217,8 @@ export function NoteAnnotations({
   aiBackgroundEnabled?: boolean;
   onAcceptRelation?: (r: Relation) => Promise<void>;
   commands?: ReactNode;
+  onNewCommand?: () => void;
+  newCommandDisabled?: boolean;
   commandCount?: number;
   hasCommandDrafts?: boolean;
 }) {
@@ -557,47 +562,64 @@ export function NoteAnnotations({
           if (!expandedRef.current) setClosing(false);
         }}
       >
-        <div
-          className="annotation-tabs"
-          role="tablist"
-          aria-label="KI-Bereich"
-          onKeyDown={(event) => {
-            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-            event.preventDefault();
-            const next =
-              event.key === 'Home'
-                ? 'annotations'
-                : event.key === 'End'
-                  ? 'commands'
-                  : tab === 'annotations'
+        <div className="annotation-tabs-row">
+          <div
+            className="annotation-tabs"
+            role="tablist"
+            aria-label="KI-Bereich"
+            onKeyDown={(event) => {
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+              event.preventDefault();
+              const next =
+                event.key === 'Home'
+                  ? 'annotations'
+                  : event.key === 'End'
                     ? 'commands'
-                    : 'annotations';
-            setTab(next);
-            event.currentTarget
-              .querySelector<HTMLButtonElement>(`#${CSS.escape(`${tabId}-${next}-tab`)}`)
-              ?.focus();
-          }}
-        >
-          <button
-            type="button"
-            id={`${tabId}-annotations-tab`}
-            role="tab"
-            aria-selected={tab === 'annotations'}
-            aria-controls={`${tabId}-annotations`}
-            onClick={() => setTab('annotations')}
+                    : tab === 'annotations'
+                      ? 'commands'
+                      : 'annotations';
+              setTab(next);
+              event.currentTarget
+                .querySelector<HTMLButtonElement>(`#${CSS.escape(`${tabId}-${next}-tab`)}`)
+                ?.focus();
+            }}
           >
-            Anmerkungen
-          </button>
-          <button
-            type="button"
-            id={`${tabId}-commands-tab`}
-            role="tab"
-            aria-selected={tab === 'commands'}
-            aria-controls={`${tabId}-commands`}
-            onClick={() => setTab('commands')}
-          >
-            Aufträge{commandCount ? ` · ${commandCount}` : ''}
-          </button>
+            <button
+              type="button"
+              id={`${tabId}-annotations-tab`}
+              role="tab"
+              aria-selected={tab === 'annotations'}
+              aria-controls={`${tabId}-annotations`}
+              onClick={() => setTab('annotations')}
+            >
+              Anmerkungen
+            </button>
+            <button
+              type="button"
+              id={`${tabId}-commands-tab`}
+              role="tab"
+              aria-selected={tab === 'commands'}
+              aria-controls={`${tabId}-commands`}
+              onClick={() => setTab('commands')}
+            >
+              Aufträge{commandCount ? ` · ${commandCount}` : ''}
+            </button>
+          </div>
+          {onNewCommand && (
+            <button
+              type="button"
+              className="icon-button annotation-new-command"
+              aria-label="Neuer KI-Auftrag"
+              title="Neuer KI-Auftrag"
+              disabled={newCommandDisabled}
+              onClick={() => {
+                setTab('commands');
+                onNewCommand();
+              }}
+            >
+              <Plus size={18} aria-hidden="true" />
+            </button>
+          )}
         </div>
         <div
           className="annotation-panel"

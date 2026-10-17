@@ -3,6 +3,14 @@
 import assert from 'node:assert/strict';
 import { readFile, mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import ts from 'typescript';
+
+const measureCode = ts
+  .transpile(await readFile(new URL('../src/textarea-size.ts', import.meta.url), 'utf8'), {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext,
+  })
+  .replace('export function', 'function');
 
 const css = (
   await Promise.all(
@@ -27,7 +35,7 @@ function fixture({ longNote = false, inline = false, closed = false } = {}) {
         <div class="note-annotations annotation-shell ${inline ? 'annotation-inline' : 'annotation-docked'} ${closed ? '' : 'annotation-open'}">
           <div class="annotation-heading"><button class="annotation-toggle">KI-Anmerkungen <span class="annotation-status">Geprüft · keine Hinweise</span></button><div class="annotation-heading-indicators"><button>1 Auftrag</button></div></div>
           <div class="annotation-content" ${closed ? 'hidden' : ''}>
-            <div class="annotation-tabs"><button>Anmerkungen</button><button>Aufträge · 1</button></div>
+            <div class="annotation-tabs-row"><div class="annotation-tabs"><button>Anmerkungen</button><button>Aufträge · 1</button></div><button class="icon-button annotation-new-command" aria-label="Neuer KI-Auftrag">+</button></div>
             <div class="annotation-panel" role="tabpanel" hidden>Andere Anmerkungen</div>
             <div class="annotation-panel" role="tabpanel"><div class="markdown"><h2>Empfohlene Lesereihenfolge</h2>${paragraph.repeat(40)}<p id="research-end">Ende der Recherche</p></div></div>
           </div>
@@ -70,6 +78,49 @@ try {
   assert.ok((await measure()).noteOverflow > 0, 'Long notes must remain scrollable independently');
   await page.setContent(fixture({ closed: true }));
   assert.equal((await measure()).outerOverflow, 0, 'Closed annotations must not introduce outer scroll');
+
+  // Editing uses measured textareas, whose flex parent must reserve their full height.
+  for (const width of [1740, 1460, 1100, 412]) {
+    for (const closed of [false, true]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.setContent(fixture({ closed }));
+      await page.addScriptTag({ content: measureCode });
+      const result = await page.evaluate(() => {
+        document.querySelector('.editor').classList.remove('editor-reading');
+        const content = document.querySelector('.editor-content');
+        content.className = 'editor-content';
+        content.innerHTML =
+          '<div class="inline-note-editor"><textarea aria-label="Notiztext"></textarea></div>';
+        const tags = document.querySelector('.editor-tags');
+        tags.innerHTML = '<span>#JUGENDARBEIT</span><span>#KOCHEN</span>';
+        tags.insertAdjacentHTML('afterend', '<div class="note-collections">Sammlungen</div>');
+        const field = content.querySelector('textarea');
+        field.value = 'Eine lange Notiz mit Zutaten und mehreren Absätzen.\n'.repeat(60);
+        resizeNoteTextarea(field);
+        field.focus({ preventScroll: true });
+        const body = document.querySelector('.editor-body');
+        body.scrollTop = 500;
+        const scrollBefore = body.scrollTop;
+        field.value += 'Weiterer Text';
+        resizeNoteTextarea(field);
+        return {
+          tagsAfterText: tags.getBoundingClientRect().top >= field.getBoundingClientRect().bottom - 1,
+          collectionsAfterTags:
+            document.querySelector('.note-collections').getBoundingClientRect().top >=
+            tags.getBoundingClientRect().bottom - 1,
+          contentContainsText:
+            content.getBoundingClientRect().bottom >= field.getBoundingClientRect().bottom - 1,
+          scrollStable: body.scrollTop === scrollBefore,
+          noClipping: field.scrollHeight <= field.clientHeight + 1,
+        };
+      });
+      console.log(JSON.stringify({ editing: true, width, closed, ...result }));
+      assert.ok(
+        Object.values(result).every(Boolean),
+        'Editing must keep tags and collections below the full text',
+      );
+    }
+  }
 
   // Resize across the breakpoint and back without rebuilding the DOM.
   await page.setContent(fixture({ inline: true }));

@@ -1,6 +1,6 @@
 # Noto
 
-**Aktuelle Version: 1.5.15.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.15](docs/releases/1.5.15.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
+**Aktuelle Version: 1.5.16.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.16](docs/releases/1.5.16.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 Eine lokale Windows- und Linux-Notizapp mit Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 1.0 enthält PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
 
@@ -98,7 +98,7 @@ Strukturierte KI-Aufträge können ihre Ergebnisse als Vergleichstabelle, Ablauf
 
 Sammlungen zeigen Notizen und Dokumente gemeinsam. „Frage zu dieser Sammlung“ legt einen KI-Auftrag als Notiz in der Sammlung ab. „Mit diesem Dokument arbeiten“ erstellt eine Notiz mit genau diesem Dokument als ausgewählter Quelle.
 
-In einer Notiz öffnet „KI fragen“ einen Auftrag mit sichtbarer Kontextauswahl. Alternativ eine Zeile wie `/ki Fasse die Konzeption zur Beteiligung zusammen und mache einen Vorschlag für den offenen Treff` schreiben und speichern. Unter „KI-Kontext“ stehen diese Notiz mit Anhängen, eine Sammlung, ausgewählte Dokumente/Notizen/Tags oder das gesamte Notizbuch zur Verfügung. Neue Notizen verwenden zunächst ihre erste Sammlung oder nur die eigenen Anhänge; Webquellen sind separat zuschaltbar. Bestehende Notizen ohne gespeicherte Kontextauswahl behalten ihr bisheriges Rechercheverhalten.
+In einer Notiz öffnet das Plus neben „Aufträge“ im KI-Anmerkungsbereich die Eingabe für eine Frage oder einen Auftrag mit sichtbarer Kontextauswahl. Alternativ eine Zeile wie `/ki Fasse die Konzeption zur Beteiligung zusammen und mache einen Vorschlag für den offenen Treff` schreiben und speichern. Unter „KI-Kontext“ stehen diese Notiz mit Anhängen, eine Sammlung, ausgewählte Dokumente/Notizen/Tags oder das gesamte Notizbuch zur Verfügung. Neue Notizen verwenden zunächst ihre erste Sammlung oder nur die eigenen Anhänge; Webquellen sind separat zuschaltbar. Bestehende Notizen ohne gespeicherte Kontextauswahl behalten ihr bisheriges Rechercheverhalten.
 
 Automatische Anmerkungen, manuelle Prüfungen und KI-Aufträge verwenden dieselbe Auswahl passender Originalstellen. Kurze Quellen passen vollständig in den Kontext; lange Anhänge werden anhand von Auftrag und Notiz ausgewertet, statt an einer gemeinsamen Zeichenbegrenzung zu scheitern. Der Server speichert Textabschnitte und eine kompakte Übersicht aus Originalauszügen je Dokumentinhalt und Verarbeitungsversion. Das benötigt keine zusätzliche KI-Anfrage. Unveränderte Dokumente können in mehreren Notizen wiederverwendet werden; ein geänderter oder per OCR verbesserter Text wird neu aufbereitet.
 

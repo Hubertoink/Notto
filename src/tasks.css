@@ -96,14 +96,25 @@
 .annotation-shell [hidden] {
   display: none !important;
 }
+.annotation-tabs-row {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0;
+  border-bottom: 1px solid var(--nt-line);
+  padding-right: 4px;
+}
 .annotation-tabs {
   display: flex;
+  min-width: 0;
   gap: 4px;
-  border-bottom: 1px solid var(--nt-line);
-  padding: 0 12px;
+  padding: 0 4px;
+}
+.annotation-new-command {
+  flex-shrink: 0;
 }
 .annotation-tabs button {
-  padding: 10px 12px;
+  padding: 10px 8px;
   color: var(--nt-muted);
   border: 0;
   border-bottom: 3px solid transparent;

@@ -1,6 +1,6 @@
 # Noto
 
-**Aktuelle Version: 1.5.14.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.14](docs/releases/1.5.14.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
+**Aktuelle Version: 1.5.15.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.15](docs/releases/1.5.15.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 Eine lokale Windows- und Linux-Notizapp mit Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 1.0 enthält PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
 
@@ -91,6 +91,8 @@ Quellenlinks werden dedupliziert und in der Desktop-App über den Standardbrowse
 - Papierkorb und Archiv sind reversibel. Historische Textfassungen können als neuer Entwurf übernommen werden.
 
 ## Dokumente und Projekt-Notebooks
+
+Strukturierte KI-Aufträge können ihre Ergebnisse als Vergleichstabelle, Ablaufplan oder Quellenkarten darstellen. Die Ansicht lässt sich auf Text umschalten und als bearbeitbares Markdown in die Notiz übernehmen. Funktionsumfang, Architektur und Prüfungen: [Visuelle KI-Aufträge mit OpenUI](docs/GENERATIVE-UI.md).
 
 „Dokumente“ in der Seitenleiste ist eine eigenständige Bibliothek. Dateien lassen sich hochladen, benennen, taggen und mehreren Sammlungen zuordnen. Bestehende Notizanhänge können ohne erneuten Upload übernommen werden. „Neue Fassung hochladen“ erhält die Dokumentidentität, Tags und Zuordnungen; frühere Originaldateien bleiben in der Versionsansicht und im ZIP-Export erhalten. PDF-, DOCX- und Textauslesung benötigt keinen API-Schlüssel. DOCX-Vorschauen lesen den Haupttext und Tabellen; eingebettete Bilder, Kommentare und das ursprüngliche Seitenlayout werden nicht ausgelesen. TXT/Markdown müssen UTF-8 sein.
 

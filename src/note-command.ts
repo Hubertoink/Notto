@@ -96,6 +96,7 @@ export const commandAnswerSchema = z.object({
 });
 
 export interface CommandResult {
+  presentation?: import('./command-presentation.js').CommandPresentationData;
   transcripts?: { title: string; url: string; language: string; automatic: boolean; partial: boolean }[];
   summary: string;
   context?: import('./document-context.js').ContextReport;

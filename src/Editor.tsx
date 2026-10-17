@@ -80,8 +80,13 @@ export function Editor({
 }) {
   const { scope, notify, notes, sync } = useNotto();
   const [commandWeb, setCommandWeb] = useState(config(scope).commandWeb !== false);
+  const [excludedTags, setExcludedTags] = useState(config(scope).excludedTags);
   useEffect(() => {
-    const update = () => setCommandWeb(config(scope).commandWeb !== false);
+    const update = () => {
+      const settings = config(scope);
+      setCommandWeb(settings.commandWeb !== false);
+      setExcludedTags(settings.excludedTags);
+    };
     update();
     window.addEventListener('notto-ai-config', update);
     return () => window.removeEventListener('notto-ai-config', update);
@@ -255,13 +260,25 @@ export function Editor({
       window.removeEventListener('scroll', update, true);
     };
   }, [tagToken, content, preview]);
+  const noAITags = useMemo(
+    () =>
+      new Set(
+        excludedTags
+          .toLowerCase()
+          .split(/[\s,]+/)
+          .map((tag) => tag.replace(/^#/, ''))
+          .filter(Boolean),
+      ),
+    [excludedTags],
+  );
   const tagOptions = [
-    ...new Set(
-      (notes || [])
+    ...new Set([
+      ...noAITags,
+      ...(notes || [])
         .filter((n) => n.scope === scope && !n.deleted)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
         .flatMap((n) => tagsOf(n.content)),
-    ),
+    ]),
   ]
     .filter((t) => t.toLocaleLowerCase('de').startsWith(tagToken?.query.toLocaleLowerCase('de') || ''))
     .slice(0, 5);
@@ -1097,7 +1114,7 @@ export function Editor({
                 style={tagPosition}
                 id="tag-suggestions"
                 role="listbox"
-                aria-label={tagToken.kind === 'note' ? 'Notiz auswählen' : 'Vorhandene Tags'}
+                aria-label={tagToken.kind === 'note' ? 'Notiz auswählen' : 'Tags auswählen'}
               >
                 {suggestions.map((suggestion, i) => (
                   <button
@@ -1110,6 +1127,11 @@ export function Editor({
                     onClick={() => acceptSuggestion(suggestion.id)}
                   >
                     {tagToken.kind === 'tag' ? <TagLabel name={suggestion.id} /> : suggestion.label}
+                    {tagToken.kind === 'tag' && noAITags.has(suggestion.id) && (
+                      <span className="tag-no-ai" title="Schließt diese Notiz von der KI aus">
+                        Keine KI
+                      </span>
+                    )}
                   </button>
                 ))}
                 {!suggestions.length && <p className="suggestions-empty">Keine passende Notiz</p>}
@@ -1135,6 +1157,11 @@ export function Editor({
             {tagsOf(content).map((tag) => (
               <span className="tag" key={tag}>
                 <TagLabel name={tag} />
+                {noAITags.has(tag) && (
+                  <span className="tag-no-ai" title="Schließt diese Notiz von der KI aus">
+                    Keine KI
+                  </span>
+                )}
               </span>
             ))}
           </div>

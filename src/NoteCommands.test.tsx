@@ -271,3 +271,63 @@ it('keeps the last result during a network outage and refreshes on reconnect wit
   fireEvent(window, new Event('online'));
   await screen.findByText('Aktuelles Ergebnis');
 });
+
+it('loads a saved OpenUI answer with its real citation and exports a comparison without losing evidence', async () => {
+  vi.mocked(serverRequest).mockResolvedValue({
+    commands: [
+      {
+        id: 'visual-result',
+        note_id: 'note',
+        revision: 'r',
+        prompt: 'Vergleiche die Konzepte',
+        status: 'done',
+        stage: 'Fertig',
+        created_at: '2026-10-17T12:00:00Z',
+        error: null,
+        result: {
+          summary: 'Zwei Konzepte.',
+          sources: [],
+          warnings: [],
+          presentation: { version: 1, source: 'root = Answer([Comparison([0,1])])' },
+          items: [
+            {
+              title: 'Offene Planung',
+              detail: 'Gemeinsam entscheiden.',
+              kind: 'fact',
+              citation: {
+                noteId: 'source',
+                revision: 'r',
+                title: 'Konzeption',
+                page: 7,
+                quote: 'Alle entscheiden gemeinsam.',
+              },
+            },
+            { title: 'Feste Planung', detail: 'Termine vorher vereinbaren.', kind: 'proposal' },
+          ],
+        },
+      },
+    ],
+  });
+  const insert = vi.fn();
+  render(
+    <NoteCommands
+      scope="user"
+      noteId="note"
+      content="Vergleich"
+      editing={false}
+      dirty={false}
+      onStart={vi.fn()}
+      onInsert={insert}
+    />,
+  );
+  await screen.findByRole('table');
+  fireEvent.click(screen.getByRole('button', { name: 'Beleg zeigen' }));
+  expect(screen.getByText('Alle entscheiden gemeinsam.')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Konzeption, Seite 7' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'In Notiz übernehmen' }));
+  expect(insert.mock.lastCall![0]).toContain('| Offene Planung | Gemeinsam entscheiden. | Aus den Quellen |');
+  expect(insert.mock.lastCall![0]).toContain('[Konzeption](notes/source), Seite 7');
+  fireEvent.click(screen.getByRole('button', { name: 'Textansicht' }));
+  expect(screen.queryByRole('table')).toBeNull();
+  expect(screen.getByText('Gemeinsam entscheiden.')).toBeTruthy();
+});

@@ -1,13 +1,28 @@
 import { isConnectionError } from './connection';
-import { useEffect, useRef, useState } from 'react';
+import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, CircleAlert, LoaderCircle, Play, RotateCw, Square } from 'lucide-react';
 import { serverRequest } from './backend';
 import { ownBackend, readCloudConfig } from './cloud';
 import { Modal, NoteMarkdown, Sources, readableDate } from './components';
 import { commandThreads, noteCommands, type NoteCommand } from './note-command';
 import './note-commands.css';
+import { commandResultMarkdown } from './command-result-text';
+const CommandPresentation = lazy(() => import('./CommandPresentation'));
 import { CitationLink } from './CommandCitation';
 import { transcriptTime } from './youtube';
+
+class PresentationBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
 
 function CommandImage({ command, id, title }: { command: string; id: string; title: string }) {
   const [url, setUrl] = useState('');
@@ -231,6 +246,66 @@ export function NoteCommands({
         const active = ['pending', 'running'].includes(command.status);
         const result = resultCommand?.result;
         const previous = !!resultCommand && resultCommand.id !== command.id;
+        const renderItem = (index: number, layout: 'card' | 'comparison' = 'card') => {
+          const item = result!.items[index];
+          return (
+            <section className="command-card" key={index}>
+              {item.imageId && (
+                <CommandImage command={resultCommand!.id} id={item.imageId} title={item.title} />
+              )}
+              <div>
+                {item.kind && (
+                  <small>
+                    {item.kind === 'fact'
+                      ? 'Aus den Quellen'
+                      : item.kind === 'inference'
+                        ? 'Schlussfolgerung'
+                        : 'Vorschlag'}
+                  </small>
+                )}
+                {layout !== 'comparison' && <h3>{item.title}</h3>}
+                {item.imageCaption && <small>{item.imageCaption}</small>}
+                <p>{item.detail}</p>
+                {item.transcriptCitation && (
+                  <blockquote>
+                    <p>{item.transcriptCitation.quote}</p>
+                    <small>
+                      YouTube · {transcriptTime(item.transcriptCitation.start)} ·{' '}
+                      {item.transcriptCitation.language}
+                      {item.transcriptCitation.automatic ? ' · automatische Untertitel' : ''}
+                    </small>
+                  </blockquote>
+                )}
+                {item.imageError && <small>Screenshot nicht verfügbar: {item.imageError}</small>}
+                {item.url && (
+                  <Sources
+                    sources={[
+                      {
+                        title: item.transcriptCitation
+                          ? `${item.title} · ${transcriptTime(item.transcriptCitation.start)}`
+                          : item.title,
+                        url: item.url,
+                      },
+                    ]}
+                    compact
+                    importFrom={noteId ? { noteId, scope } : undefined}
+                  />
+                )}
+                {item.citation && <CitationLink citation={item.citation} scope={scope} />}
+              </div>
+            </section>
+          );
+        };
+        const plainResult = result && (
+          <>
+            <div className="command-results">{result.items.map((_, index) => renderItem(index))}</div>
+            {onInsert && (
+              <button type="button" onClick={() => onInsert(commandResultMarkdown(result))}>
+                In Notiz übernehmen
+              </button>
+            )}
+          </>
+        );
         return (
           <article className={`command-run command-${command.status}`} key={command.prompt}>
             <header>
@@ -320,78 +395,26 @@ export function NoteCommands({
                     ))}
                   </ul>
                 )}
-                <div className="command-results">
-                  {result.items.map((item, index) => (
-                    <section className="command-card" key={index}>
-                      {item.imageId && (
-                        <CommandImage command={resultCommand!.id} id={item.imageId} title={item.title} />
-                      )}
-                      <div>
-                        {item.kind && (
-                          <small>
-                            {item.kind === 'fact'
-                              ? 'Aus den Quellen'
-                              : item.kind === 'inference'
-                                ? 'Schlussfolgerung'
-                                : 'Vorschlag'}
-                          </small>
-                        )}
-                        <h3>{item.title}</h3>
-                        {item.imageCaption && <small>{item.imageCaption}</small>}
-                        <p>{item.detail}</p>
-                        {item.transcriptCitation && (
-                          <blockquote>
-                            <p>{item.transcriptCitation.quote}</p>
-                            <small>
-                              YouTube · {transcriptTime(item.transcriptCitation.start)} ·{' '}
-                              {item.transcriptCitation.language}
-                              {item.transcriptCitation.automatic ? ' · automatische Untertitel' : ''}
-                            </small>
-                          </blockquote>
-                        )}
-                        {item.imageError && <small>Screenshot nicht verfügbar: {item.imageError}</small>}
-                        {item.url && (
-                          <Sources
-                            sources={[
-                              {
-                                title: item.transcriptCitation
-                                  ? `${item.title} · ${transcriptTime(item.transcriptCitation.start)}`
-                                  : item.title,
-                                url: item.url,
-                              },
-                            ]}
-                            compact
-                            importFrom={noteId ? { noteId, scope } : undefined}
-                          />
-                        )}
-                        {item.citation && <CitationLink citation={item.citation} scope={scope} />}
-                      </div>
-                    </section>
-                  ))}
-                </div>
+                {result.presentation ? (
+                  <PresentationBoundary key={resultCommand!.id} fallback={plainResult}>
+                    <Suspense fallback={plainResult}>
+                      <CommandPresentation
+                        key={resultCommand!.id}
+                        result={result}
+                        renderItem={renderItem}
+                        onInsert={onInsert}
+                        fallback={plainResult}
+                      />
+                    </Suspense>
+                  </PresentationBoundary>
+                ) : (
+                  plainResult
+                )}
                 <Sources
                   sources={result.sources}
                   compact
                   importFrom={noteId ? { noteId, scope } : undefined}
                 />
-                {onInsert && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onInsert(
-                        [
-                          result.research || result.summary,
-                          ...result.items.map(
-                            (item) =>
-                              `### ${item.title}\n\n${item.kind === 'proposal' ? 'Vorschlag: ' : item.kind === 'inference' ? 'Schlussfolgerung: ' : ''}${item.detail}${item.citation ? `\n\nQuelle: [${item.citation.title}](notes/${item.citation.noteId})${item.citation.page ? `, Seite ${item.citation.page}` : ''}${item.citation.quote ? `\n\n> ${item.citation.quote.replace(/\n/g, '\n> ')}` : ''}` : ''}${item.transcriptCitation ? `\n\nQuelle: [YouTube · ${transcriptTime(item.transcriptCitation.start)}](${item.url})\n\n> ${item.transcriptCitation.quote.replace(/\n/g, '\n> ')}` : ''}`,
-                          ),
-                        ].join('\n\n'),
-                      )
-                    }
-                  >
-                    In Notiz übernehmen
-                  </button>
-                )}
                 {!!result.contextSources?.length && (
                   <details className="command-sources">
                     <summary>Verwendeter Notiz- und Dokumentkontext</summary>

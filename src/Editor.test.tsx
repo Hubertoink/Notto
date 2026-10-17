@@ -569,6 +569,7 @@ it('suggests existing tags and accepts a prefix match with the keyboard', async 
   await waitFor(() => expect((field as HTMLTextAreaElement).disabled).toBe(false));
   await user.type(field, '#');
   expect(await screen.findAllByRole('option')).toHaveLength(5);
+  expect(screen.getAllByRole('option')[0].textContent).toBe('privatKeine KI');
   await user.type(field, 'Jugend');
   expect(screen.getAllByRole('option')).toHaveLength(2);
   await user.keyboard('{ArrowDown}{Enter}');
@@ -576,6 +577,34 @@ it('suggests existing tags and accepts a prefix match with the keyboard', async 
   expect(screen.queryByRole('listbox')).toBeNull();
   await user.type(field, '#neuertag ');
   expect((field as HTMLTextAreaElement).value).toBe('#jugendhaus #neuertag ');
+});
+
+it('prioritizes configured AI exclusion tags before used tags and keeps their meaning visible after insertion', async () => {
+  localStorage.setItem('notto-ai:local', JSON.stringify({ excludedTags: '#NoAI, geheim noai' }));
+  await repo.put(newNote('local', '#arbeit #noai #planung #team #ideen #projekt'), null);
+  renderEditor();
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  await user.type(field, '#');
+  const options = await screen.findAllByRole('option');
+  expect(options.map((option) => option.textContent)).toEqual([
+    'noaiKeine KI',
+    'geheimKeine KI',
+    'arbeit',
+    'planung',
+    'team',
+  ]);
+  await user.keyboard('{Enter}');
+  expect(field.value).toBe('#noai ');
+  expect(screen.queryByRole('listbox')).toBeNull();
+  expect(screen.getByText('Keine KI').closest('.tag')?.textContent).toBe('noaiKeine KI');
+
+  localStorage.setItem('notto-ai:local', JSON.stringify({ excludedTags: 'vertraulich' }));
+  fireEvent(window, new Event('notto-ai-config'));
+  expect(screen.queryByText('Keine KI')).toBeNull();
+  await user.type(field, '#');
+  expect(screen.getAllByRole('option')[0].textContent).toBe('vertraulichKeine KI');
 });
 
 it('formats selected text through icons and keeps editing at the selection', async () => {

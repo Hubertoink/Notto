@@ -460,6 +460,45 @@ it('rejects other accounts, stale revisions and excluded notes', async () => {
   ]);
   expect((await start()).statusCode).toBe(403);
 });
+
+it.each(['valid', 'invalid', 'filtered'])(
+  'stores only complete, grounded OpenUI layouts and returns them on reload: %s',
+  async (mode) => {
+    await start();
+    const reply = response();
+    const answer = JSON.parse(reply.output[0].content[0].text);
+    answer.items[0].target = null;
+    answer.items.push({ ...answer.items[0], title: 'Zweiter Aspekt' });
+    if (mode === 'filtered') answer.items[1].quote = 'Erfundener Beleg';
+    answer.presentation =
+      mode === 'invalid' ? 'root = Answer([Plan([99])])' : 'root = Answer([Comparison([0, 1])])';
+    reply.output[0].content[0].text = JSON.stringify(answer);
+    vi.mocked(openai).mockResolvedValue(reply);
+    await workCommandOnce(adapter, env);
+    const jobs = await app.inject({
+      method: 'GET',
+      url: `/api/commands?noteId=${note.id}`,
+      headers: headers(),
+    });
+    const command = jobs.json().commands[0];
+    expect(command.status).toBe('done');
+    expect(command.result.items).toHaveLength(mode === 'filtered' ? 1 : 2);
+    if (mode === 'valid')
+      expect(command.result.presentation).toEqual({
+        version: 1,
+        source: 'root = Answer([Comparison([0,1])])',
+      });
+    else expect(command.result.presentation).toBeUndefined();
+    const schema = (vi.mocked(openai).mock.calls[0][3].text as any).format.schema;
+    expect(schema.required).toContain('presentation');
+    expect(schema.properties.presentation.anyOf).toEqual([
+      { type: 'string', maxLength: 4000 },
+      { type: 'null' },
+    ]);
+    expect(vi.mocked(openai).mock.calls[0][3].instructions).not.toContain('Your ENTIRE response');
+    if (mode !== 'filtered') expect(openai).toHaveBeenCalledTimes(1);
+  },
+);
 it('cleans a completed prompt without losing edits or a changed instruction', async () => {
   await start();
   const edited = reviseNote(note, { content: note.content + '\nNeue Gedanken\n/ki Ein anderer Auftrag' });

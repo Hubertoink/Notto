@@ -2045,6 +2045,10 @@ button.tags-heading {
   gap: 2px;
 }
 .tag-suggestions button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   text-align: left;
   padding: 6px 10px;
   overflow-wrap: anywhere;
@@ -2056,6 +2060,22 @@ button.tags-heading {
 }
 .tag-suggestions button[aria-selected='true'] {
   background: #678edb33;
+}
+.tag-no-ai {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border: 1px solid var(--nt-line);
+  color: var(--nt-muted);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.editor-tags .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
 }
 .formatting-toolbar {
   display: flex;

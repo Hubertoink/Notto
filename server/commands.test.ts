@@ -762,7 +762,7 @@ it('researches reading recommendations from the Brooks note without requiring su
   expect(job.result.sources).toContainEqual({ title: 'No Silver Bullet', url: 'https://example.com/brooks' });
 });
 
-it('really searches for reviews, verifies recency and preserves clickable citations without screenshots', async () => {
+it('requests review search, checks recency and preserves provider citations using controlled responses', async () => {
   await start();
   await pg.query(
     "UPDATE note_commands SET prompt='Suche Rezensionen zu den letzten drei Veröffentlichungen',note_content='Mouhanad Khorchide'",

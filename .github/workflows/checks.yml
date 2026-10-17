@@ -27,5 +27,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Install Chromium for layout checks
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:layout
+      - name: Upload layout screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: layout-failure
+          path: |
+            test-results/*.png
+            .notto-dev/openui-qa/*.png
+          if-no-files-found: ignore
+          retention-days: 7
       - run: npm run build
       - run: npm run build:server

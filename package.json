@@ -1,6 +1,6 @@
 {
   "name": "notto",
-  "version": "1.5.16",
+  "version": "1.5.17",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "desktop": "node scripts/desktop.mjs dev",
     "desktop:build": "node scripts/desktop.mjs build",
     "test": "vitest run",
+    "test:layout": "node scripts/check-navigation-layout.mjs && node scripts/check-annotation-layout.mjs && node scripts/check-editor-scroll.mjs && node scripts/check-command-presentation.mjs && node scripts/check-command-entry.mjs",
     "eval:harness": "vitest run src/harness.test.ts src/memory-policy.test.ts server/app.test.ts server/sources.test.ts src/Organization.test.tsx",
     "eval:harness:live": "tsx scripts/eval-harness.ts"
   },

@@ -2,6 +2,7 @@ import { DesktopFrame } from './DesktopFrame';
 import { collectionNames, createCollection, addNoteToCollection, NOTE_DRAG_TYPE } from './collections';
 import { flushSync } from 'react-dom';
 import { useSidebarDisclosure } from './sidebar-disclosure';
+import { noteListCounts } from './note-list-counts';
 import { FloatingSearch } from './FloatingSearch';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -313,7 +314,7 @@ function Notebook({
     window.addEventListener('notto-open-note', openReference);
     return () => window.removeEventListener('notto-open-note', openReference);
   }, [notes, scope]);
-  const filtered = useMemo(
+  const matching = useMemo(
     () =>
       notes
         .filter(
@@ -321,17 +322,15 @@ function Notebook({
             (view === 'trash' ? n.deleted : !n.deleted) &&
             (view === 'archive' ? n.archived : view === 'trash' ? true : !n.archived) &&
             (view === 'pinned' ? n.pinned : true) &&
-            (view === 'documents'
-              ? !!n.document
-              : view === 'all' && !tag && !collection
-                ? !n.document
-                : true) &&
+            (view === 'documents' ? !!n.document : true) &&
             (!tag || tagsOf(n.content).includes(tag)) &&
             (!collection || n.collections?.includes(collection)),
         )
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt)),
     [notes, view, tag, collection],
   );
+  const filtered = view === 'all' && !tag && !collection ? matching.filter((n) => !n.document) : matching;
+  const listCounts = useMemo(() => noteListCounts(matching), [matching]);
   const selectedNote = notes.find((n) => n.id === selected);
   const title = tasksOpen
     ? 'Aufgaben'
@@ -804,10 +803,10 @@ function Notebook({
               <div>
                 <FittingListTitle title={title} />
                 <p>
-                  {filtered.filter((n) => !n.document).length}{' '}
-                  {filtered.filter((n) => !n.document).length === 1 ? 'Notiz' : 'Notizen'} ·{' '}
-                  {filtered.filter((n) => n.document).length}{' '}
-                  {filtered.filter((n) => n.document).length === 1 ? 'Dokument' : 'Dokumente'}
+                  {listCounts.notes} {listCounts.notes === 1 ? 'Notiz' : 'Notizen'} ·{' '}
+                  <span title="Gespeicherte Dokumente und Dokumentanhänge, ohne reine Weblinks. Jede Datei wird einmal gezählt.">
+                    {listCounts.documents} {listCounts.documents === 1 ? 'Dokument' : 'Dokumente'}
+                  </span>
                   {visibleDrafts.length > 0 &&
                     ` · ${visibleDrafts.length} ${visibleDrafts.length === 1 ? 'Entwurf' : 'Entwürfe'}`}
                 </p>

@@ -6,11 +6,12 @@ import App from './App';
 import { newNote } from './domain';
 
 const note = newNote('local', '# Verlauf prüfen\nEine Notiz für die Navigation.');
+let testNotes = [note];
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 vi.mock('./Login', () => ({ WebAccess: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock('./state', () => ({
   useNotto: () => ({
-    notes: [note],
+    notes: testNotes,
     scope: 'local',
     user: null,
     loading: false,
@@ -31,8 +32,40 @@ vi.mock('./Widget', () => ({ Widget: () => null }));
 
 afterEach(() => {
   cleanup();
+  testNotes = [note];
   window.history.replaceState(null, '', '/');
   localStorage.clear();
+});
+
+it('counts documents before hiding library rows in All Notes and respects collection filters', () => {
+  const document = {
+    ...newNote('local', '[Konzept](attachments/abc.pdf)'),
+    collections: ['Jugendarbeit'],
+    document: { attachmentId: 'abc.pdf', name: 'Konzept', mime: 'application/pdf', version: 1 },
+  };
+  const attached = { ...newNote('local', '[Anhang](attachments/def.pdf)'), collections: ['Jugendarbeit'] };
+  testNotes = [
+    note,
+    document,
+    attached,
+    {
+      ...document,
+      id: 'archived',
+      archived: true,
+      document: { ...document.document, attachmentId: 'aaa.pdf' },
+    },
+    {
+      ...document,
+      id: 'deleted',
+      deleted: true,
+      document: { ...document.document, attachmentId: 'bbb.pdf' },
+    },
+  ];
+  const view = render(<App />);
+  expect(view.container.querySelector('.list-heading p')?.textContent).toBe('2 Notizen · 2 Dokumente');
+  expect(view.container.querySelectorAll('.note-list .note-card')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('button', { name: /^Jugendarbeit\s*2$/ }));
+  expect(view.container.querySelector('.list-heading p')?.textContent).toBe('1 Notiz · 2 Dokumente');
 });
 
 it('keeps note navigation in browser back and forward history', async () => {

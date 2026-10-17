@@ -1,6 +1,6 @@
 # Noto
 
-**Aktuelle Version: 1.5.16.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.16](docs/releases/1.5.16.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
+**Aktuelle Version: 1.5.17.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.17](docs/releases/1.5.17.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 Eine lokale Windows- und Linux-Notizapp mit Randwidget und derselben Oberfläche im Browser. React 19, Astryx, Motion und Tauri 2. Version 1.0 enthält PDF-Anhänge, eine getrennte Wissensebene mit KI-Vorschlägen, Recherche, Diktat, Texterkennung und belegte Notizbuchantworten. Einrichtung und Funktionsgrenzen stehen in [docs/AI-SETUP.md](docs/AI-SETUP.md).
 
@@ -157,6 +157,8 @@ Ein Secret- oder Service-Role-Key gehört niemals in die Oberfläche, `.env` mit
 `npm run build` erstellt die Webapp unter `dist/`. Im Mittwald-Betrieb liefert der App-Container diese zusammen mit der API aus; siehe [SELF-HOSTING.md](docs/SELF-HOSTING.md). `.openai/hosting.json` gehört zur früheren privaten Vorschau. Lokale Browsernotizen werden erst nach ausdrücklichem Kopieren ins Konto synchronisiert.
 
 ## Prüfungen und Grenzen
+
+[Testreview und Prüfstrategie](docs/TEST-REVIEW-2026-10-18.md): Welche Bereiche die Tests absichern, welche Grenzen bleiben und welche Prüfungen in CI laufen. Browserprüfungen für Navigation, Scrollen und KI-Aufträge: `npm run test:layout`.
 
 Die automatisierten Prüfungen umfassen Originaltext-Roundtrips, Tags, Suche, Historie, Konfliktschutz, Kontentrennung in IndexedDB, Wiederherstellung des Editors, Synchronisationsabbrüche sowie das echte PostgreSQL-Schema in PGlite inklusive Row Level Security. Rust-Tests prüfen Pfadgrenzen, SQLite-Versionskontrolle, Wiederherstellung der Markdown-Dateien und den Erhalt externer Textänderungen.
 

@@ -86,8 +86,7 @@ textarea:focus-visible {
 }
 .sidebar {
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   width: 228px;
   flex-shrink: 0;
@@ -102,20 +101,22 @@ textarea:focus-visible {
   flex-shrink: 0;
 }
 .sidebar-fixed {
-  position: sticky;
-  top: -26px;
+  position: relative;
   z-index: 4;
   margin: -26px 0 0;
   padding-top: 26px;
   background: var(--nt-sidebar);
 }
 .sidebar > .sidebar-scroll {
-  flex: 0 0 auto;
-  min-height: auto;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .sidebar,
 .sidebar-scroll,
+.note-list,
 .tag-navigation,
 .collection-navigation,
 .collection-notes,
@@ -127,6 +128,7 @@ textarea:focus-visible {
 }
 .sidebar::-webkit-scrollbar,
 .sidebar-scroll::-webkit-scrollbar,
+.note-list::-webkit-scrollbar,
 .tag-navigation::-webkit-scrollbar,
 .collection-navigation::-webkit-scrollbar,
 .collection-notes::-webkit-scrollbar,
@@ -138,6 +140,7 @@ textarea:focus-visible {
 }
 .sidebar::-webkit-scrollbar-track,
 .sidebar-scroll::-webkit-scrollbar-track,
+.note-list::-webkit-scrollbar-track,
 .tag-navigation::-webkit-scrollbar-track,
 .collection-navigation::-webkit-scrollbar-track,
 .collection-notes::-webkit-scrollbar-track,
@@ -148,6 +151,7 @@ textarea:focus-visible {
 }
 .sidebar::-webkit-scrollbar-thumb,
 .sidebar-scroll::-webkit-scrollbar-thumb,
+.note-list::-webkit-scrollbar-thumb,
 .tag-navigation::-webkit-scrollbar-thumb,
 .collection-navigation::-webkit-scrollbar-thumb,
 .collection-notes::-webkit-scrollbar-thumb,
@@ -161,6 +165,7 @@ textarea:focus-visible {
 }
 .sidebar::-webkit-scrollbar-thumb:hover,
 .sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.note-list::-webkit-scrollbar-thumb:hover,
 .tag-navigation::-webkit-scrollbar-thumb:hover,
 .collection-navigation::-webkit-scrollbar-thumb:hover,
 .collection-notes::-webkit-scrollbar-thumb:hover,
@@ -468,6 +473,8 @@ textarea:focus-visible {
 .note-list {
   padding: 0 10px 12px;
   overflow: auto;
+  min-height: 0;
+  scrollbar-gutter: stable;
   flex: 1;
 }
 .note-card {

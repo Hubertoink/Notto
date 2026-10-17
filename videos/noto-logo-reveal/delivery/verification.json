@@ -1,0 +1,25 @@
+{
+  "duration": 3,
+  "width": 1920,
+  "height": 1080,
+  "fps": 60,
+  "frames": 180,
+  "audio": false,
+  "mp4Bytes": 184610,
+  "webmBytes": 120386,
+  "loopSeam": {
+    "meanAbsoluteChannelDifference": 0,
+    "maxChannelDifference": 0
+  },
+  "composition": "noto-logo-reveal",
+  "proofTimes": [
+    0,
+    0.35,
+    0.7,
+    1.1,
+    1.26,
+    1.72,
+    2.2,
+    2.98
+  ]
+}

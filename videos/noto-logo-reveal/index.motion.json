@@ -1,0 +1,12 @@
+{
+  "duration": 3,
+  "assertions": [
+    { "kind": "appearsBy", "selector": "#blue-piece", "bySec": 0.4 },
+    { "kind": "appearsBy", "selector": "#red-piece", "bySec": 0.55 },
+    { "kind": "appearsBy", "selector": "#yellow-piece", "bySec": 0.7 },
+    { "kind": "before", "a": "#blue-piece", "b": "#yellow-piece" },
+    { "kind": "before", "a": "#yellow-piece", "b": "#letter-0" },
+    { "kind": "appearsBy", "selector": "#letter-3", "bySec": 2.05 },
+    { "kind": "staysInFrame", "selector": "#lockup" }
+  ]
+}

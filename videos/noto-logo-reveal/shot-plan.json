@@ -1,0 +1,54 @@
+{
+  "category": "logo-reveal",
+  "status": "final",
+  "duration_s": 3,
+  "fps": 60,
+  "canvas": { "w": 1920, "h": 1080, "aspect": "16:9" },
+  "style": "Restrained premium SaaS identity sting. Matte near-black field, exact NOTO vector geometry, warm white wordmark. Intelligent magnetic assembly with soft inertia; one quiet traveling light accent, then completely still recognition hold. Static camera.",
+  "palette": ["#101110", "#0645ef", "#e63822", "#f0c600", "#f1efe7"],
+  "font": "Use the existing NOTO wordmark font and weight from the application; preserve its visual geometry rather than substituting a fashionable typeface.",
+  "beats": [0.04, 0.16, 0.32, 1.10, 1.42, 2.02, 2.62],
+  "export": "mp4",
+  "asset_needs": [
+    { "role": "brand-icon", "kind": "svg", "source": "../../public/noto-bauhaus.svg", "treatment": "none" }
+  ],
+  "shot_brief": "From a quiet matte black field, NOTO's blue square glides in from the left, the red circle curves down from the upper right and the yellow triangle rises from below. All three follow one invisible attractive field into the exact existing Bauhaus icon. On the final settling beat, a very soft warm light pulse travels through the three shapes. Immediately after this pulse starts, NOTO rises into view one letter at a time. The finished horizontal brand lockup holds without movement, then fades as one to the opening black for a clean repeating seam.",
+  "block": "logo-outro",
+  "customize": {
+    "source_basis": "Reuse the logo-outro assembly / glow / hold structure, reduced from 6s to 3s and replacing all placeholder assets with the existing NOTO icon.",
+    "remove": ["tagline", "URL pill", "extra text", "camera movement", "particles", "flares", "impact flash", "logo scaling"],
+    "wordmark_primitive": "bottom-up-letters",
+    "light_primitive": "shimmer-sweep",
+    "custom_gap": "Exact original three-part SVG needs separately transformed groups and specific directional arrival paths. Logo-outro is orchestration scaffolding; do not substitute its default shapes or reveal with a generic full-logo scale.",
+    "layout": {
+      "lockup_center": [960, 540],
+      "lockup_target_width": 920,
+      "icon_visible_height": 300,
+      "icon_to_wordmark_gap": 70,
+      "wordmark_target_width": 535,
+      "wordmark_cap_height": 145,
+      "alignment": "Match the attached horizontal logo reference. The wordmark sits vertically centered against the complete icon, including its low triangle. Preserve the source SVG's relative geometry and triangle orientation. Whole lockup remains fixed at its final position throughout."
+    },
+    "motion_rules": ["directional entrances with overlapping timing", "near-critical damped settle", "letter stagger", "single synchronized exit"],
+    "lighting": "A restrained highlight and local ambient halo may be applied to each exact vector shape. Keep flat brand colors dominant. The traveling sweep must remain clipped to the icon, opacity approximately 0.10-0.16, no white flash, bloom radius about 12-20px at 1080p. Avoid a visible stage spotlight or floor reflection.",
+    "timeline": [
+      { "start": 0.0, "end": 0.04, "action": "Matte near-black; all content at zero opacity." },
+      { "start": 0.04, "end": 0.84, "element": "blue square", "action": "Translate from x=-300px relative to final position, no rotation or scale. Opacity eases in during first 0.23s. Soft accelerate then long decelerating settle." },
+      { "start": 0.16, "end": 1.02, "element": "red circle", "action": "Arrive from x=210px,y=-190px along a soft curved path. Very small physical overshoot, maximum 1%, with no oscillation. Opacity rises over 0.25s independently." },
+      { "start": 0.32, "end": 1.10, "element": "yellow triangle", "action": "Rise from y=230px, x=0. No rotation; keep triangle orientation exact. Soft attraction, increasingly slow last third. Opacity rises over 0.23s." },
+      { "start": 1.10, "end": 1.42, "element": "logo light pulse", "action": "A narrow diffuse highlight sweeps across the icon's exact geometry left to right; local glow briefly lifts then returns to baseline. No shape motion." },
+      { "start": 1.42, "end": 2.02, "element": "NOTO", "action": "N,O,T,O reveal left to right; stagger 0.07s, duration 0.39s per letter, opacity 0 to 1 and y=16px to 0. power3.out easing; no blur or scale." },
+      { "start": 2.02, "end": 2.62, "action": "Finished brand lockup holds completely still and fully readable." },
+      { "start": 2.62, "end": 2.96, "action": "Entire lockup and lighting fade together to zero, sine.inOut. No reverse assembly." },
+      { "start": 2.96, "end": 3.0, "action": "Same matte black as opening; loop seam is identical." }
+    ],
+    "catalog_evidence": [
+      { "query": "geometric logo piece by piece assembly with glow bloom", "selected": "logo-outro", "reason": "Exact piece-by-piece assembly and glow bloom orchestration; remove tagline and URL." },
+      { "query": "staggered letters opacity rise reveal", "selected": "bottom-up-letters", "reason": "Deterministic per-letter rise; customize amplitude to a restrained 16px and add smooth opacity." },
+      { "query": "traveling light sweep subtle glow", "selected": "shimmer-sweep", "reason": "A traveling highlight can be clipped to original geometry and dialed down. light-sweep-pass was considered but its whole-scene reshading exceeds this minimal brief." }
+    ],
+    "qa_frames_s": [0.0, 0.35, 0.70, 1.10, 1.26, 1.72, 2.2, 2.98],
+    "qa_requirements": ["Exact original icon proportions and orientation", "No unintended visual elements", "Full lockup centered within 16:9 safe area", "Letters stay crisp and unwarped", "No overshoot on opacity", "First and final frames match", "Exactly 180 frames at 60fps"]
+  },
+  "content": { "logo": "assets/noto-bauhaus.svg", "wordmark": "NOTO", "tagline": "", "url": "" }
+}

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>NOTO — Logo Reveal</title>
+  <script src="assets/gsap.min.js"></script>
+  <style>
+    :root { --matte:#101110; --blue:#0645ef; --red:#e63822; --yellow:#f0c600; --ink:#f1eee5; }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:var(--matte); }
+    #stage { position:relative; width:100%; height:100%; overflow:hidden; background:var(--matte); }
+    .clip { position:absolute; inset:0; display:flex; justify-content:center; align-items:center; padding:80px; }
+    #lockup { display:flex; align-items:center; gap:70px; width:919.0625px; flex:none; }
+    #icon { display:block; width:314.0625px; height:300px; flex:none; overflow:visible; }
+    #wordmark { display:block; width:535px; height:149.4277px; flex:none; overflow:visible; fill:var(--ink); }
+    .piece,.letter { opacity:0; }
+    .blue { fill:var(--blue); }
+    .red { fill:var(--red); }
+    .yellow { fill:var(--yellow); }
+    .halo { opacity:0.055; filter:url(#ambient-softness); }
+    .reflection { fill:url(#soft-reflection); }
+    #light-pulse,#pulse-halo { opacity:0; }
+  </style>
+</head>
+<body>
+  <div data-hf-id="hf-znx9" id="stage" data-composition-id="noto-logo-reveal" data-start="0" data-duration="3" data-fps="60" data-width="1920" data-height="1080">
+    <section data-hf-id="hf-idog" id="logo-scene" class="clip" data-start="0" data-duration="3" data-track-index="0" aria-label="NOTO logo reveal">
+      <div data-hf-id="hf-hvps" id="lockup" aria-label="NOTO">
+        <svg data-hf-id="hf-t2jj" id="icon" viewBox="4 8 67 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" data-layout-allow-overflow="true">
+          <defs data-hf-id="hf-mh0t">
+            <!-- Exact geometry from public/noto-bauhaus.svg; only translation and lighting are animated. -->
+            <path data-hf-id="hf-2uu6" id="square-shape" d="M4 8h32v32H4z"/>
+            <circle data-hf-id="hf-wko5" id="circle-shape" cx="55" cy="24" r="16"/>
+            <path data-hf-id="hf-cqjc" id="triangle-shape" d="M4 44v28h32L4 44Z"/>
+            <filter data-hf-id="hf-zlm7" id="ambient-softness" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB"><feGaussianBlur data-hf-id="hf-pdex" stdDeviation="3.2"/></filter>
+            <linearGradient data-hf-id="hf-sory" id="soft-reflection" x1="0" y1="0" x2="0.6" y2="1">
+              <stop data-hf-id="hf-ppbc" offset="0" stop-color="var(--ink)" stop-opacity="0.06"/>
+              <stop data-hf-id="hf-1q0o" offset="0.54" stop-color="var(--ink)" stop-opacity="0.012"/>
+              <stop data-hf-id="hf-vcor" offset="1" stop-color="var(--ink)" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient data-hf-id="hf-5kdw" id="traveling-light">
+              <stop data-hf-id="hf-cw1k" offset="0" stop-color="var(--ink)" stop-opacity="0"/>
+              <stop data-hf-id="hf-6m80" offset="0.5" stop-color="var(--ink)" stop-opacity="0.16"/>
+              <stop data-hf-id="hf-l6ez" offset="1" stop-color="var(--ink)" stop-opacity="0"/>
+            </linearGradient>
+            <clipPath data-hf-id="hf-isz7" id="icon-mask"><use data-hf-id="hf-rj3t" href="#square-shape"/><use data-hf-id="hf-wbac" href="#circle-shape"/><use data-hf-id="hf-5occ" href="#triangle-shape"/></clipPath>
+          </defs>
+          <g data-hf-id="hf-v4qj" id="blue-piece" class="piece blue"><use data-hf-id="hf-5r26" class="halo" href="#square-shape"/><use data-hf-id="hf-1qh9" href="#square-shape"/><use data-hf-id="hf-drwl" class="reflection" href="#square-shape"/></g>
+          <g data-hf-id="hf-mj9d" id="red-piece" class="piece red"><use data-hf-id="hf-viwb" class="halo" href="#circle-shape"/><use data-hf-id="hf-kn30" href="#circle-shape"/><use data-hf-id="hf-j0u8" class="reflection" href="#circle-shape"/></g>
+          <g data-hf-id="hf-dr5b" id="yellow-piece" class="piece yellow"><use data-hf-id="hf-kty7" class="halo" href="#triangle-shape"/><use data-hf-id="hf-hp84" href="#triangle-shape"/><use data-hf-id="hf-4pmo" class="reflection" href="#triangle-shape"/></g>
+          <g data-hf-id="hf-9kbx" id="pulse-halo" filter="url(#ambient-softness)"><use data-hf-id="hf-dpuc" class="blue" href="#square-shape"/><use data-hf-id="hf-2jra" class="red" href="#circle-shape"/><use data-hf-id="hf-6p4l" class="yellow" href="#triangle-shape"/></g>
+          <g data-hf-id="hf-54ih" id="light-pulse" clip-path="url(#icon-mask)"><rect data-hf-id="hf-95my" id="light-band" x="-24" y="4" width="28" height="72" fill="url(#traveling-light)"/></g>
+        </svg>
+        <svg data-hf-id="hf-kv60" id="wordmark" viewBox="14.782 0 527.851 147.431" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="NOTO" data-layout-allow-overflow="true">
+          <path data-hf-id="hf-czta" id="letter-0" class="letter" d="M41.526 145L14.782 145L14.782 2.431L42.790 2.431L101.140 97.639L101.140 2.431L127.884 2.431L127.884 145L99.001 145L41.526 52.029"/>
+          <path data-hf-id="hf-12kv" id="letter-1" class="letter" d="M144.247 74.591Q144.247 52.807 150.763 38.025Q155.625 27.133 164.037 18.478Q172.449 9.822 182.466 5.641Q195.789 0 213.197 0Q244.706 0 263.621 19.547Q282.537 39.095 282.537 73.910Q282.537 108.434 263.767 127.933Q244.998 147.431 213.586 147.431Q181.785 147.431 163.016 128.030Q144.247 108.628 144.247 74.591M173.908 73.618Q173.908 97.834 185.092 110.330Q196.276 122.827 213.489 122.827Q230.702 122.827 241.740 110.428Q252.778 98.028 252.778 73.229Q252.778 48.722 242.032 36.663Q231.286 24.604 213.489 24.604Q195.692 24.604 184.800 36.809Q173.908 49.014 173.908 73.618"/>
+          <path data-hf-id="hf-96g3" id="letter-2" class="letter" d="M357.638 145L328.852 145L328.852 26.549L286.549 26.549L286.549 2.431L399.845 2.431L399.845 26.549L357.638 26.549"/>
+          <path data-hf-id="hf-32l6" id="letter-3" class="letter" d="M404.343 74.591Q404.343 52.807 410.859 38.025Q415.722 27.133 424.134 18.478Q432.546 9.822 442.563 5.641Q455.886 0 473.294 0Q504.803 0 523.718 19.547Q542.633 39.095 542.633 73.910Q542.633 108.434 523.864 127.933Q505.095 147.431 473.683 147.431Q441.882 147.431 423.113 128.030Q404.343 108.628 404.343 74.591M434.005 73.618Q434.005 97.834 445.188 110.330Q456.372 122.827 473.586 122.827Q490.799 122.827 501.837 110.428Q512.875 98.028 512.875 73.229Q512.875 48.722 502.128 36.663Q491.382 24.604 473.586 24.604Q455.789 24.604 444.897 36.809Q434.005 49.014 434.005 73.618"/>
+        </svg>
+      </div>
+    </section>
+  </div>
+  <script>
+    // Adapted from registry logo-outro (assembly / light / hold), bottom-up-letters
+    // (per-letter opacity + upward stagger), shimmer-sweep (seekable traveling band).
+    // Exact source SVG needs independent groups; no placeholder logo or font is used.
+    const tl = gsap.timeline({ paused:true });
+    tl.addLabel('assemble',0.04);
+    tl.addLabel('light',1.10);
+    tl.addLabel('wordmark',1.42);
+    tl.addLabel('hold',2.02);
+    tl.addLabel('resolve',2.62);
+
+    // Motion is measured in original SVG viewBox units (4.6875 output pixels per unit).
+    tl.fromTo('#blue-piece',{x:-64},{x:0,duration:0.80,ease:'power3.out'},0.04);
+    tl.fromTo('#blue-piece',{opacity:0},{opacity:1,duration:0.23,ease:'sine.inOut'},0.04);
+
+    // Separate x/y easing describes one restrained curved arrival, then 1px of settle.
+    tl.fromTo('#red-piece',{x:44.8},{x:-0.20,duration:0.72,ease:'power3.out'},0.16);
+    tl.fromTo('#red-piece',{y:-40.5333},{y:0.16,duration:0.72,ease:'power2.out'},0.16);
+    tl.to('#red-piece',{x:0,y:0,duration:0.14,ease:'sine.inOut'},0.88);
+    tl.fromTo('#red-piece',{opacity:0},{opacity:1,duration:0.25,ease:'sine.inOut'},0.16);
+
+    tl.fromTo('#yellow-piece',{y:49.0667},{y:0,duration:0.78,ease:'power3.out'},0.32);
+    tl.fromTo('#yellow-piece',{opacity:0},{opacity:1,duration:0.23,ease:'sine.inOut'},0.32);
+
+    // One soft pass, clipped to the brand geometry. No stage spotlight or flash.
+    tl.fromTo('#light-pulse',{opacity:0},{opacity:1,duration:0.06,ease:'sine.inOut'},1.10);
+    tl.fromTo('#light-band',{x:0},{x:100,duration:0.32,ease:'power1.inOut'},1.10);
+    tl.to('#light-pulse',{opacity:0,duration:0.06,ease:'sine.inOut'},1.36);
+    tl.fromTo('#pulse-halo',{opacity:0},{opacity:0.075,duration:0.12,ease:'sine.inOut'},1.10);
+    tl.to('#pulse-halo',{opacity:0,duration:0.20,ease:'sine.inOut'},1.22);
+
+    tl.fromTo('.letter',{opacity:0,y:15.79},{opacity:1,y:0,duration:0.39,stagger:0.07,ease:'power3.out'},1.42);
+    tl.fromTo('#lockup',{opacity:1},{opacity:0,duration:0.34,ease:'sine.inOut',immediateRender:false},2.62);
+    window.__timelines = window.__timelines || {};
+    window.__timelines['noto-logo-reveal'] = tl;
+    tl.seek(0);
+  </script>
+</body>
+</html>

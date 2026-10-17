@@ -1,0 +1,40 @@
+import { execFileSync } from 'node:child_process';
+import { mkdir, copyFile, writeFile, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import assert from 'node:assert/strict';
+import ffmpeg from 'ffmpeg-static';
+import ffprobe from 'ffprobe-static';
+
+const source = resolve('renders/noto-logo-reveal-1080p60.mp4');
+const destination = resolve('delivery');
+await mkdir(destination, {recursive:true});
+const run = (args) => execFileSync(ffmpeg, ['-hide_banner','-loglevel','error','-y',...args], {windowsHide:true,maxBuffer:32*1024*1024});
+const probe = (path) => JSON.parse(execFileSync(ffprobe.path, ['-v','error','-show_format','-show_streams','-of','json',path], {encoding:'utf8',windowsHide:true}));
+const metadata = probe(source);
+const stream = metadata.streams.find((item) => item.codec_type === 'video');
+assert.equal(stream.width,1920);
+assert.equal(stream.height,1080);
+assert.equal(stream.r_frame_rate,'60/1');
+assert.equal(Number(stream.nb_frames),180);
+assert.equal(Number(metadata.format.duration),3);
+const mp4 = resolve(destination,'noto-logo-reveal.mp4');
+const webm = resolve(destination,'noto-logo-reveal.webm');
+// MP4 is the direct HyperFrames delivery export; fast-start layout is set by HF.
+await copyFile(source,mp4);
+run(['-i',source,'-an','-c:v','libvpx-vp9','-b:v','0','-crf','27','-row-mt','1','-pix_fmt','yuv420p',webm]);
+run(['-ss','2.2','-i',source,'-frames:v','1',resolve(destination,'noto-logo-poster.png')]);
+run(['-i',source,'-vf',"select='eq(n,0)+eq(n,21)+eq(n,42)+eq(n,66)+eq(n,76)+eq(n,103)+eq(n,132)+eq(n,179)',scale=640:360,tile=4x2:padding=8:margin=8:color=0x101110",'-frames:v','1',resolve(destination,'noto-logo-filmstrip.jpg')]);
+const raw = (frame) => run(['-i',source,'-vf',`select=eq(n\\,${frame})`,'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1']);
+const first=raw(0), last=raw(179);
+assert.equal(first.length,1920*1080*3);
+assert.equal(last.length,first.length);
+let error=0,maxError=0;
+for(let i=0;i<first.length;i++){ const diff=Math.abs(first[i]-last[i]); error+=diff; maxError=Math.max(diff,maxError); }
+const meanError=error/first.length;
+assert.ok(meanError<0.1,`Loop seam differs: ${meanError}`);
+const webMetadata=probe(webm);
+assert.equal(Number(webMetadata.format.duration),3);
+assert.equal(webMetadata.streams[0].r_frame_rate,'60/1');
+const report={duration:3,width:1920,height:1080,fps:60,frames:180,audio:false,mp4Bytes:(await stat(mp4)).size,webmBytes:(await stat(webm)).size,loopSeam:{meanAbsoluteChannelDifference:meanError,maxChannelDifference:maxError},composition:'noto-logo-reveal',proofTimes:[0,0.35,0.7,1.1,1.26,1.72,2.2,2.98]};
+await writeFile(resolve(destination,'verification.json'),JSON.stringify(report,null,2)+'\n');
+console.log(JSON.stringify(report,null,2));

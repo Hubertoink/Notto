@@ -20,6 +20,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue('') }
 vi.mock('@tauri-apps/plugin-updater', () => ({ check: updater.check }));
 vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: updater.relaunch }));
 vi.mock('./export', () => ({ exportNotebook: vi.fn() }));
+vi.mock('./backend', () => ({ serverRequest: vi.fn() }));
 vi.mock('./cloud', () => ({
   configured: () => true,
   readCloudConfig: () => ({ url: '' }),
@@ -56,6 +57,9 @@ it('shows one settings category at a time and keeps account input when switching
   expect(screen.queryByRole('textbox', { name: 'E-Mail' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Markdown importieren' }));
   expect(onImport).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: 'Speicherplatz' }));
+  expect(screen.getByRole('heading', { name: 'Speicherplatz' })).toBeTruthy();
+  expect(screen.getByText(/mit einem Noto-Serverkonto anmelden/).closest('[hidden]')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Konto & Sync' }));
   expect((screen.getByRole('textbox', { name: 'E-Mail' }) as HTMLInputElement).value).toBe(
     'test@example.com',

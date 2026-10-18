@@ -12,6 +12,7 @@ const env: Environment = {
   dataDir: process.env.DATA_DIR || '/data/attachments',
   staticDir: process.env.STATIC_DIR || 'dist',
   secureCookies: process.env.NODE_ENV === 'production',
+  storageAdminEmail: process.env.SETUP_EMAIL?.toLowerCase().trim(),
   openaiKey: process.env.OPENAI_API_KEY,
   models: (process.env.OPENAI_MODELS || '')
     .split(',')
@@ -50,10 +51,17 @@ if (process.env.NOTTO_ROLE === 'worker') {
     process.on(signal, () => {
       void app.close().then(() => db.end());
     });
+  const maintainStorage = () =>
+    db
+      .query(
+        'DELETE FROM sessions WHERE expires_at<now(); DELETE FROM rate_limits WHERE expires_at<now(); DELETE FROM youtube_transcript_cache WHERE expires_at<now()',
+      )
+      .catch((error: unknown) => {
+        console.error('Storage maintenance failed', error instanceof Error ? error.name : 'Error');
+      });
+  await maintainStorage();
   const cleanup = setInterval(() => {
-    void db
-      .query('DELETE FROM sessions WHERE expires_at<now(); DELETE FROM rate_limits WHERE expires_at<now()')
-      .catch(() => {});
+    void maintainStorage();
   }, 86400000);
   cleanup.unref();
 }

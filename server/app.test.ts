@@ -3,7 +3,7 @@ import { workOnce } from './worker';
 import { findServerRelations } from './note-relations';
 import { openai } from './openai';
 import { PGlite } from '@electric-sql/pglite';
-import { readFile, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildApp } from './app';
@@ -665,6 +665,7 @@ beforeAll(async () => {
     secureCookies: false,
     models: ['gpt-4.1-mini'],
     dailyLimit: 10,
+    storageAdminEmail: 'alice@example.com',
   });
   const a = await app.inject({
     method: 'POST',
@@ -695,6 +696,81 @@ it('reports the deployed package version in the health endpoint', async () => {
   const { version } = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   expect(response.statusCode).toBe(200);
   expect(response.json()).toEqual({ ok: true, version });
+});
+it('reports only account storage and clears only explicitly confirmed rebuildable caches', async () => {
+  const id = `${crypto.randomUUID()}.txt`;
+  await pg.query('INSERT INTO attachments(user_id,id,name,mime,sha256,size) VALUES($1,$2,$3,$4,$5,$6)', [
+    bob,
+    id,
+    'bob-private.txt',
+    'text/plain',
+    'test',
+    123456789,
+  ]);
+  for (const user of [alice, bob]) {
+    await pg.query(
+      'INSERT INTO document_context_cache(user_id,attachment_id,fingerprint,document) VALUES($1,$2,$3,$4)',
+      [user, id, 'test', JSON.stringify({ text: 'Cached context' })],
+    );
+    await pg.query(
+      "INSERT INTO youtube_transcript_cache(user_id,video_id,document,expires_at) VALUES($1,$2,$3,now()+interval '1 day')",
+      [user, 'storage-test', JSON.stringify({ text: 'Cached transcript' })],
+    );
+  }
+  expect((await app.inject({ url: '/api/storage' })).statusCode).toBe(401);
+  const report = (await app.inject({ url: '/api/storage', headers: headers(aToken) })).json();
+  expect(report.totalBytes).toBe(
+    report.categories.reduce((sum: number, c: { bytes: number }) => sum + c.bytes, 0),
+  );
+  expect(report.largestAttachments.some((a: { id: string }) => a.id === id)).toBe(false);
+  expect(report.categories.find((c: { key: string }) => c.key === 'document-cache').bytes).toBeGreaterThan(0);
+  const before = await pg.query('SELECT document FROM notes WHERE user_id=$1 ORDER BY id', [alice]);
+  const knowledgeBefore = await pg.query('SELECT document FROM knowledge WHERE user_id=$1 ORDER BY id', [
+    alice,
+  ]);
+  const clear = (payload: unknown, token = aToken) =>
+    app.inject({ method: 'PUT', url: '/api/storage/cache', headers: headers(token), payload });
+  expect((await clear({})).statusCode).toBe(400);
+  expect((await clear({ confirm: false })).statusCode).toBe(400);
+  expect((await clear({ confirm: true, user: bob })).statusCode).toBe(400);
+  expect((await clear({ confirm: true })).statusCode).toBe(200);
+  for (const table of ['document_context_cache', 'youtube_transcript_cache']) {
+    expect((await pg.query(`SELECT * FROM ${table} WHERE user_id=$1`, [alice])).rows).toHaveLength(0);
+    expect((await pg.query(`SELECT * FROM ${table} WHERE user_id=$1`, [bob])).rows.length).toBeGreaterThan(0);
+  }
+  expect((await pg.query('SELECT document FROM notes WHERE user_id=$1 ORDER BY id', [alice])).rows).toEqual(
+    before.rows,
+  );
+  expect(
+    (await pg.query('SELECT document FROM knowledge WHERE user_id=$1 ORDER BY id', [alice])).rows,
+  ).toEqual(knowledgeBefore.rows);
+  expect(
+    (await pg.query('SELECT size FROM attachments WHERE user_id=$1 AND id=$2', [bob, id])).rows[0].size,
+  ).toBe(123456789);
+  expect((await clear({ confirm: true })).statusCode).toBe(200);
+});
+it('exposes a measured hosting report only to the configured operator', async () => {
+  const hosting = {
+    measuredAt: new Date().toISOString(),
+    registryBytes: 1000,
+    attachmentBytes: 2000,
+    databaseVolumeBytes: 3000,
+    databaseBytes: 200,
+    registryTags: 6,
+  };
+  const path = join(dir, '.hosting-storage.json');
+  await writeFile(path, JSON.stringify(hosting));
+  try {
+    expect((await app.inject({ url: '/api/storage', headers: headers(aToken) })).json().hosting).toEqual(
+      hosting,
+    );
+    expect((await app.inject({ url: '/api/storage', headers: headers(bToken) })).json().hosting).toBeNull();
+    await writeFile(path, '{"invalid":true}');
+    expect((await app.inject({ url: '/api/storage', headers: headers(aToken) })).statusCode).toBe(500);
+    expect((await app.inject({ url: '/api/storage', headers: headers(bToken) })).statusCode).toBe(200);
+  } finally {
+    await rm(path);
+  }
 });
 it('runs consented server jobs with quoted evidence without rewriting originals', async () => {
   await pg.exec('DELETE FROM jobs');

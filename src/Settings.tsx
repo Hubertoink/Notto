@@ -20,6 +20,7 @@ import { exportNotebook } from './export';
 import { useNotto } from './state';
 import { useCaptureShortcut, shortcutOptions, shortcutLabel } from './shortcuts';
 import { noteBackgrounds, type NoteBackgroundId } from './note-backgrounds';
+import { StorageSettings } from './StorageSettings';
 import {
   automaticUpdateChecksEnabled,
   checkForUpdate,
@@ -51,6 +52,7 @@ export function Settings({
     ['appearance', 'Darstellung'],
     ['account', 'Konto & Sync'],
     ['data', 'Deine Daten'],
+    ['storage', 'Speicherplatz'],
     ...(desktop ? [['shortcuts', 'Tastenkürzel & Widget']] : []),
     ...(desktop ? [['updates', 'Updates']] : []),
   ];
@@ -146,8 +148,8 @@ export function Settings({
     <Modal
       title={user?.email ? `Einstellungen · ${user.email}` : 'Einstellungen · Lokales Notizbuch'}
       onClose={onClose}
-      width={880}
-      className="settings-dialog"
+      width={page === 'storage' ? 1080 : 880}
+      className={`settings-dialog${page === 'storage' ? ' settings-dialog-storage' : ''}`}
     >
       <div className="settings-layout">
         <nav className="settings-navigation" aria-label="Einstellungsbereiche">
@@ -398,6 +400,7 @@ export function Settings({
               </p>
             )}
           </section>
+          {page === 'storage' && <StorageSettings key={scope} />}
           {desktop && (
             <section className="settings-section" hidden={page !== 'shortcuts'}>
               <h3>Tastenkürzel & Randwidget</h3>

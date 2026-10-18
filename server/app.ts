@@ -1,6 +1,7 @@
 import { memorySchema } from '../src/memory-policy.js';
 import { commandRoutes, queueSavedCommands } from './command-routes.js';
 import { documentImportRoutes } from './document-import-routes.js';
+import { storageRoutes } from './storage.js';
 import { organizationRecordSchema, organizationDecisionSchema } from '../src/agent-policy.js';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
@@ -29,6 +30,7 @@ export interface Environment extends AIEnvironment {
   dataDir: string;
   staticDir?: string;
   secureCookies: boolean;
+  storageAdminEmail?: string;
 }
 const credentials = z.object({
   email: z
@@ -416,6 +418,7 @@ export async function buildApp(db: Database, env: Environment) {
     if (!settings?.enabled) fail('KI zuerst für dieses Notizbuch aktivieren.', 403);
     return openai(db, req.nottoUser!.id, p.endpoint, p.body, env);
   });
+  storageRoutes(app, db, env);
   commandRoutes(app, db, env);
   documentImportRoutes(app, db, env.dataDir);
   if (env.staticDir) {

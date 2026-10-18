@@ -68,12 +68,63 @@ mw container update 815c2e94-2fdf-431c-ae7c-6feb74988d79 -p p-wqa66m --image p-w
 Ein vollständiges Compose-Deployment erfordert eine aktuelle lokale Secret-Datei; ein dort leerer OpenAI-Wert würde einen im Container gesetzten Schlüssel überschreiben.
 
 1. Codeänderungen prüfen und nach GitHub pushen. `Notto checks` führt Tests, Web- und Server-Build aus.
-2. `Notto container` unter GitHub Actions manuell auf main starten. Er baut ein Image und legt es mit der vollständigen Commit-ID in der privaten Registry ab. Registry-Zugangsdaten sind als Actions-Secrets hinterlegt.
-3. `NOTTO_IMAGE` in `.notto-deploy/production.env` auf `p-wqa66m.project.space/notto:<commit>` setzen.
-4. `mw stack deploy --stack-id 4ffda78f-d86e-42df-b037-fd189425d44f --compose-file docker-compose.yml --env-file .notto-deploy/production.env -q` ausführen. Keine vollständigen Stack-JSONs in Logs ausgeben: sie enthalten die Server-Secrets.
-5. `https://noto-app.de/api/health` prüfen. Windows-Installer separat über den Windows-Workflow erstellen und installieren.
+2. `Notto container` unter GitHub Actions manuell auf main starten und **deploy** aktiviert lassen. Er baut das Image mit Commit-Tag, aktualisiert App und Worker, prüft `/api/health` auf die neue Paketversion, bereinigt die Registry und veröffentlicht neue Speichermesswerte. Benötigt neben Registry-Secrets das verschlüsselte Repository-Secret `MITTWALD_API_TOKEN` mit Rechten für das Noto-Projekt, Containerverwaltung und SSH-Schlüssel des Benutzers.
+3. Die Workflow-Run-Seite auf erfolgreichen Abschluss prüfen. Windows-/Linux-Installer separat über den Desktop-Workflow erstellen.
 
-Das Image enthält keine Zugangsdaten. Deployment-Secrets liegen getrennt von Quellcode und Image. Die produktive Veröffentlichung ist bewusst ein eigener Schritt; das Erstellen eines Images aktualisiert den laufenden Dienst nicht.
+**Nur bauen:** `deploy` abwählen. Dann werden keine laufenden Container geändert und keine alten Images entfernt. Häufige reine Builds können weiterhin Registry-Speicher belegen.
+
+**Manuelle Alternative:** `scripts/deploy-mittwald.mjs` mit `MITTWALD_API_TOKEN`, `MITTWALD_PROJECT_ID=p-wqa66m` und `NOTTO_IMAGE=p-wqa66m.project.space/notto:<commit>` aufrufen. Der Quellstand und seine Paketversion müssen zum Image passen. Das Skript erhält bestehende Container-Secrets und Volumes; es ersetzt ausschließlich die Images. Es führt denselben Ablauf einschließlich Bereinigung und Hosting-Bericht aus. Ein vollständiges `mw stack deploy` ist nur für Infrastrukturänderungen erforderlich und benötigt eine aktuelle Secret-Datei. Vollständige Stack-/Container-JSONs enthalten Secrets und gehören nicht in Logs.
+
+Das Image enthält keine Zugangsdaten. Deployment-Secrets liegen getrennt von Quellcode und Image. Jeder Deployment-Lauf registriert einen eigenen temporären SSH-Schlüssel mit einer Stunde Ablaufzeit und widerruft ihn im Abschlussblock. Bei einem harten Abbruch greift spätestens das Ablaufdatum. Der Workflow serialisiert Build, Deployment und Registry-Wartung mit derselben Concurrency-Gruppe. Keine parallelen manuellen Builds oder Registry-Schreibzugriffe starten.
+
+## Speicherplatz und Registry-Wartung
+
+**Einstellungen → Speicherplatz** ist im Web und im Desktop verfügbar. Die API `GET /api/storage` zählt ausschließlich das angemeldete Konto: JSON-Nutzdaten, Originalanhänge, Wissen, KI-Aufträge, Ergebnisbilder und die beiden wiederherstellbaren Server-Caches. Die Summe ist kein physischer Hosting-Verbrauch und enthält insbesondere keine Registry, Backups, Datenbankindizes oder WAL-Dateien. Papierkorb und Historie sind enthalten; die Historie ist zusätzlich als Teilmenge ausgewiesen. Lokaler Web-Speicher wird, falls unterstützt, separat geschätzt; native Desktop-Dateien sind nicht darin enthalten.
+
+`PUT /api/storage/cache` mit `{"confirm":true}` löscht transaktional nur Dokument-Kontext und YouTube-Transkripte dieses Kontos. Erneute Nutzung erstellt diese Daten neu. Es werden weder Wissenseinträge noch synchronisierte Originale entfernt; Offline-Geräte können daher keine gelöschten Originale unbeabsichtigt zurückkopieren. PostgreSQL verwendet freigewordene Tabellenplätze erneut, ohne seine Dateien sofort zu verkleinern. Kein `VACUUM FULL` im laufenden Betrieb ausführen. Die tägliche Serverwartung entfernt zusätzlich abgelaufene Transkripte.
+
+### Hosting-Bericht
+
+Mit Mittwald-CLI-Zugang und einem bereits registrierten SSH-Schlüssel:
+
+```sh
+export MITTWALD_API_TOKEN="$(cat ~/.config/mw/token)"
+export MITTWALD_PROJECT_ID=p-wqa66m
+export MITTWALD_SSH_IDENTITY_FILE=/absoluter/pfad/zum/ssh-key
+node scripts/mittwald-storage-report.mjs
+node scripts/mittwald-storage-report.mjs --publish-report
+```
+
+Der erste Aufruf misst ausschließlich. Der zweite veröffentlicht zusätzlich einen Bericht im gemeinsamen Attachment-Volume (`.hosting-storage.json`), ohne Zugangsdaten zu speichern. Die Betreiberansicht ist nur für `SETUP_EMAIL` sichtbar. Der Zeitstempel bleibt sichtbar: „Speicher aktualisieren“ lädt den letzten Bericht, misst aber nicht selbst beim Hoster. Die gemessenen Verzeichnisse sind die Standardpfade dieses Deployments. Backups, Images auf Mittwald-Hosts und sonstige Projektdateien sind keine vollständige Teilmenge dieses Berichts; die Werte nicht mit Kontodaten addieren.
+
+### Alte Images begrenzen
+
+Jeder Container-Build veröffentlicht einen unveränderlichen Commit-Tag. Ohne Wartung wachsen Registry-Blobs unbegrenzt, auch bei wenigen Notizen. **Ab 1.5.19 erledigt ein erfolgreiches Deployment über `Notto container` die folgenden Wartungsschritte automatisch.** Die Aufbewahrungsregel ist: neuestes Image, laufende/vorgemerkte Images und deren OCI-Untermanifeste. Keine zusätzlichen alten Versionen. `latest` und der Commit-Tag können dasselbe Image ohne doppelte Layers bezeichnen.
+
+Die Wartung betrifft ausschließlich die Registry, nicht Notizen, PDFs, Datenbank oder den Papierkorb. Eine frühere Softwareversion muss nach der Bereinigung bei Bedarf neu gebaut werden. Die Anzahl benötigter Images kann während eines Updates vorübergehend größer als eins sein.
+
+Ab 1.5.18 installiert das Image ausschließlich Chromium Headless Shell. Das spart rund 389 MiB gegenüber der zusätzlichen vollständigen Chromium-Installation. Screenshot- und PDF-Smoke-Tests laufen bereits beim Image-Build. Alte Image-Layers werden dadurch nicht automatisch entfernt.
+
+1. Builds und Deployments für die Wartung pausieren. Aktuelle **und bereits vorgemerkte** App-/Worker-Images über `mw container list -p p-wqa66m -o json` maschinell auslesen; vollständige Ausgaben enthalten Secrets und gehören nicht in Logs. Alle benötigten `imageDigest`-Werte schützen. Falls ein ImageDigest fehlt oder ein Deployment läuft: abbrechen.
+2. `REGISTRY_URL=https://p-wqa66m.project.space`, `REGISTRY_USER`, `REGISTRY_PASSWORD` und `REGISTRY_DEPLOYED_DIGESTS` (kommaseparierte SHA256-Digests) ausschließlich als Umgebungsvariablen bereitstellen.
+3. `node scripts/registry-retention.mjs` erstellt zunächst nur einen Plan. Er schützt die angegebenen laufenden Images samt übergeordneten Tags, `latest` sowie rekursiv deren OCI-Manifeste einschließlich Provenance-Daten. Keine zusätzlichen Rückfallversionen werden aufbewahrt.
+4. Plan prüfen, dann `node scripts/registry-retention.mjs --apply`. Dies entfernt ausschließlich nicht geschützte Manifeste aus dem Repository `notto`. Noch kein Plattenplatz wird freigegeben.
+5. Registry stoppen: `mw container stop c-etyefv -p p-wqa66m -q`. **App, Worker und Datenbank nicht stoppen.** Keine Garbage-Collection parallel zu Registry-Schreibzugriffen!
+6. Im Registry-Stack einen temporären Container mit demselben Registry-Image und demselben Volume starten:
+
+   ```sh
+   mw container run -p p-wqa66m \
+     --stack-id d68be178-038d-40ff-9773-016376a4f54a \
+     --name registry-gc --volume registry-data:/var/lib/registry \
+     --entrypoint /bin/registry mittwald/registry:3 \
+     garbage-collect --quiet /etc/distribution/config.yml
+   ```
+
+   Die zurückgegebene Container-ID notieren und Status/Logs prüfen. Erfolgreicher Abschluss muss Exitcode 0 haben (Mittwald kann einmalige beendete Container trotzdem als „error“ anzeigen). **Kein `--delete-untagged`**: OCI-Untermanifeste können trotz fehlendem eigenem Tag benötigt werden.
+7. Nur den temporären Container mit seiner konkreten ID entfernen; Registry wieder starten. Auch bei Wartungsfehlern den Collector zuerst sicher stoppen/entfernen und dann die Registry wieder starten. Ist nicht sicher, ob der Collector noch schreibt, Registry ausgeschaltet lassen und die Wartung im mStudio prüfen; niemals gleichzeitige Schreibzugriffe riskieren. `latest`, laufende Digests und deren Blobs mit den passenden OCI-/Docker-Accept-Headern prüfen, anschließend `/api/health` und die echten Verzeichnisgrößen kontrollieren.
+8. Den Hosting-Bericht neu veröffentlichen. Mittwald kann bis zu einer Stunde benötigen, um seine eigene Anzeige nachzuführen.
+
+Es gibt **keinen zeitgesteuerten Löschjob**: Bereinigt wird nach erfolgreichen Deployments im beschriebenen Workflow. Andere Deployment-Wege und reine Builds lösen das nicht aus. Bei einem Wartungsfehler schlägt der Actions-Lauf sichtbar fehl; ein erfolgreiches App-Update wird nicht als erfolgreiche Speicherbereinigung ausgegeben. Zugangsdaten oder Docker-/Mittwald-Verwaltungsrechte werden bewusst nicht an die normale App-Oberfläche weitergegeben.
 
 ## Backups und Grenzen
 

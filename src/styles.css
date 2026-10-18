@@ -1038,6 +1038,44 @@ textarea:focus-visible {
   color: var(--nt-muted);
   padding-top: 15px;
 }
+.rewrite-review-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--nt-muted);
+}
+.rewrite-review-legend {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--nt-muted);
+}
+.rewrite-line {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  padding: 4px 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.85;
+  border-left: 3px solid transparent;
+}
+.rewrite-line-added {
+  background: light-dark(#e0f3e4, #203e2b);
+  color: light-dark(#165a2b, #b1efbd);
+  border-color: light-dark(#287c40, #7cce90);
+}
+.rewrite-line-removed {
+  background: light-dark(#fbe8e4, #452a28);
+  color: light-dark(#8d3025, #ffc1b8);
+  border-color: light-dark(#ad4535, #e99588);
+  text-decoration: line-through;
+}
+.rewrite-line-marker {
+  user-select: none;
+}
 .markdown {
   min-width: 0;
   font-size: 16px;
@@ -3044,6 +3082,7 @@ button.tags-heading {
 }
 .rewrite-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 22px;

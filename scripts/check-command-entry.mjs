@@ -50,6 +50,16 @@ try {
       'Variantenvergleich\n\nVariante A: 80 Euro, drinnen.\nVariante B: 40 Euro, draußen.\n\n#jugendarbeit',
     );
     const context = page.getByRole('button', { name: 'KI-Kontext', exact: true });
+    await page.getByRole('button', { name: 'Mit KI überarbeiten', exact: true }).click();
+    const rewrite = page.getByRole('dialog', { name: 'Notiz überarbeiten', exact: true });
+    await rewrite.waitFor({ state: 'visible' });
+    assert.equal(await rewrite.getByRole('button', { name: 'Entwurf erstellen' }).isDisabled(), true);
+    await rewrite.getByRole('button', { name: 'Strukturieren', exact: true }).click();
+    assert.equal(await rewrite.getByRole('button', { name: 'Entwurf erstellen' }).isEnabled(), true);
+    assert.equal(await rewrite.evaluate(el => el.scrollWidth > el.clientWidth + 1), false);
+    await page.screenshot({ path: resolve(output, `rewrite-dialog-${name}.png`), fullPage: true });
+    await rewrite.getByRole('button', { name: 'Abbrechen', exact: true }).click();
+    await rewrite.waitFor({ state: 'hidden' });
     await context.click();
     const popup = page.getByRole('dialog', { name: 'KI-Kontext', exact: true });
     await popup.waitFor({ state: 'visible' });

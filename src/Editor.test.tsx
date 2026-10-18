@@ -181,11 +181,42 @@ it('applies a rewrite only to the draft and can restore the original wording', a
   await waitFor(() => expect(field.disabled).toBe(false));
   await user.type(field, 'gedanke kurz');
   await user.click(screen.getByRole('button', { name: 'Mit KI überarbeiten' }));
-  await waitFor(() => expect(field.value).toBe('Ein lesbarer Gedanke.'));
+  expect(rewriting.rewriteNote).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Lesbarer schreiben' }));
+  await user.click(screen.getByRole('button', { name: 'Entwurf erstellen' }));
+  const review = await screen.findByRole('region', { name: 'KI-Änderungen prüfen' });
+  expect(within(review).getByText('Ein lesbarer Gedanke.').closest('.rewrite-line-added')).toBeTruthy();
+  expect(within(review).getByText('gedanke kurz').closest('.rewrite-line-removed')).toBeTruthy();
   expect(await repo.list('local')).toHaveLength(0);
   await user.click(screen.getByRole('button', { name: 'KI-Überarbeitung rückgängig' }));
-  expect(field.value).toBe('gedanke kurz');
+  expect((screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement).value).toBe(
+    'gedanke kurz',
+  );
+  expect(screen.queryByRole('region', { name: 'KI-Änderungen prüfen' })).toBeNull();
 });
+it('keeps the comparison while editing and clears it only after saving the reviewed draft', async () => {
+  vi.spyOn(rewriting, 'rewriteNote').mockResolvedValue('Neuer Text');
+  renderEditor();
+  const user = userEvent.setup();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  fireEvent.change(field, { target: { value: 'Alter Text' } });
+  await user.click(screen.getByRole('button', { name: 'Mit KI überarbeiten' }));
+  await user.click(screen.getByRole('button', { name: 'Lesbarer schreiben' }));
+  await user.click(screen.getByRole('button', { name: 'Entwurf erstellen' }));
+  await screen.findByRole('region', { name: 'KI-Änderungen prüfen' });
+  await user.click(screen.getByRole('button', { name: 'Weiter bearbeiten' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Notiztext' }), {
+    target: { value: 'Neuer Text mit Ergänzung' },
+  });
+  await user.click(screen.getByRole('button', { name: 'Änderungen prüfen' }));
+  expect(screen.getByText('Neuer Text mit Ergänzung').closest('.rewrite-line-added')).toBeTruthy();
+  expect(await repo.list('local')).toHaveLength(0);
+  await user.click(screen.getByRole('button', { name: 'Festhalten' }));
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'KI-Änderungen prüfen' })).toBeNull());
+  expect((await repo.list('local'))[0].content).toBe('Neuer Text mit Ergänzung');
+});
+
 it('discards a delayed rewrite when the user has continued typing', async () => {
   let finish!: (text: string) => void;
   vi.spyOn(rewriting, 'rewriteNote').mockImplementation(
@@ -200,6 +231,8 @@ it('discards a delayed rewrite when the user has continued typing', async () => 
   await waitFor(() => expect(field.disabled).toBe(false));
   await user.type(field, 'gedanke');
   await user.click(screen.getByRole('button', { name: 'Mit KI überarbeiten' }));
+  await user.click(screen.getByRole('button', { name: 'Lesbarer schreiben' }));
+  await user.click(screen.getByRole('button', { name: 'Entwurf erstellen' }));
   await user.type(field, ' weiter');
   finish('Alter Vorschlag');
   await screen.findByText('Der Text wurde inzwischen geändert. Bitte die Überarbeitung erneut starten.');
@@ -871,6 +904,8 @@ it('does not offer conflict actions for a failed AI rewrite', async () => {
   const button = screen.getByRole('button', { name: 'Mit KI überarbeiten' });
   await waitFor(() => expect(button.getAttribute('disabled')).toBeNull());
   await user.click(button);
+  await user.click(screen.getByRole('button', { name: 'Lesbarer schreiben' }));
+  await user.click(screen.getByRole('button', { name: 'Entwurf erstellen' }));
   await screen.findByRole('alert');
   expect(screen.queryByRole('button', { name: 'Als aktuelle Version übernehmen' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Als neue Notiz sichern' })).toBeNull();

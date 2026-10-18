@@ -49,6 +49,7 @@ import { Dictation } from './Dictation';
 import { NoteAnnotations, useKnowledgeRecords } from './Tasks';
 import { collectionNames, createCollection } from './collections';
 import { rewriteNote } from './rewrite';
+import { RewriteReview } from './RewriteReview';
 import { applyRelation, type Relation } from './note-relations';
 import { eligible, config, knowledge } from './intelligence';
 import { tagPopupPosition } from './tag-popup';
@@ -167,6 +168,7 @@ export function Editor({
   const [rewriteRequest, setRewriteRequest] = useState<string | null>(null);
   const [saveConflict, setSaveConflict] = useState(false);
   const [rewriteUndo, setRewriteUndo] = useState<{ before: string; after: string } | null>(null);
+  const [reviewRewrite, setReviewRewrite] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addingImages, setAddingImages] = useState(0);
   const imageOperations = useRef(0);
@@ -638,6 +640,8 @@ export function Editor({
       initialContextRef.current = aiContext;
       initialCollectionRef.current = collections;
       setDraftStatus('Gespeichert');
+      setRewriteUndo(null);
+      setReviewRewrite(false);
       ++editGeneration.current;
       clearTimeout(statusTimer.current);
       notify('Notiz gespeichert');
@@ -729,7 +733,8 @@ export function Editor({
       if (editGeneration.current !== generation || textRef.current !== before)
         throw new Error('Der Text wurde inzwischen geändert. Bitte die Überarbeitung erneut starten.');
       change(after);
-      setRewriteUndo({ before, after });
+      setRewriteUndo({ before: rewriteUndo?.before ?? before, after });
+      setReviewRewrite(true);
       setPreview(false);
       notify('Überarbeitet – als Entwurf. Bitte vor dem Speichern prüfen.');
     } catch (e) {
@@ -894,7 +899,7 @@ export function Editor({
                 isIconOnly
                 variant="ghost"
                 isDisabled={rewriting || saving || !ready || !content.trim()}
-                onClick={() => void rewrite()}
+                onClick={() => setRewriteRequest('')}
               />
             )}
             {rewriteUndo && content === rewriteUndo.after && (
@@ -907,6 +912,7 @@ export function Editor({
                 onClick={() => {
                   change(rewriteUndo.before);
                   setRewriteUndo(null);
+                  setReviewRewrite(false);
                   setPreview(false);
                 }}
               />
@@ -917,7 +923,10 @@ export function Editor({
               className={preview ? 'note-action-edit' : 'note-action-preview'}
               isIconOnly
               variant="ghost"
-              onClick={() => setPreview(!preview)}
+              onClick={() => {
+                setReviewRewrite(false);
+                setPreview(!preview);
+              }}
             />
             {note && !compact && (
               <Action
@@ -1000,7 +1009,15 @@ export function Editor({
         </Modal>
       )}
       <div className="editor-body">
-        {!preview && (
+        {rewriteUndo && (
+          <div className="rewrite-review-controls">
+            <span>KI-Entwurf · noch nicht festgehalten</span>
+            <button type="button" className="text-button" onClick={() => setReviewRewrite(!reviewRewrite)}>
+              {reviewRewrite ? 'Weiter bearbeiten' : 'Änderungen prüfen'}
+            </button>
+          </div>
+        )}
+        {!preview && !reviewRewrite && (
           <div ref={toolbar} className="formatting-toolbar" role="toolbar" aria-label="Text formatieren">
             {formatActions.map(([kind, label, Icon]) => (
               <button
@@ -1036,7 +1053,9 @@ export function Editor({
             void addFiles(Array.from(e.dataTransfer.files));
           }}
         >
-          {preview ? (
+          {reviewRewrite && rewriteUndo ? (
+            <RewriteReview before={rewriteUndo.before} after={content} />
+          ) : preview ? (
             <NoteMarkdown
               content={
                 noteCommands(content).reduceRight(

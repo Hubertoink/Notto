@@ -10,6 +10,24 @@ import { maintainRegistry } from './registry-retention.mjs';
 const execute = promisify(execFile);
 const pause = () => new Promise((resolve) => setTimeout(resolve, 5000));
 
+export async function registryRequest(url, options) {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        redirect: 'error',
+        signal: AbortSignal.timeout(30000),
+      });
+      if (![502, 503, 504].includes(response.status) || attempt === 11) return response;
+      await response.body?.cancel();
+    } catch (error) {
+      if (attempt === 11 || !(error instanceof TypeError || error.name === 'TimeoutError')) throw error;
+    }
+    if (attempt === 0) console.log('Registry temporarily unavailable; retrying request.');
+    await pause();
+  }
+}
+
 export async function offlineCollection(operations) {
   let maintenance;
   try {
@@ -90,7 +108,7 @@ export async function deployMittwald(env = process.env) {
   async function verifyManifest(reference, checked = new Set()) {
     if (checked.has(reference)) return;
     checked.add(reference);
-    const response = await fetch(
+    const response = await registryRequest(
       `https://${registryHost}/v2/notto/manifests/${encodeURIComponent(reference)}`,
       {
         headers: registryAuth,
@@ -102,7 +120,7 @@ export async function deployMittwald(env = process.env) {
     const manifest = await response.json();
     for (const child of manifest.manifests || []) await verifyManifest(child.digest, checked);
     for (const blob of [manifest.config, ...(manifest.layers || [])].filter(Boolean)) {
-      const check = await fetch(`https://${registryHost}/v2/notto/blobs/${blob.digest}`, {
+      const check = await registryRequest(`https://${registryHost}/v2/notto/blobs/${blob.digest}`, {
         method: 'HEAD',
         headers: registryAuth,
         redirect: 'error',

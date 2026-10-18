@@ -58,6 +58,19 @@ import { type AIContext } from './domain';
 import { ContextPicker } from './ContextPicker';
 import { defaultContext, webResearchEnabled } from './source-context';
 import { resizeNoteTextarea } from './textarea-size';
+import { createTextareaMirror } from './textarea-selection';
+
+const formatActions = [
+  ['bold', 'Fett (Strg B)', Bold],
+  ['italic', 'Kursiv (Strg I)', Italic],
+  ['heading', 'Überschrift', Heading2],
+  ['bullet', 'Aufzählung', List],
+  ['number', 'Nummerierte Liste', ListOrdered],
+  ['task', 'Checkbox', ListTodo],
+  ['quote', 'Zitat', Quote],
+  ['link', 'Weblink einfügen', Link],
+  ['table', 'Tabelle einfügen', Table2],
+] as const;
 
 export function Editor({
   note,
@@ -134,6 +147,81 @@ export function Editor({
   const undoStack = useRef<string[]>([]);
   const lastHistory = useRef<{ mode: 'typing' | 'step'; at: number } | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const toolbar = useRef<HTMLDivElement>(null);
+  const selectionToolbar = useRef<HTMLDivElement>(null);
+  const [textSelection, setTextSelection] = useState<{
+    field: HTMLTextAreaElement;
+    start: number;
+    end: number;
+  } | null>(null);
+  const dismissedSelection = useRef<typeof textSelection>(null);
+  const dismissSelection = () => {
+    // A delayed browser selection event must not reopen a menu dismissed with Escape.
+    const field = input.current;
+    dismissedSelection.current = field
+      ? { field, start: field.selectionStart, end: field.selectionEnd }
+      : null;
+    setTextSelection(null);
+  };
+  const [selectionPosition, setSelectionPosition] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!textSelection || preview || !ready || saving) {
+      setSelectionPosition(null);
+      return;
+    }
+    const { field, start, end } = textSelection;
+    const mirror = createTextareaMirror(field);
+    const update = () => {
+      const panel = field.closest('.detail-panel, .editor-compact .editor-content');
+      const panelRect = panel?.getBoundingClientRect();
+      const viewport = window.visualViewport;
+      const viewportTop = viewport?.offsetTop || 0;
+      const viewportLeft = viewport?.offsetLeft || 0;
+      const viewportRight = viewportLeft + (viewport?.width || window.innerWidth);
+      const viewportBottom = viewportTop + (viewport?.height || window.innerHeight);
+      const left = Math.max(viewportLeft + 8, (panelRect?.left || 0) + 8);
+      const right = Math.min(viewportRight - 8, (panelRect?.right ?? viewportRight) - 8);
+      const top = Math.max(
+        viewportTop + 8,
+        panelRect?.top || 0,
+        toolbar.current?.getBoundingClientRect().bottom || 0,
+      );
+      const bottom = Math.min(viewportBottom - 8, panelRect?.bottom ?? viewportBottom);
+      const rect = mirror.rects(start, end).find((rect) => rect.bottom > top && rect.top < bottom);
+      const menu = selectionToolbar.current;
+      if (!rect || !menu || !field.isConnected) {
+        setSelectionPosition(null);
+        return;
+      }
+      const width = menu.offsetWidth;
+      const height = menu.offsetHeight;
+      const above = rect.top - height - 8;
+      const y = above >= top ? above : Math.max(top, rect.bottom + 8);
+      if (y + height > bottom || width > right - left) {
+        setSelectionPosition(null);
+        return;
+      }
+      setSelectionPosition({
+        left: Math.max(left, Math.min((rect.left + rect.right - width) / 2, right - width)),
+        top: y,
+      });
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('scroll', update);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(field);
+    return () => {
+      mirror.remove();
+      observer?.disconnect();
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('scroll', update);
+    };
+  }, [textSelection, content, preview, ready, saving]);
   const textFields = useRef(new Map<number, HTMLTextAreaElement>());
   const offsetOf = (el: HTMLTextAreaElement | null) => Number(el?.dataset.start || 0);
   const selectionStart = () =>
@@ -194,57 +282,13 @@ export function Editor({
       setTagPosition(null);
       return;
     }
-    // Mirror the textarea's typography and wrapping to locate the active hashtag.
-    const mirror = document.createElement('div');
-    mirror.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(mirror);
+    const mirror = createTextareaMirror(el);
     const update = () => {
-      const style = getComputedStyle(el);
       const rect = el.getBoundingClientRect();
-      for (const property of [
-        'font-family',
-        'font-size',
-        'font-weight',
-        'font-style',
-        'font-variant',
-        'line-height',
-        'letter-spacing',
-        'word-spacing',
-        'text-transform',
-        'text-indent',
-        'text-align',
-        'tab-size',
-        'padding-top',
-        'padding-right',
-        'padding-bottom',
-        'padding-left',
-        'direction',
-      ]) {
-        mirror.style.setProperty(property, style.getPropertyValue(property));
-      }
-      Object.assign(mirror.style, {
-        position: 'fixed',
-        visibility: 'hidden',
-        pointerEvents: 'none',
-        left: '0',
-        top: '0',
-        width: `${el.clientWidth}px`,
-        boxSizing: 'border-box',
-        whiteSpace: 'pre-wrap',
-        overflowWrap: 'break-word',
-        border: '0',
-      });
-      const marker = document.createElement('span');
-      marker.textContent = el.value.slice(tagToken.start - offsetOf(el), tagToken.end - offsetOf(el)) || '#';
-      mirror.replaceChildren(
-        document.createTextNode(el.value.slice(0, tagToken.start - offsetOf(el))),
-        marker,
-        document.createTextNode(el.value.slice(tagToken.end - offsetOf(el))),
-      );
-      const bounds = marker.getClientRects()[0] || marker.getBoundingClientRect();
-      const left = rect.left + el.clientLeft + bounds.left - el.scrollLeft;
-      const belowTop = rect.top + el.clientTop + bounds.bottom - el.scrollTop + 4;
-      const aboveBottom = rect.top + el.clientTop + bounds.top - el.scrollTop - 4;
+      const bounds = mirror.rects(tagToken.start - offsetOf(el), tagToken.end - offsetOf(el))[0];
+      const left = bounds.left;
+      const belowTop = bounds.bottom + 4;
+      const aboveBottom = bounds.top - 4;
       if (belowTop < rect.top || belowTop > rect.bottom + 4) {
         setTagPosition(null);
         return;
@@ -340,6 +384,7 @@ export function Editor({
       kind,
     );
     acceptedTagCaret.current = { start: result.start, end: result.end };
+    setTextSelection(null);
     change(result.text);
     setTagToken(null);
   };
@@ -392,6 +437,7 @@ export function Editor({
   useEffect(() => {
     alive.current = true;
     let cancelled = false;
+    let focusTimer: ReturnType<typeof setTimeout> | undefined;
     setReady(false);
     base.current = note?.revision ?? null;
     initial.current = note?.content ?? '';
@@ -418,7 +464,10 @@ export function Editor({
           setDraftStatus('Entwurf wiederhergestellt');
         }
         setReady(true);
-        setTimeout(() => input.current?.focus(), 80);
+        const active = document.activeElement;
+        focusTimer = setTimeout(() => {
+          if (!cancelled && document.activeElement === active) input.current?.focus();
+        }, 80);
       })
       .catch((e) => {
         setError(String(e));
@@ -426,6 +475,7 @@ export function Editor({
       });
     return () => {
       cancelled = true;
+      clearTimeout(focusTimer);
       alive.current = false;
       clearTimeout(statusTimer.current);
     };
@@ -950,20 +1000,8 @@ export function Editor({
       )}
       <div className="editor-body">
         {!preview && (
-          <div className="formatting-toolbar" role="toolbar" aria-label="Text formatieren">
-            {(
-              [
-                ['bold', 'Fett (Strg B)', Bold],
-                ['italic', 'Kursiv (Strg I)', Italic],
-                ['heading', 'Überschrift', Heading2],
-                ['bullet', 'Aufzählung', List],
-                ['number', 'Nummerierte Liste', ListOrdered],
-                ['task', 'Checkbox', ListTodo],
-                ['quote', 'Zitat', Quote],
-                ['link', 'Weblink einfügen', Link],
-                ['table', 'Tabelle einfügen', Table2],
-              ] as const
-            ).map(([kind, label, Icon]) => (
+          <div ref={toolbar} className="formatting-toolbar" role="toolbar" aria-label="Text formatieren">
+            {formatActions.map(([kind, label, Icon]) => (
               <button
                 key={kind}
                 type="button"
@@ -1053,7 +1091,27 @@ export function Editor({
                       inspectTag(e.target);
                     }}
                     onClick={(e) => inspectTag(e.currentTarget)}
-                    onBlur={() => setTagToken(null)}
+                    onSelect={(e) => {
+                      const field = e.currentTarget;
+                      const dismissed = dismissedSelection.current;
+                      if (
+                        dismissed?.field === field &&
+                        dismissed.start === field.selectionStart &&
+                        dismissed.end === field.selectionEnd
+                      )
+                        return;
+                      dismissedSelection.current = null;
+                      setTextSelection(
+                        field.selectionStart !== field.selectionEnd &&
+                          field.value.slice(field.selectionStart, field.selectionEnd).trim()
+                          ? { field, start: field.selectionStart, end: field.selectionEnd }
+                          : null,
+                      );
+                    }}
+                    onBlur={(e) => {
+                      setTagToken(null);
+                      if (!selectionToolbar.current?.contains(e.relatedTarget)) setTextSelection(null);
+                    }}
                     onKeyUp={(e) => {
                       if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key))
                         inspectTag(e.currentTarget);
@@ -1072,6 +1130,15 @@ export function Editor({
                       }
                     }}
                     onKeyDown={(e) => {
+                      if (
+                        e.key === 'Escape' &&
+                        (textSelection || e.currentTarget.selectionStart !== e.currentTarget.selectionEnd)
+                      ) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dismissSelection();
+                        return;
+                      }
                       if (
                         !e.nativeEvent.isComposing &&
                         (e.ctrlKey || e.metaKey) &&
@@ -1125,6 +1192,51 @@ export function Editor({
               )}
             </div>
           )}
+          {textSelection &&
+            !preview &&
+            ready &&
+            !saving &&
+            createPortal(
+              <div
+                ref={selectionToolbar}
+                className="formatting-toolbar selection-formatting-toolbar"
+                role="toolbar"
+                aria-label="Markierten Text formatieren"
+                style={
+                  selectionPosition
+                    ? { ...selectionPosition, visibility: 'visible' }
+                    : { left: 0, top: 0, visibility: 'hidden' }
+                }
+                onPointerDown={(e) => e.preventDefault()}
+                onBlur={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget) && e.relatedTarget !== input.current)
+                    setTextSelection(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    textSelection.field.focus({ preventScroll: true });
+                    dismissSelection();
+                  }
+                }}
+              >
+                {formatActions
+                  .filter(([kind]) => ['bold', 'italic', 'heading', 'bullet', 'link'].includes(kind))
+                  .map(([kind, label, Icon]) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      aria-label={label}
+                      title={label}
+                      onClick={() => format(kind)}
+                    >
+                      <Icon size={17} />
+                    </button>
+                  ))}
+              </div>,
+              document.body,
+            )}
           {!preview &&
             tagToken &&
             tagPosition &&

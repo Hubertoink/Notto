@@ -2086,6 +2086,9 @@ button.tags-heading {
   max-width: 100%;
 }
 .formatting-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2093,6 +2096,7 @@ button.tags-heading {
   margin-top: 18px;
   padding: 6px 0;
   border-bottom: 1px solid var(--nt-line);
+  background: var(--nt-paper);
 }
 .formatting-toolbar button {
   display: inline-flex;
@@ -2121,6 +2125,28 @@ button.tags-heading {
 }
 .formatting-toolbar + .editor-content {
   margin-top: 12px;
+}
+.selection-formatting-toolbar {
+  position: fixed;
+  z-index: 1100;
+  flex-wrap: nowrap;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid var(--nt-line);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--nt-text) 16%, transparent);
+}
+@media (min-width: 701px) and (pointer: fine) {
+  @container note-detail (max-width: 600px) {
+    .formatting-toolbar {
+      padding-right: 116px;
+    }
+  }
+}
+@media (max-width: 700px) {
+  .detail-panel .formatting-toolbar {
+    padding-left: 32px;
+  }
 }
 .suggestions-empty {
   padding: 8px 10px;

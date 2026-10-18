@@ -14,6 +14,12 @@ const source = await readFile(new URL('../src/textarea-size.ts', import.meta.url
 const measureCode = ts
   .transpile(source, { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext })
   .replace('export function', 'function');
+const selectionCode = ts
+  .transpile(await readFile(new URL('../src/textarea-selection.ts', import.meta.url), 'utf8'), {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext,
+  })
+  .replace('export function', 'function');
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({
@@ -24,9 +30,13 @@ try {
   await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style>
     <div class="notebook detail-open"><main class="main"><div class="work-area"><section class="detail-panel">
     <section class="editor"><div class="editor-heading">Notiz bearbeiten</div><div class="editor-body">
+    <div class="formatting-toolbar" role="toolbar"><button>Fett</button><button>Kursiv</button></div>
     <div class="editor-content"><div class="inline-note-editor"><textarea aria-label="Notiztext"></textarea></div></div>
     </div><div class="editor-footer">Gespeichert</div></section></section></div></main></div>`);
   await page.addScriptTag({ content: `${measureCode}\nwindow.resizeNoteTextarea = resizeNoteTextarea;` });
+  await page.addScriptTag({
+    content: `${selectionCode}\nwindow.createTextareaMirror = createTextareaMirror;`,
+  });
   const result = await page.evaluate(() => {
     const field = document.querySelector('textarea');
     const panel = document.querySelector('.detail-panel');
@@ -86,8 +96,37 @@ try {
         return field.scrollHeight <= field.clientHeight + 1;
       }),
     );
+    const formatting = await page.evaluate(() => {
+      const field = document.querySelector('textarea');
+      const panel = document.querySelector('.detail-panel');
+      const toolbar = document.querySelector('.formatting-toolbar');
+      panel.scrollTop = 500;
+      const mirror = window.createTextareaMirror(field);
+      const before = mirror.rects(0, 12)[0];
+      panel.scrollTop += 100;
+      const after = mirror.rects(0, 12)[0];
+      mirror.remove();
+      return {
+        toolbarTop: toolbar.getBoundingClientRect().top,
+        panelTop: panel.getBoundingClientRect().top,
+        toolbarBottom: toolbar.getBoundingClientRect().bottom,
+        panelBottom: panel.getBoundingClientRect().bottom,
+        selectionShift: before.top - after.top,
+      };
+    });
+    assert.ok(
+      Math.abs(formatting.toolbarTop - formatting.panelTop) <= 1,
+      'Formatting toolbar must stay at the top of the note viewport',
+    );
+    assert.ok(formatting.toolbarBottom < formatting.panelBottom);
+    assert.ok(
+      Math.abs(formatting.selectionShift - 100) <= 1,
+      'Selection coordinates must follow the scrolled text',
+    );
   }
-  console.log('Editor scrolling, focus, shrinking, and width reflow checks passed.');
+  console.log(
+    'Editor scrolling, sticky formatting, selection coordinates, focus, shrinking, and width reflow checks passed.',
+  );
 } finally {
   await browser.close();
 }

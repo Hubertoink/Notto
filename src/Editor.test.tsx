@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Theme } from '@astryxdesign/core/theme';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
@@ -17,6 +17,7 @@ import * as rewriting from './rewrite';
 import * as cloud from './cloud';
 import * as state from './state';
 import * as backend from './backend';
+import * as textareaSelection from './textarea-selection';
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false, invoke: vi.fn() }));
 beforeAll(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -106,6 +107,59 @@ it('edits and formats text after an inline image without changing its reference'
   fireEvent.click(screen.getByRole('button', { name: 'Fett (Strg B)' }));
   expect(after.value).toBe('\n\n**Danach**');
   expect(screen.getByRole('button', { name: 'Foto bearbeiten' })).toBeTruthy();
+});
+it('formats a selection from the floating toolbar and dismisses it with Escape or a collapsed selection', async () => {
+  const remove = vi.fn();
+  vi.spyOn(textareaSelection, 'createTextareaMirror').mockReturnValue({
+    rects: () => [{ left: 40, right: 140, top: 120, bottom: 145 }],
+    remove,
+  });
+  renderEditor();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  fireEvent.change(field, { target: { value: 'Ein markierter Gedanke' } });
+  field.focus();
+  field.setSelectionRange(4, 14);
+  fireEvent.select(field);
+  const menu = await screen.findByRole('toolbar', { name: 'Markierten Text formatieren' });
+  fireEvent.pointerDown(within(menu).getByRole('button', { name: 'Fett (Strg B)' }));
+  fireEvent.click(within(menu).getByRole('button', { name: 'Fett (Strg B)' }));
+  expect(field.value).toBe('Ein **markierter** Gedanke');
+  expect(document.activeElement).toBe(field);
+  expect(field.selectionStart).toBe(6);
+  expect(field.selectionEnd).toBe(16);
+  fireEvent.keyDown(field, { key: 'Escape' });
+  fireEvent.select(field);
+  expect(screen.queryByRole('toolbar', { name: 'Markierten Text formatieren' })).toBeNull();
+  field.setSelectionRange(0, 3);
+  fireEvent.select(field);
+  await screen.findByRole('toolbar', { name: 'Markierten Text formatieren' });
+  field.setSelectionRange(3, 3);
+  fireEvent.select(field);
+  expect(screen.queryByRole('toolbar', { name: 'Markierten Text formatieren' })).toBeNull();
+  expect(remove).toHaveBeenCalled();
+});
+it('keeps floating formatting scoped to the selected text segment after an image and hides on blur', async () => {
+  vi.spyOn(textareaSelection, 'createTextareaMirror').mockReturnValue({
+    rects: () => [{ left: 40, right: 140, top: 120, bottom: 145 }],
+    remove: vi.fn(),
+  });
+  renderEditor();
+  const field = screen.getByRole('textbox', { name: 'Notiztext' }) as HTMLTextAreaElement;
+  await waitFor(() => expect(field.disabled).toBe(false));
+  fireEvent.change(field, { target: { value: 'Titel\n\n![Foto](attachments/abc.png)\n\nDanach' } });
+  const after = screen.getAllByRole('textbox', { name: 'Notiztext' })[1] as HTMLTextAreaElement;
+  after.focus();
+  after.setSelectionRange(2, 8);
+  fireEvent.select(after);
+  const menu = await screen.findByRole('toolbar', { name: 'Markierten Text formatieren' });
+  fireEvent.click(within(menu).getByRole('button', { name: 'Kursiv (Strg I)' }));
+  expect(after.value).toBe('\n\n*Danach*');
+  expect(screen.getByRole('button', { name: 'Foto bearbeiten' })).toBeTruthy();
+  fireEvent.select(after);
+  await screen.findByRole('toolbar', { name: 'Markierten Text formatieren' });
+  fireEvent.blur(after);
+  expect(screen.queryByRole('toolbar', { name: 'Markierten Text formatieren' })).toBeNull();
 });
 it('saves image deletion from its visual control into the note text', async () => {
   renderEditor();

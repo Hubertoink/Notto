@@ -10,9 +10,12 @@ import {
 } from './note-tools';
 import { createPortal } from 'react-dom';
 import { AttachmentTitle } from './AttachmentTitle';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  BrainCircuit,
+  Globe,
+  WholeWord,
   WandSparkles,
   Undo2,
   Bold,
@@ -120,6 +123,35 @@ export function Editor({
   const commandSubmitLock = useRef(false);
   const commandInput = useRef<HTMLTextAreaElement>(null);
   const [contextOpen, setContextOpen] = useState(false);
+  const contextId = useId();
+  const contextButton = useRef<HTMLButtonElement>(null);
+  const contextPopover = useRef<HTMLDivElement>(null);
+  const wordCount = useMemo(() => {
+    const text = content.replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    return text.match(/[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*/gu)?.length ?? 0;
+  }, [content]);
+  useLayoutEffect(() => {
+    if (!contextOpen) return;
+    const position = () => {
+      const rect = contextButton.current?.getBoundingClientRect();
+      const panel = contextPopover.current;
+      if (!rect || !panel) return;
+      panel.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - 432))}px`;
+      panel.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+      panel.style.maxHeight = `${Math.max(120, rect.top - 20)}px`;
+    };
+    position();
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+    return () => {
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+    };
+  }, [contextOpen]);
+  useEffect(() => {
+    contextPopover.current?.hidePopover?.();
+    setContextOpen(false);
+  }, [note?.id]);
   const collectionRef = useRef(collections);
   const initialCollectionRef = useRef(collections);
   const [collectionInput, setCollectionInput] = useState('');
@@ -916,37 +948,6 @@ export function Editor({
           </div>
         )}
       </div>
-      {!compact && (
-        <details className="context-controls" onToggle={(e) => setContextOpen(e.currentTarget.open)}>
-          <summary>
-            KI-Kontext ·{' '}
-            {aiContext.mode === 'note'
-              ? 'Notiz und Anhänge'
-              : aiContext.mode === 'collection'
-                ? aiContext.collection
-                : aiContext.mode === 'selected'
-                  ? 'Ausgewählte Quellen'
-                  : 'Gesamtes Notizbuch'}
-            {' · '}
-            {webResearchEnabled(aiContext, { commandWeb }) ? 'Webrecherche an' : 'Webrecherche aus'}
-          </summary>
-          {contextOpen && (
-            <ContextPicker
-              names={knownCollections}
-              value={aiContext}
-              commandWeb={commandWeb}
-              current={{ ...(note ?? draftNote), collections }}
-              notes={notes || []}
-              disabled={saving}
-              onChange={(value) => {
-                setAIContext(value);
-                contextRef.current = value;
-                change(textRef.current);
-              }}
-            />
-          )}
-        </details>
-      )}
       {rewriteRequest !== null && (
         <Modal title="Notiz überarbeiten" className="rewrite-dialog" onClose={() => setRewriteRequest(null)}>
           <p className="rewrite-intro">Was möchtest du verbessern?</p>
@@ -1538,6 +1539,75 @@ export function Editor({
             isLoading={saving}
             onClick={() => void save()}
           />
+        </div>
+        <div className="note-status-bar" aria-label="Notizstatus">
+          {!compact && (
+            <>
+              <button
+                ref={contextButton}
+                type="button"
+                className="icon-button"
+                aria-label="KI-Kontext"
+                title="KI-Kontext"
+                aria-haspopup="dialog"
+                aria-expanded={contextOpen}
+                aria-controls={contextId}
+                popoverTarget={contextId}
+              >
+                <BrainCircuit size={18} aria-hidden="true" />
+              </button>
+              <div
+                id={contextId}
+                ref={contextPopover}
+                popover="auto"
+                role="dialog"
+                aria-label="KI-Kontext"
+                className="context-popover"
+                onToggle={(event) => setContextOpen(event.newState === 'open')}
+              >
+                <div className="context-popover-heading">
+                  <strong>KI-Kontext</strong>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="KI-Kontext schließen"
+                    popoverTarget={contextId}
+                    popoverTargetAction="hide"
+                  >
+                    <X size={17} aria-hidden="true" />
+                  </button>
+                </div>
+                <ContextPicker
+                  names={knownCollections}
+                  value={aiContext}
+                  commandWeb={commandWeb}
+                  current={{ ...(note ?? draftNote), collections }}
+                  notes={notes || []}
+                  disabled={saving}
+                  onChange={(value) => {
+                    setAIContext(value);
+                    contextRef.current = value;
+                    change(textRef.current);
+                  }}
+                />
+              </div>
+              {webResearchEnabled(aiContext, { commandWeb }) && (
+                <span className="note-status-item" aria-label="Webrecherche an" title="Webrecherche an">
+                  <Globe size={16} aria-hidden="true" />
+                </span>
+              )}
+            </>
+          )}
+          <span
+            className="note-status-item"
+            aria-label={`${wordCount} ${wordCount === 1 ? 'Wort' : 'Wörter'}`}
+            title="Wortanzahl"
+          >
+            <WholeWord size={17} aria-hidden="true" />
+            <span>
+              {wordCount.toLocaleString('de-DE')} {wordCount === 1 ? 'Wort' : 'Wörter'}
+            </span>
+          </span>
         </div>
         {history && note && (
           <Modal

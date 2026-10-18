@@ -49,6 +49,29 @@ try {
     await field.fill(
       'Variantenvergleich\n\nVariante A: 80 Euro, drinnen.\nVariante B: 40 Euro, draußen.\n\n#jugendarbeit',
     );
+    const context = page.getByRole('button', { name: 'KI-Kontext', exact: true });
+    await context.click();
+    const popup = page.getByRole('dialog', { name: 'KI-Kontext', exact: true });
+    await popup.waitFor({ state: 'visible' });
+    const bounds = await popup.boundingBox();
+    assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
+    assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 1000);
+    await page.getByLabel('Webrecherche für diese Notiz ausschalten').check();
+    assert.equal(await page.getByLabel('Webrecherche an', { exact: true }).count(), 0);
+    await page.screenshot({ path: resolve(output, `context-${name}.png`), fullPage: true });
+    await page.keyboard.press('Escape');
+    await popup.waitFor({ state: 'hidden' });
+    assert.equal(await context.evaluate((el) => el === document.activeElement), true);
+    await context.click();
+    await page.getByLabel('Webrecherche für diese Notiz ausschalten').uncheck();
+    await page.getByRole('button', { name: 'KI-Kontext schließen' }).click();
+    await popup.waitFor({ state: 'hidden' });
+    assert.equal(await page.getByLabel('Webrecherche an', { exact: true }).count(), 1);
+    await context.click();
+    await field.click();
+    await popup.waitFor({ state: 'hidden' });
+    await field.fill('Ein **kurzer** Text mit [Link](https://example.org/langer/pfad).');
+    assert.equal(await page.getByLabel('5 Wörter', { exact: true }).count(), 1);
     if (!(await page.getByRole('button', { name: 'Neuer KI-Auftrag', exact: true }).isVisible()))
       await page.getByRole('button', { name: /KI-Anmerkungen/ }).click();
     await page.getByRole('button', { name: 'Neuer KI-Auftrag', exact: true }).click();

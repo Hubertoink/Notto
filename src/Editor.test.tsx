@@ -72,16 +72,13 @@ it('shows inherited web research for a legacy note and persists a deliberate not
       </NottoProvider>
     </Theme>,
   );
-  const summary = await screen.findByText(/KI-Kontext · Notiz und Anhänge · Webrecherche an/);
-  const details = summary.closest('details')!;
-  details.open = true;
-  fireEvent(details, new Event('toggle'));
+  await screen.findByLabelText('Webrecherche an');
   const checkbox = (await screen.findByLabelText(
     'Webrecherche für diese Notiz ausschalten',
   )) as HTMLInputElement;
   expect(checkbox.checked).toBe(false);
   fireEvent.click(checkbox);
-  await screen.findByText(/KI-Kontext · Notiz und Anhänge · Webrecherche aus/);
+  expect(screen.queryByLabelText('Webrecherche an')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Festhalten' }));
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect((await repo.get('local', note.id))?.aiContext?.webPolicy).toBe('off');
@@ -89,10 +86,10 @@ it('shows inherited web research for a legacy note and persists a deliberate not
 
 it('updates the visible context status when the global command web setting changes', async () => {
   renderEditor();
-  await screen.findByText(/Webrecherche an/);
+  await screen.findByLabelText('Webrecherche an');
   localStorage.setItem('notto-ai:local', JSON.stringify({ commandWeb: false }));
   fireEvent(window, new Event('notto-ai-config'));
-  await screen.findByText(/KI-Kontext · Notiz und Anhänge · Webrecherche aus/);
+  expect(screen.queryByLabelText('Webrecherche an')).toBeNull();
 });
 it('edits and formats text after an inline image without changing its reference', async () => {
   renderEditor();

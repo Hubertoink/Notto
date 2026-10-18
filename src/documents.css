@@ -260,12 +260,46 @@
 .context-web input {
   width: auto;
 }
-.context-controls {
-  margin: 10px 20px;
+.note-status-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 8px;
+  color: var(--nt-muted);
+  font-size: 12px;
 }
-.context-controls > summary {
-  cursor: pointer;
-  font-size: 13px;
+.note-status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.context-popover {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(420px, calc(100vw - 24px));
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--nt-line);
+  border-radius: 12px;
+  background: var(--nt-paper);
+  color: var(--nt-text);
+  box-shadow: 0 12px 40px var(--nt-shadow);
+}
+.context-popover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.context-popover .context-picker {
+  margin: 0;
+  min-width: 0;
+}
+.context-popover .context-picker legend {
+  display: none;
 }
 .document-citation {
   display: block;

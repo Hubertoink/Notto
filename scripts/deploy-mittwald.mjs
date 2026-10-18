@@ -240,6 +240,22 @@ export async function deployMittwald(env = process.env) {
       start: async () => {
         await mw(['container', 'start', registry.id, ...project, '-q']);
         await waitFor(async () => service(await list(), 'registry').status === 'running', 'registry restart');
+        console.log('Waiting for the registry HTTPS endpoint after restart.');
+        await waitFor(async () => {
+          try {
+            const response = await fetch(`https://${registryHost}/v2/`, {
+              headers: registryAuth,
+              redirect: 'error',
+              signal: AbortSignal.timeout(15000),
+            });
+            if ([502, 503, 504].includes(response.status)) return false;
+            if (!response.ok) throw new Error(`Registry readiness check failed (${response.status}).`);
+            return true;
+          } catch (error) {
+            if (error instanceof TypeError || error.name === 'TimeoutError') return false;
+            throw error;
+          }
+        }, 'registry HTTPS readiness');
       },
     });
     await verifyManifest('latest');

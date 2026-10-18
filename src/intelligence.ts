@@ -1,4 +1,5 @@
 import { researchCandidates, researchInstructions, researchInput } from './research-policy';
+import { automaticReviewAllowed } from './automatic-review';
 import { memoryContext } from './memory-policy';
 import { knowledgeRole, uniqueSources } from './knowledge-policy';
 import { invoke } from '@tauri-apps/api/core';
@@ -282,12 +283,13 @@ export async function evidence(note: Note, records?: KnowledgeRecord[]): Promise
   }
   return result;
 }
-export async function analyze(note: Note) {
+export async function analyze(note: Note, automatic = false) {
   if (!eligible(note))
     throw new Error(
       noteExclusionReason(note, config(note.scope)) || 'Diese Notiz ist von der KI ausgeschlossen.',
     );
   const records = await knowledge.list(note.scope);
+  if (automatic && (!config(note.scope).auto || !automaticReviewAllowed(records, note))) return;
   for (const id of attachmentIds(note.content).filter((id) => /\.(pdf|docx|txt|md)$/.test(id))) {
     if (!records.some((r) => r.kind === 'extraction' && r.noteId === note.id && (r.data as any).id === id)) {
       const shared = records

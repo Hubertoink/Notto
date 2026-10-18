@@ -1,4 +1,5 @@
 import { researchCandidates, researchInstructions, researchInput } from '../src/research-policy.js';
+import { automaticReviewAllowed } from '../src/automatic-review.js';
 import { knowledgeRole, uniqueSources } from '../src/knowledge-policy.js';
 import { workCommandOnce } from './command-worker.js';
 import { randomUUID } from 'node:crypto';
@@ -61,6 +62,13 @@ export async function workOnce(db: Database, env: AIEnvironment) {
         job.note_id,
       ])
     ).rows.map((r) => r.document);
+    if (
+      (job.kind === 'analysis' || job.kind.startsWith('relations')) &&
+      !automaticReviewAllowed(records, { id: job.note_id, scope: job.user_id })
+    ) {
+      await db.query("UPDATE jobs SET status='skipped',lease_until=NULL,error=NULL WHERE id=$1", [job.id]);
+      return true;
+    }
     if (job.kind.startsWith('relations')) {
       await findServerRelations(db, env, job.user_id, n, c);
       await db.query("UPDATE jobs SET status='done',lease_until=NULL,error=NULL WHERE id=$1", [job.id]);

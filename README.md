@@ -1,6 +1,6 @@
 # Noto
 
-**Aktuelle Version: 1.5.22.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.22](docs/releases/1.5.22.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
+**Aktuelle Version: 1.5.23.** Die Web-App unter [noto-app.de](https://noto-app.de) nutzt ein eigenes Docker-Backend auf Mittwald. Windows und Linux erlauben weiterhin lokale Notizen und Konto-Synchronisation. Supabase wird für diesen Betrieb nicht benötigt. Änderungen: [Release 1.5.23](docs/releases/1.5.23.md). Einrichtung, Einladungen, OpenAI-Schlüssel und Updates: [SELF-HOSTING.md](docs/SELF-HOSTING.md).
 
 Unter **Einstellungen → Speicherplatz** zeigen Web und Desktop den Kontospeicher nach Kategorien, große Anhänge, Papierkorb und Versionshistorie. Wiederherstellbare Server-Caches lassen sich nach Bestätigung bereinigen; Originale bleiben erhalten. Container-Images und andere Hosting-Dateien sind davon getrennt. Betreiber können einen direkt gemessenen Hosting-Bericht veröffentlichen; siehe [Speicherwartung](docs/SELF-HOSTING.md#speicherplatz-und-registry-wartung).
 

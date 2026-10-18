@@ -1,5 +1,6 @@
 import { isConnectionError } from './connection';
 import { researchCandidates } from './research-policy';
+import { automaticReviewAllowed } from './automatic-review';
 import { AttachmentTitle } from './AttachmentTitle';
 import { findNoteRelations } from './relation-client';
 import { pairKey, linkedTo, type RelationBatch } from './note-relations';
@@ -112,7 +113,11 @@ export function IntelligenceWorker() {
       try {
         const records = await knowledge.list(scope);
         const note = notes.find(
-          (n) => eligible(n) && !latest(records, 'analysis', n) && !failed.current.has(n.revision),
+          (n) =>
+            eligible(n) &&
+            automaticReviewAllowed(records, n) &&
+            !latest(records, 'analysis', n) &&
+            !failed.current.has(n.revision),
         );
         if (cancelled) return;
         if (!note) {
@@ -121,7 +126,9 @@ export function IntelligenceWorker() {
               .filter((r) => r.kind === 'note-relations')
               .flatMap((r) => (r.data as RelationBatch).checked),
           );
-          const allowed = notes.filter((n) => eligible(n) && n.content.length <= 60000);
+          const allowed = notes.filter(
+            (n) => eligible(n) && automaticReviewAllowed(records, n) && n.content.length <= 60000,
+          );
           const pendingRelations = allowed.find(
             (n) =>
               !failed.current.has(`relations:${n.revision}`) &&
@@ -173,7 +180,7 @@ export function IntelligenceWorker() {
           return;
         }
         try {
-          await analyze(note);
+          await analyze(note, true);
         } catch (e) {
           if (isConnectionError(e)) return;
           failed.current.add(note.revision);
@@ -629,7 +636,7 @@ export function Knowledge({
               checked={settings.auto}
               onChange={(e) => update({ auto: e.target.checked })}
             />{' '}
-            Gespeicherte Notizen im Hintergrund analysieren{' '}
+            Gespeicherte Notizen im Hintergrund analysieren (höchstens drei Prüfungen pro Notiz){' '}
             {scope !== 'local' && ownBackend()
               ? '– auch bei geschlossener App'
               : '– solange Noto geöffnet ist'}

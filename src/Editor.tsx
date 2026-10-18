@@ -169,6 +169,7 @@ export function Editor({
   const [saveConflict, setSaveConflict] = useState(false);
   const [rewriteUndo, setRewriteUndo] = useState<{ before: string; after: string } | null>(null);
   const [reviewRewrite, setReviewRewrite] = useState(false);
+  const [historyChanges, setHistoryChanges] = useState(true);
   const [saving, setSaving] = useState(false);
   const [addingImages, setAddingImages] = useState(0);
   const imageOperations = useRef(0);
@@ -178,6 +179,11 @@ export function Editor({
   const [error, setError] = useState('');
   const [history, setHistory] = useState(false);
   const [oldRevision, setOldRevision] = useState<Revision | null>(null);
+  const historyIndex = note
+    ? oldRevision
+      ? note.history.findIndex((r) => r.revision === oldRevision.revision)
+      : note.history.length - 1
+    : -1;
   const undoStack = useRef<string[]>([]);
   const lastHistory = useRef<{ mode: 'typing' | 'step'; at: number } | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -1645,7 +1651,7 @@ export function Editor({
                 {[...note.history].reverse().map((r, i) => (
                   <button
                     key={r.revision}
-                    className={`history-item ${oldRevision?.revision === r.revision ? 'selected' : ''}`}
+                    className={`history-item ${note.history[historyIndex]?.revision === r.revision ? 'selected' : ''}`}
                     onClick={() => setOldRevision(r)}
                   >
                     {readableDate(r.savedAt)}
@@ -1654,10 +1660,36 @@ export function Editor({
                 ))}
               </div>
               <div className="history-preview">
-                <NoteMarkdown
-                  content={(oldRevision ?? note.history[note.history.length - 1]).content}
-                  scope={scope}
-                />
+                {historyIndex > 0 ? (
+                  <>
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() => setHistoryChanges(!historyChanges)}
+                    >
+                      {historyChanges ? 'Vollständigen Text anzeigen' : 'Änderungen zur Vorversion anzeigen'}
+                    </button>
+                    {historyChanges ? (
+                      <RewriteReview
+                        history
+                        before={note.history[historyIndex - 1].content}
+                        after={note.history[historyIndex].content}
+                      />
+                    ) : (
+                      <NoteMarkdown content={note.history[historyIndex].content} scope={scope} />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="muted small">
+                      Erste verfügbare Version – keine Vorversion zum Vergleichen.
+                    </p>
+                    <NoteMarkdown
+                      content={note.history[historyIndex]?.content ?? note.content}
+                      scope={scope}
+                    />
+                  </>
+                )}
               </div>
             </div>
             <div className="modal-actions">

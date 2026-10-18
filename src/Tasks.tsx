@@ -1,4 +1,5 @@
 import { isConnectionError } from './connection';
+import { automaticReviewAllowed } from './automatic-review';
 import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, useRef, useId, type ReactNode, type CSSProperties } from 'react';
 import { withoutNoteCommands, commandEvidence } from './note-command';
@@ -224,6 +225,7 @@ export function NoteAnnotations({
 }) {
   const { notes = [] } = useNotto();
   const records = useKnowledgeRecords(note.scope);
+  const automaticReview = automaticReviewAllowed(records, note);
   const excluded = noteExclusionReason(note, config(note.scope));
   const [open, setOpen] = useState(false);
   const [docked, setDocked] = useState(false);
@@ -309,7 +311,10 @@ export function NoteAnnotations({
   };
   const analysis = noteAnalysis(records, note);
   const analysisCurrent = !!analysis && currentAnalysis(note, analysis.revision);
-  const job = useAnalysisJob(note, !analysisCurrent && !excluded && config(note.scope).auto);
+  const job = useAnalysisJob(
+    note,
+    !analysisCurrent && !excluded && config(note.scope).auto && automaticReview,
+  );
   const insights =
     analysis && currentAnalysis(note, analysis.revision)
       ? ((analysis.data as Analysis).suggestions || [])
@@ -454,9 +459,11 @@ export function NoteAnnotations({
     checked: analysis
       ? `Der aktuelle Inhalt wurde am ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(analysis.at))} geprüft.${annotationCount ? ` ${annotationCount} ${annotationCount === 1 ? 'Eintrag' : 'Einträge'} in den Anmerkungen.` : ' Keine offenen Hinweise.'}`
       : '',
-    outdated: config(note.scope).auto
-      ? 'Der Inhalt wurde seit der letzten KI-Prüfung geändert. Die automatische Prüfung ist eingeschaltet. Den Hintergrundstatus findest du unter „Wissen & KI“; mit „Aktualisieren“ kannst du die Prüfung direkt erneut starten.'
-      : 'Der Inhalt wurde seit der letzten KI-Prüfung geändert. Die automatische Prüfung ist ausgeschaltet. Mit „Aktualisieren“ kannst du diese Fassung prüfen.',
+    outdated: !automaticReview
+      ? 'Drei KI-Prüfungen sind abgeschlossen. Weitere Änderungen lösen keine automatische Prüfung aus. Klicke auf den Prüfstatus, um diese Fassung ausdrücklich prüfen zu lassen.'
+      : config(note.scope).auto
+        ? 'Der Inhalt wurde seit der letzten KI-Prüfung geändert. Die automatische Prüfung ist eingeschaltet. Den Hintergrundstatus findest du unter „Wissen & KI“; mit „Aktualisieren“ kannst du die Prüfung direkt erneut starten.'
+        : 'Der Inhalt wurde seit der letzten KI-Prüfung geändert. Die automatische Prüfung ist ausgeschaltet. Mit „Aktualisieren“ kannst du diese Fassung prüfen.',
     queued: job?.error
       ? 'Die automatische Prüfung konnte noch nicht abgeschlossen werden. Eine Wiederholung ist vorgesehen.'
       : 'Diese Fassung wartet auf die automatische KI-Prüfung.',
@@ -485,21 +492,33 @@ export function NoteAnnotations({
       }
     >
       <div className="annotation-heading">
-        <button
-          ref={trigger}
-          className={`annotation-toggle ${indicators.length ? 'has-annotations' : ''}`}
-          aria-expanded={expanded}
-          onClick={() => {
-            toggle(!expanded);
-          }}
-          title={`${reviewLabel}. KI-Anmerkungen direkt in der Notiz anzeigen`}
-        >
-          <Sparkles size={17} />
-          <span>KI-Anmerkungen</span>
-          <span className={`annotation-status annotation-status-${reviewState}`}>
+        <div className="annotation-heading-main">
+          <button
+            ref={trigger}
+            className={`annotation-toggle ${indicators.length ? 'has-annotations' : ''}`}
+            aria-expanded={expanded}
+            onClick={() => {
+              toggle(!expanded);
+            }}
+            title={`${reviewLabel}. KI-Anmerkungen direkt in der Notiz anzeigen`}
+          >
+            <Sparkles size={17} />
+            <span>KI-Anmerkungen</span>
+          </button>
+          <button
+            type="button"
+            className={`annotation-status annotation-status-${reviewState} annotation-review-button`}
+            disabled={!!updating || hasUnsavedChanges || !!excluded || job?.status === 'running'}
+            title={`${reviewDescription} Klicken: KI-Prüfung starten.${!automaticReview ? ' Automatische Prüfung nach drei Durchläufen pausiert.' : ''}`}
+            onClick={() => {
+              setTab('annotations');
+              toggle(true);
+              void refresh();
+            }}
+          >
             <ReviewIcon size={14} aria-hidden="true" /> {reviewLabel}
-          </span>
-        </button>
+          </button>
+        </div>
         <div className="annotation-heading-indicators">
           {(commandCount > 0 || hasCommandDrafts) && (
             <button
@@ -633,6 +652,12 @@ export function NoteAnnotations({
             <ReviewIcon size={18} aria-hidden="true" />
             <div>
               <p>{reviewDescription}</p>
+              {!automaticReview && (
+                <p className="muted small">
+                  Automatische Prüfung nach drei Durchläufen pausiert. Weitere Prüfungen startest du über den
+                  Prüfstatus.
+                </p>
+              )}
               {(analysis?.data as Analysis | undefined)?.context && (
                 <div className="muted small">
                   <p>

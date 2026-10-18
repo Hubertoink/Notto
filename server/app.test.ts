@@ -28,6 +28,76 @@ const headers = (secret?: string) => ({
   'x-notto-client': 'desktop',
   ...(secret ? { authorization: `Bearer ${secret}` } : {}),
 });
+it.each([2, 3])('runs automatic review only below the limit: %s completed reviews', async (count) => {
+  await pg.exec('DELETE FROM jobs');
+  const note = newNote(alice, 'Eine neue Fassung nach kleinen Änderungen.');
+  await pg.query(
+    'INSERT INTO ai_settings(user_id,document) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET document=excluded.document',
+    [
+      alice,
+      JSON.stringify({
+        enabled: true,
+        auto: true,
+        autoResearch: true,
+        model: 'gpt-4.1-mini',
+        excludedTags: '',
+        excludedNotes: [],
+      }),
+    ],
+  );
+  for (let i = 0; i < count; i++) {
+    const record = {
+      id: crypto.randomUUID(),
+      scope: alice,
+      noteId: note.id,
+      revision: crypto.randomUUID(),
+      kind: 'analysis',
+      at: new Date().toISOString(),
+      data: { suggestions: [] },
+    };
+    await pg.query('INSERT INTO knowledge(user_id,id,document) VALUES($1,$2,$3)', [
+      alice,
+      record.id,
+      JSON.stringify(record),
+    ]);
+  }
+  await app.inject({
+    method: 'POST',
+    url: '/api/notes/push',
+    headers: headers(aToken),
+    payload: { p_id: note.id, p_revision: note.revision, p_base_revision: null, p_document: note },
+  });
+  const fetch = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: 'completed',
+          output: [{ content: [{ type: 'output_text', text: '{"suggestions":[]}' }] }],
+        }),
+      ),
+    );
+  try {
+    await workOnce(adapter, { openaiKey: 'test-only', models: ['gpt-4.1-mini'], dailyLimit: 100 });
+    expect(fetch).toHaveBeenCalledTimes(count === 2 ? 1 : 0);
+    expect(
+      (await pg.query("SELECT status FROM jobs WHERE note_id=$1 AND kind='analysis'", [note.id])).rows[0]
+        .status,
+    ).toBe(count === 2 ? 'done' : 'skipped');
+    expect(
+      (
+        await pg.query(
+          "SELECT document FROM knowledge WHERE user_id=$1 AND document->>'noteId'=$2 AND document->>'kind'='analysis'",
+          [alice, note.id],
+        )
+      ).rows,
+    ).toHaveLength(3);
+  } finally {
+    fetch.mockRestore();
+    await pg.exec('DELETE FROM jobs');
+    await pg.query('DELETE FROM ai_settings WHERE user_id=$1', [alice]);
+  }
+});
 it.each(['internal link', 'formatting', 'external link', 'hashtag'])(
   'reuses analysis after %s without a model call and checks real edits again',
   async (mode) => {

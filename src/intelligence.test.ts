@@ -39,6 +39,19 @@ const response = (suggestions: unknown[]) => ({
   },
   error: null,
 });
+it('stops automatic review after three persisted results but permits explicit review', async () => {
+  const note = newNote('local', 'Ein Gedanke');
+  await repo.put(note, null);
+  saveConfig('local', { ...config('local'), auto: true });
+  for (let i = 0; i < 3; i++)
+    await knowledge.append({ ...note, revision: `previous-${i}` }, 'analysis', { suggestions: [] });
+  await analyze(note, true);
+  expect(api).not.toHaveBeenCalled();
+  api.mockResolvedValue(response([]));
+  await analyze(note);
+  expect(api).toHaveBeenCalled();
+  expect(latest(await knowledge.list('local'), 'analysis', note)).toBeTruthy();
+});
 it('includes saved personal instructions and forgets them without changing a note', async () => {
   const note = newNote('local', item.quote);
   await repo.put(note, null);

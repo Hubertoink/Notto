@@ -659,6 +659,54 @@ it('refreshes outdated annotations from the saved revision and closes through th
   await user.click(screen.getByRole('button', { name: 'Anmerkungen schließen' }));
   expect(screen.getByRole('button', { name: /KI-Anmerkungen/ }).getAttribute('aria-expanded')).toBe('false');
 });
+it('starts an explicit review from the status button after three completed reviews', async () => {
+  const note = newNote('local', 'Neue Fassung');
+  await repo.put(note, null);
+  for (let i = 0; i < 3; i++)
+    await knowledge.append({ scope: note.scope, id: note.id, revision: `old-${i}` }, 'analysis', {
+      suggestions: [],
+    });
+  const analyze = vi.spyOn(intelligence, 'analyze').mockResolvedValue(undefined);
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={note} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const button = await screen.findByRole('button', { name: 'Prüfung veraltet' });
+  expect(analyze).not.toHaveBeenCalled();
+  expect(button.title).toContain('Drei KI-Prüfungen');
+  await userEvent.setup().click(button);
+  await waitFor(() => expect(analyze).toHaveBeenCalledWith(note));
+});
+
+it('compares each selected history version with its own predecessor', async () => {
+  const first = newNote('local', 'Erste Fassung');
+  const second = reviseNote(first, { content: 'Zweite Fassung' });
+  const third = reviseNote(second, { content: 'Dritte Fassung' });
+  await repo.put(third, null);
+  render(
+    <Theme theme={neutralTheme}>
+      <NottoProvider>
+        <Editor note={third} onSaved={vi.fn()} />
+      </NottoProvider>
+    </Theme>,
+  );
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Versionshistorie' }));
+  const modal = screen.getByRole('dialog', { name: 'Versionshistorie' });
+  let comparison = within(modal).getByRole('region', { name: 'Änderungen zur Vorversion' });
+  expect(within(comparison).getByText('Zweite Fassung').closest('.rewrite-line-removed')).toBeTruthy();
+  expect(within(comparison).getByText('Dritte Fassung').closest('.rewrite-line-added')).toBeTruthy();
+  await user.click(within(modal).getByRole('button', { name: /Version 2$/ }));
+  comparison = within(modal).getByRole('region', { name: 'Änderungen zur Vorversion' });
+  expect(within(comparison).getByText('Erste Fassung').closest('.rewrite-line-removed')).toBeTruthy();
+  expect(within(comparison).getByText('Zweite Fassung').closest('.rewrite-line-added')).toBeTruthy();
+  await user.click(within(modal).getByRole('button', { name: /Version 1$/ }));
+  expect(within(modal).queryByRole('region', { name: 'Änderungen zur Vorversion' })).toBeNull();
+  expect(within(modal).getByText(/Erste verfügbare Version/)).toBeTruthy();
+});
 it('distinguishes an unreviewed note from a checked note without suggestions', async () => {
   const note = newNote('local', 'Eine Notiz ohne offene Aufgaben');
   await repo.put(note, null);

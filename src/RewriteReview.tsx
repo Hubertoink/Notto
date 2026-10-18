@@ -1,13 +1,27 @@
 import { useMemo } from 'react';
 import { rewriteDiff } from './rewrite-diff';
 
-export function RewriteReview({ before, after }: { before: string; after: string }) {
+export function RewriteReview({
+  before,
+  after,
+  history = false,
+}: {
+  before: string;
+  after: string;
+  history?: boolean;
+}) {
   const lines = useMemo(() => rewriteDiff(before, after), [before, after]);
   return (
-    <section className="rewrite-review" aria-label="KI-Änderungen prüfen">
+    <section
+      className="rewrite-review"
+      aria-label={history ? 'Änderungen zur Vorversion' : 'KI-Änderungen prüfen'}
+    >
       <p className="rewrite-review-legend">
-        Grün / +: neu oder geändert · Rot / −: entfernt. Erst „Festhalten“ speichert die neue Fassung.
+        {history
+          ? 'Vergleich mit der Vorversion. Grün / +: neu oder geändert · Rot / −: entfernt.'
+          : 'Grün / +: neu oder geändert · Rot / −: entfernt. Erst „Festhalten“ speichert die neue Fassung.'}
       </p>
+      {history && before === after && <p className="muted small">Keine Textänderungen zur Vorversion.</p>}
       <div className="rewrite-diff">
         {lines.map((line, index) => (
           <div key={index} className={`rewrite-line rewrite-line-${line.kind}`}>

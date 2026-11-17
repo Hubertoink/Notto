@@ -120,7 +120,7 @@ it('searches notebooks above 1000 chunks with bounded indexing and reuses vector
   await repo.put(pinned, note.revision);
   await semanticSearch('local', 'Atlas', [pinned]);
   expect(api.mock.calls).toHaveLength(1); // Identical text chunks share cached vectors.
-});
+}, 15000); // The 1.8 MB fixture can exceed the default timeout on Linux CI runners.
 it('reserves retrieval places for different notes before adding duplicate perspectives', () => {
   const hits = diverseHits(
     [

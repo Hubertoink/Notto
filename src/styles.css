@@ -3182,7 +3182,8 @@ button.tags-heading {
 }
 .image-fan-cards {
   position: absolute;
-  inset: 8px 0 auto;
+  /* Leave room for rotated corners inside the reading area's clipping boundary. */
+  inset: 8px 16px auto;
 }
 .image-fan-card {
   position: absolute;

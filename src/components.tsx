@@ -630,6 +630,8 @@ export function InlineImage({
 
 function ImageGallery({ content, scope }: { content: string; scope: string }) {
   const images = noteImages(content).filter((image) => image.thumbnail);
+  const previewCount = Math.min(images.length, 8);
+  const lastPreviewIndex = Math.max(1, previewCount - 1);
   const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [columns, setColumns] = useState(3);
@@ -637,7 +639,10 @@ function ImageGallery({ content, scope }: { content: string; scope: string }) {
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const measure = () => setColumns(Math.max(1, Math.floor(el.clientWidth / 145)));
+    const measure = () => {
+      const cards = el.querySelector<HTMLDivElement>('.image-fan-cards');
+      setColumns(Math.max(1, Math.floor((cards?.clientWidth ?? el.clientWidth) / 145)));
+    };
     measure();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(el);
@@ -667,16 +672,19 @@ function ImageGallery({ content, scope }: { content: string; scope: string }) {
             className="image-fan-card"
             aria-label={expanded ? `${image.alt || `Bild ${i + 1}`} vergrößern` : 'Bilder auffächern'}
             aria-expanded={expanded}
+            aria-hidden={!expanded && i >= previewCount}
             tabIndex={expanded || i === 0 ? 0 : -1}
             style={{
               width: expanded ? `calc(${100 / columns}% - 10px)` : '70px',
               height: expanded ? '130px' : '80px',
-              left: expanded ? `${((i % columns) * 100) / columns}%` : `${Math.min(i, 3) * 24}px`,
+              left: expanded
+                ? `${((i % columns) * 100) / columns}%`
+                : `clamp(0px, calc((100% - 70px) * ${Math.min(i, lastPreviewIndex) / lastPreviewIndex}), ${Math.min(i, lastPreviewIndex) * 24}px)`,
               transform: expanded
                 ? `translateY(${Math.floor(i / columns) * 142}px) rotate(${i % 2 ? 2 : -2}deg)`
-                : `rotate(${Math.min(i, 3) * 7 - 10}deg)`,
-              opacity: expanded || i < 4 ? 1 : 0,
-              pointerEvents: expanded || i < 4 ? 'auto' : 'none',
+                : `rotate(${(Math.min(i, lastPreviewIndex) / lastPreviewIndex) * 21 - 10}deg)`,
+              opacity: expanded || i < previewCount ? 1 : 0,
+              pointerEvents: expanded || i < previewCount ? 'auto' : 'none',
               zIndex: i + 1,
             }}
             onClick={() => (expanded ? setSelected(i) : setExpanded(true))}

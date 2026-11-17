@@ -188,3 +188,24 @@ it('keeps loaded image DOM and object URLs across save rerenders and text change
   expect(revoke).toHaveBeenCalledWith('blob:test-image');
   vi.unstubAllGlobals();
 });
+
+it.each([1, 4, 8, 10])('shows up to eight of %i thumbnails and expands the complete gallery', (count) => {
+  vi.mocked(fetchAttachment).mockResolvedValue({ bytes: [1], mime: 'image/png' } as any);
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = () => 'blob:thumbnail';
+      static revokeObjectURL = vi.fn();
+    },
+  );
+  const content = Array.from(
+    { length: count },
+    (_, i) => `![Bild ${i + 1}](attachments/${i.toString(16)}.png "noto:width=50;mode=thumbnail")`,
+  ).join('\n');
+  render(<NoteMarkdown scope="local" content={content} />);
+  expect(screen.getAllByRole('button', { name: 'Bilder auffächern' })).toHaveLength(Math.min(count, 8));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Bilder auffächern' })[0]);
+  expect(screen.getAllByRole('button', { name: /^Bild \d+ vergrößern$/ })).toHaveLength(count);
+  fireEvent.click(screen.getByRole('button', { name: 'Bilder einklappen' }));
+  expect(screen.getAllByRole('button', { name: 'Bilder auffächern' })).toHaveLength(Math.min(count, 8));
+});

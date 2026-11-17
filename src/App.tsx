@@ -822,14 +822,14 @@ function Notebook({
             </div>
             {(view === 'documents' || collection) && (
               <DocumentUpload
-                key={`${scope}:${collection ?? ''}`}
+                key={`upload:${scope}:${collection ?? ''}`}
                 collection={collection}
                 onOpen={openTaskNote}
               />
             )}
             {collection && (
               <CollectionQuestion
-                key={`${scope}:${collection}`}
+                key={`question:${scope}:${collection}`}
                 collection={collection}
                 onOpen={openTaskNote}
               />

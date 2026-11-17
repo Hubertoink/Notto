@@ -103,6 +103,18 @@ try {
       Object.values(result).every(Boolean),
       'Navigation footer stays visible and list scrollbar matches the surface',
     );
+    for (const [index, collection] of ['01', '02', '03', '01', '01', '02'].entries()) {
+      if (width <= 700 && index > 0) await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+      await page.getByRole('button', { name: new RegExp(`^Sammlung ${collection}\\s*1$`) }).click();
+      await page.waitForFunction(() => document.querySelectorAll('.note-list .note-card').length === 1);
+      assert.equal(await page.getByRole('button', { name: 'Dokumente hochladen' }).count(), 1);
+      assert.equal(await page.getByRole('textbox', { name: 'Frage zu dieser Sammlung' }).count(), 1);
+    }
+    await page.screenshot({ path: resolve(output, `collection-${name}.png`) });
+    if (width <= 700) await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+    await page.getByRole('button', { name: /^Alle Notizen/ }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.note-list .note-card').length === 40);
+    assert.equal(await page.locator('.document-upload, .collection-question').count(), 0);
     assert.deepEqual(errors, []);
     await page.close();
   }

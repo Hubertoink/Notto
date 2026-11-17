@@ -83,3 +83,25 @@ it('keeps note navigation in browser back and forward history', async () => {
   await waitFor(() => expect(window.location.search).toContain(`note=${note.id}`));
   await waitFor(() => expect(screen.getByTestId('editor')).toBeTruthy());
 });
+
+it('keeps one upload and question panel while switching collections and clears them on exit', () => {
+  testNotes = ['Cocktails', 'Jugendarbeit', 'Musik'].map((collection) => ({
+    ...newNote('local', `Notiz für ${collection}`),
+    collections: [collection],
+  }));
+  const view = render(<App />);
+  for (const collection of ['Cocktails', 'Jugendarbeit', 'Musik', 'Cocktails', 'Cocktails', 'Jugendarbeit']) {
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${collection}\\s*1$`) }));
+    expect(screen.getAllByRole('button', { name: 'Dokumente hochladen' })).toHaveLength(1);
+    expect(screen.getAllByRole('textbox', { name: 'Frage zu dieser Sammlung' })).toHaveLength(1);
+    expect(view.container.querySelectorAll('.note-list .note-card')).toHaveLength(1);
+    expect(view.container.querySelector('.note-list')?.textContent).toContain(`Notiz für ${collection}`);
+  }
+  fireEvent.click(screen.getByRole('button', { name: /^Alle Notizen/ }));
+  expect(screen.queryByRole('button', { name: 'Dokumente hochladen' })).toBeNull();
+  expect(screen.queryByRole('textbox', { name: 'Frage zu dieser Sammlung' })).toBeNull();
+  expect(view.container.querySelectorAll('.note-list .note-card')).toHaveLength(3);
+  fireEvent.click(screen.getByRole('button', { name: 'Dokumente' }));
+  expect(screen.getAllByRole('button', { name: 'Dokumente hochladen' })).toHaveLength(1);
+  expect(screen.queryByRole('textbox', { name: 'Frage zu dieser Sammlung' })).toBeNull();
+});

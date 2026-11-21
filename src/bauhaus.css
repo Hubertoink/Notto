@@ -178,8 +178,9 @@
   letter-spacing: -0.035em;
 }
 
-/* Navigation is always ink-dark, including in the light paper theme. */
-.sidebar {
+/* Both surfaces stay ink-dark in the light paper theme. */
+.sidebar,
+.desktop-titlebar {
   --nt-text: #f1eee5;
   --nt-muted: #c0c0b5;
   --nt-line: #5a5b51;
@@ -188,6 +189,8 @@
   --nt-paper: #20211b;
   --nt-accent: #9db5ff;
   color: var(--nt-text);
+}
+.sidebar {
   border-right: 1px solid #151613;
 }
 .brand {
@@ -720,7 +723,6 @@
   align-items: center;
   justify-content: space-between;
   background: var(--nt-sidebar);
-  color: var(--nt-text);
   border-bottom: 1px solid var(--nt-line);
   user-select: none;
 }
@@ -760,6 +762,9 @@
 }
 .desktop-window-controls button:hover {
   background: var(--nt-tint);
+}
+.desktop-window-controls button:focus-visible {
+  outline-offset: -3px;
 }
 .desktop-window-controls .desktop-close:hover {
   background: #c42b1c;

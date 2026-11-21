@@ -18,6 +18,8 @@ await writeFile(
 import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'motion/react';
 import App from '../src/App';
+import { DesktopFrame } from '../src/DesktopFrame';
+import { mockIPC, mockWindows } from '@tauri-apps/api/mocks';
 import { NottoProvider } from '../src/state';
 import { newNote } from '../src/domain';
 import { repo } from '../src/repository';
@@ -35,7 +37,9 @@ for (const id of ['abc.pdf','def.pdf']) {
   const note={...newNote('local','[Konzeption](attachments/'+id+')'),document:{attachmentId:id,name:'Konzeption',mime:'application/pdf',version:1}};
   await repo.put(note,null);
 }
-createRoot(document.getElementById('root')).render(<MotionConfig reducedMotion="always"><NottoProvider><div className="desktop-frame"><header className="desktop-titlebar">NOTO</header><App /></div></NottoProvider></MotionConfig>);
+mockWindows('main');
+mockIPC(() => false, { shouldMockEvents: true });
+createRoot(document.getElementById('root')).render(<MotionConfig reducedMotion="always"><NottoProvider><DesktopFrame enabled><App /></DesktopFrame></NottoProvider></MotionConfig>);
 `,
 );
 const server = await createServer({
@@ -71,6 +75,10 @@ try {
       new URL('/test-results/navigation.html?theme=' + theme, server.resolvedUrls.local[0]).href,
     );
     await page.locator('.note-list .note-card').first().waitFor();
+    for (const label of ['Minimieren', 'Maximieren', 'Fenster schließen']) {
+      const icon = page.getByRole('button', { name: label, exact: true }).locator('svg');
+      assert.equal(await icon.evaluate((svg) => getComputedStyle(svg).stroke), 'rgb(241, 238, 229)');
+    }
     await page.waitForFunction(() => document.querySelectorAll('.note-list .note-card').length === 40);
     assert.match(await page.locator('.list-heading p').innerText(), /40 Notizen · 2 Dokumente/);
     if (width <= 700) await page.getByRole('button', { name: 'Navigation öffnen' }).click();

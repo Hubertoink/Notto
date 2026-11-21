@@ -193,7 +193,7 @@ export function CollectionQuestion({
           maxLength={4000}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Was steht in unserer Konzeption zur Beteiligung Jugendlicher?"
+          placeholder="Deine Frage …"
         />
       </label>
       <Action
@@ -201,7 +201,6 @@ export function CollectionQuestion({
         type="submit"
         isDisabled={busy || !question.trim() || scope === 'local' || !ownBackend() || !config(scope).enabled}
       />
-      <p className="muted">Noto legt die Frage mit ihrer Antwort als Notiz in dieser Sammlung ab.</p>
       {error && <p role="alert">{error}</p>}
     </form>
   );

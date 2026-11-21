@@ -48,6 +48,12 @@ function NoteReferencePreview({
   };
   const multiple = available.length > 1;
   const previewVisible = open || previewActive;
+  const longestPreviewText = available.reduce((maximum, target) => {
+    const titleLength = titleOf(target.note.content).length;
+    const excerptLength = excerptOf(target.note.content).length;
+    return Math.max(maximum, titleLength + excerptLength);
+  }, 0);
+  const previewWidth = longestPreviewText >= 180 ? 480 : longestPreviewText >= 100 ? 420 : 340;
   const showPreview = () => {
     if (hidePreview.current) clearTimeout(hidePreview.current);
     setPreviewActive(true);
@@ -75,7 +81,7 @@ function NoteReferencePreview({
       const gap = 7;
       const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
-      const width = Math.min(340, Math.max(180, viewportWidth - margin * 2));
+      const width = Math.min(previewWidth, Math.max(180, viewportWidth - margin * 2));
       floating.style.width = `${width}px`;
       const height = Math.min(floating.scrollHeight, viewportHeight - margin * 2);
       const left = Math.max(margin, Math.min(origin.left, viewportWidth - width - margin));
@@ -98,7 +104,7 @@ function NoteReferencePreview({
       window.removeEventListener('resize', position);
       window.removeEventListener('scroll', position, true);
     };
-  }, [previewVisible, available.length]);
+  }, [previewVisible, available.length, previewWidth]);
   useEffect(() => {
     if (!open || !multiple) return;
     const frame = requestAnimationFrame(() =>
